@@ -7,8 +7,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
-
-class User extends Authenticatable
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+class User extends Authenticatable implements FilamentUser
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
@@ -58,5 +59,9 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->hasRole(Role::STAFF);
+    }
+     public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->hasRole(Role::ADMIN, Role::STAFF);
     }
 }
