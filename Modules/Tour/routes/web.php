@@ -1,8 +1,3 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Modules\Tour\Http\Controllers\TourController;
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::resource('tours', TourController::class)->names('tour');
-});
+// Trang khách do React đảm nhiệm, admin do Filament — module này không đăng ký route web.

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Filament\Resources\Tours\RelationManagers;
-
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -39,6 +39,14 @@ class DeparturesRelationManager extends RelationManager
                 ->label('Số chỗ còn')
                 ->numeric()
                 ->default(0)
+                ->minValue(0)
+                ->rules([
+                    fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                        if ((int) $value > (int) $get('seats_total')) {
+                            $fail('Số chỗ còn không được lớn hơn tổng số chỗ.');
+                        }
+                    },
+                ])
                 ->required(),
             Select::make('status')
                 ->label('Trạng thái')

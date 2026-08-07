@@ -8,11 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TourImage extends Model
 {
     protected $fillable = [
-        'tour_id', 'path', 'alt', 'is_cover', 'sort_order',
+        'tour_id', 'path', 'alt', 'sort_order',
     ];
 
     protected $casts = [
-        'is_cover'   => 'boolean',
         'sort_order' => 'integer',
     ];
 

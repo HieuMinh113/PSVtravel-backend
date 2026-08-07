@@ -7,10 +7,8 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -31,8 +29,6 @@ class ImagesRelationManager extends RelationManager
                 ->required(),
             TextInput::make('alt')
                 ->label('Mô tả ảnh (alt)'),
-            Toggle::make('is_cover')
-                ->label('Ảnh bìa'),
             TextInput::make('sort_order')
                 ->label('Thứ tự')
                 ->numeric()
@@ -46,7 +42,6 @@ class ImagesRelationManager extends RelationManager
             ->columns([
                 ImageColumn::make('path')->label('Ảnh'),
                 TextColumn::make('alt')->label('Mô tả')->placeholder('—'),
-                IconColumn::make('is_cover')->label('Ảnh bìa')->boolean(),
                 TextColumn::make('sort_order')->label('Thứ tự')->sortable(),
             ])
             ->defaultSort('sort_order')

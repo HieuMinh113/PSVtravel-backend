@@ -22,9 +22,17 @@ class BookingResource extends Resource
 {
     protected static ?string $model = Booking::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
     protected static ?string $recordTitleAttribute = 'booking_code';
+
+    protected static ?string $modelLabel = 'đơn đặt tour';
+
+    protected static ?string $pluralModelLabel = 'Đơn đặt tour';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
+
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {

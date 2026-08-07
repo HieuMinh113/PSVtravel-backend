@@ -23,7 +23,17 @@ class TourResource extends Resource
 {
     protected static ?string $model = Tour::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMapPin;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?string $modelLabel = 'tour';
+
+    protected static ?string $pluralModelLabel = 'Tour';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
+
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

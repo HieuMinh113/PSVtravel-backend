@@ -8,7 +8,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Modules\Tour\Models\TourDeparture;
-
+use Filament\Schemas\Components\Utilities\Set;
+use Modules\Tour\Models\Tour;
 class BookingForm
 {
     public static function configure(Schema $schema): Schema
@@ -25,6 +26,11 @@ class BookingForm
                 ->searchable()
                 ->preload()
                 ->live()
+                ->afterStateUpdated(function ($state, Set $set) {
+                    $tour = Tour::find($state);
+                    $set('unit_price_adult', $tour?->adult_price ?? 0);
+                    $set('unit_price_child', $tour?->child_price ?? 0);
+                })
                 ->required(),
 
             Select::make('tour_departure_id')
@@ -61,29 +67,45 @@ class BookingForm
                 ->label('Số người lớn')
                 ->numeric()
                 ->default(1)
+                ->minValue(1)
+                ->live(onBlur: true)
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::tinhTong($get, $set))
                 ->required(),
             TextInput::make('children')
                 ->label('Số trẻ em')
                 ->numeric()
                 ->default(0)
+                ->minValue(0)
+                ->live(onBlur: true)
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::tinhTong($get, $set))
                 ->required(),
 
             TextInput::make('unit_price_adult')
                 ->label('Đơn giá người lớn')
+                ->helperText('Tự lấy từ tour, sửa được nếu cần')
                 ->numeric()
+                ->default(0)
+                ->minValue(1)
                 ->suffix('₫')
-                ->default(0),
+                ->live(onBlur: true)
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::tinhTong($get, $set))
+                ->required(),
             TextInput::make('unit_price_child')
                 ->label('Đơn giá trẻ em')
                 ->numeric()
+                ->default(0)
+                ->minValue(0)
                 ->suffix('₫')
-                ->default(0),
+                ->live(onBlur: true)
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::tinhTong($get, $set)),
             TextInput::make('total_price')
                 ->label('Tổng tiền')
-                ->helperText('Giá chốt tại thời điểm đặt')
+                ->helperText('Tự tính = người lớn × đơn giá + trẻ em × đơn giá')
                 ->numeric()
+                ->default(0)
+                ->minValue(1)
                 ->suffix('₫')
-                ->default(0),
+                ->required(),
 
             Select::make('status')
                 ->label('Trạng thái đơn')
@@ -94,7 +116,9 @@ class BookingForm
                     'cancelled' => 'Đã huỷ',
                 ])
                 ->default('pending')
-                ->required(),
+                ->required()
+                ->disabledOn('edit')
+                ->helperText('Đổi trạng thái bằng nút Xác nhận / Huỷ đơn ở danh sách'),
             Select::make('payment_status')
                 ->label('Thanh toán')
                 ->options([
@@ -114,5 +138,12 @@ class BookingForm
                 ->rows(3)
                 ->columnSpanFull(),
         ]);
+    }
+    protected static function tinhTong(Get $get, Set $set): void
+    {
+        $tong = ((int) $get('adults') * (int) $get('unit_price_adult'))
+            + ((int) $get('children') * (int) $get('unit_price_child'));
+
+        $set('total_price', $tong);
     }
 }

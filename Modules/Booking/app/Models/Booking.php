@@ -10,10 +10,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
-
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 class Booking extends Model
 {
-    use SoftDeletes;
+    use LogsActivity, SoftDeletes;
+
 
     protected $fillable = [
         'booking_code', 'tour_id', 'tour_departure_id', 'user_id',
@@ -64,5 +66,17 @@ class Booking extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'status', 'payment_status', 'total_price',
+                'tour_departure_id', 'adults', 'children',
+                'customer_name', 'customer_phone', 'cancel_reason',
+            ])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->useLogName('booking');
     }
 }

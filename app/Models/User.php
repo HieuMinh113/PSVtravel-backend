@@ -2,29 +2,31 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
+use Spatie\Permission\Traits\HasRoles;
+use Spatie\Activitylog\Models\Concerns\HasActivity;
+use Spatie\Activitylog\Support\LogOptions;
 class User extends Authenticatable implements FilamentUser
 {
-    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasActivity, HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
-        'role_id',
         'name',
         'email',
         'phone',
         'avatar',
         'google_id',
         'locale',
+        'loyalty_points',
         'password',
     ];
 
-    // Các trường không bao giờ được trả về trong API response
     protected $hidden = [
         'password',
         'remember_token',
@@ -36,32 +38,21 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed', // Laravel tự băm mật khẩu, không bao giờ lưu dạng chữ thường
+            'password' => 'hashed',
         ];
     }
 
-    public function role()
+    // Chỉ nội bộ mới vào được trang quản trị; khách hàng bị chặn
+    public function canAccessPanel(Panel $panel): bool
     {
-        return $this->belongsTo(Role::class);
+        return $this->hasAnyRole(['super_admin', 'admin', 'staff']);
     }
-
-    // Kiểm tra người dùng có thuộc 1 trong các vai trò được truyền vào hay không
-    public function hasRole(string ...$roles): bool
+    public function getActivitylogOptions(): LogOptions
     {
-        return in_array($this->role?->name, $roles, true);
-    }
-
-    public function isAdmin(): bool
-    {
-        return $this->hasRole(Role::ADMIN);
-    }
-
-    public function isStaff(): bool
-    {
-        return $this->hasRole(Role::STAFF);
-    }
-     public function canAccessPanel(Panel $panel): bool
-    {
-        return $this->hasRole(Role::ADMIN, Role::STAFF);
+        return LogOptions::defaults()
+            ->logOnly(['name', 'email', 'phone'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->useLogName('user');
     }
 }
