@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/guide",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Guide\\": "app/",
+            "Modules\\Guide\\Database\\Factories\\": "database/factories/",
+            "Modules\\Guide\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Guide\\Tests\\": "tests/"
+        }
+    }
+}

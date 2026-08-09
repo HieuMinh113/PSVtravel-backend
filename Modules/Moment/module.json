@@ -1,0 +1,11 @@
+{
+    "name": "Moment",
+    "alias": "moment",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Moment\\Providers\\MomentServiceProvider"
+    ],
+    "files": []
+}

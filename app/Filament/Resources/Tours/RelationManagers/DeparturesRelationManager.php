@@ -24,6 +24,11 @@ class DeparturesRelationManager extends RelationManager
         return $schema->components([
             DatePicker::make('start_date')
                 ->label('Ngày khởi hành')
+                ->native(false)
+                ->displayFormat('d/m/Y')
+                ->minDate(now()->startOfDay())
+                ->maxDate(now()->addYears(3))
+                ->helperText('Chỉ chọn được từ hôm nay trở đi')
                 ->required(),
             TextInput::make('price_override')
                 ->label('Giá riêng đợt này')
@@ -34,6 +39,8 @@ class DeparturesRelationManager extends RelationManager
                 ->label('Tổng số chỗ')
                 ->numeric()
                 ->default(0)
+                ->minValue(1)
+                ->live(onBlur: true)
                 ->required(),
             TextInput::make('seats_left')
                 ->label('Số chỗ còn')

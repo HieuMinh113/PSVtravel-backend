@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Modules\Category\Models\Category;
 class Tour extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -66,5 +68,9 @@ class Tour extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('tour');
+    }
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(Category::class, 'category_tour');
     }
 }

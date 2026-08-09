@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Policies;
-use App\Models\User;
+
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
@@ -13,30 +13,24 @@ class UserPolicy
     {
         return $authUser->can('ViewAny:User');
     }
-        public function create(AuthUser $authUser): bool
-    {
-        return $authUser->can('Create:User');
-    }
-    public function view(AuthUser $authUser, User $user): bool
+
+    public function view(AuthUser $authUser): bool
     {
         return $authUser->can('View:User');
     }
 
-    public function update(AuthUser $authUser, User $user): bool
+    public function create(AuthUser $authUser): bool
     {
-        if ($user->hasRole('super_admin') && ! $authUser->hasRole('super_admin')) {
-            return false;
-        }
+        return $authUser->can('Create:User');
+    }
 
+    public function update(AuthUser $authUser): bool
+    {
         return $authUser->can('Update:User');
     }
 
-    public function delete(AuthUser $authUser, User $user): bool
+    public function delete(AuthUser $authUser): bool
     {
-        if ($user->hasRole('super_admin')) {
-            return false;
-        }
-
         return $authUser->can('Delete:User');
     }
 

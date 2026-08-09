@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/review",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Review\\": "app/",
+            "Modules\\Review\\Database\\Factories\\": "database/factories/",
+            "Modules\\Review\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Review\\Tests\\": "tests/"
+        }
+    }
+}

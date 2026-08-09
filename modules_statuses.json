@@ -1,4 +1,12 @@
 {
     "Tour": true,
-    "Booking": true
+    "Booking": true,
+    "Banner": true,
+    "Category": true,
+    "Guide": true,
+    "Moment": true,
+    "Review": true,
+    "Flight": true,
+    "Visa": true,
+    "Page": true
 }

@@ -105,6 +105,8 @@ class BookingForm
                 ->default(0)
                 ->minValue(1)
                 ->suffix('₫')
+                ->readOnly()
+                ->dehydrated()
                 ->required(),
 
             Select::make('status')
@@ -141,9 +143,11 @@ class BookingForm
     }
     protected static function tinhTong(Get $get, Set $set): void
     {
-        $tong = ((int) $get('adults') * (int) $get('unit_price_adult'))
-            + ((int) $get('children') * (int) $get('unit_price_child'));
+        $nguoiLon = (int) ($get('adults') ?: 0);
+        $treEm = (int) ($get('children') ?: 0);
+        $giaNguoiLon = (int) ($get('unit_price_adult') ?: 0);
+        $giaTreEm = (int) ($get('unit_price_child') ?: 0);
 
-        $set('total_price', $tong);
+        $set('total_price', ($nguoiLon * $giaNguoiLon) + ($treEm * $giaTreEm));
     }
-}
+} 

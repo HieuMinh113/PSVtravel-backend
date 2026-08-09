@@ -35,6 +35,12 @@ class TourForm
                     ])
                     ->default('domestic')
                     ->required(),
+                Select::make('categories')
+                    ->label('Danh mục')
+                    ->relationship('categories', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
                 TextInput::make('region')
                     ->label('Vùng / khu vực')
                     ->maxLength(255),
@@ -104,16 +110,17 @@ class TourForm
 
                 TextInput::make('rating')
                     ->label('Đánh giá (sao)')
-                    ->helperText('Nhập tay tạm thời, từ 0 đến 5')
+                    ->helperText('Tự tính từ các đánh giá đã duyệt')
                     ->numeric()
-                    ->minValue(0)
-                    ->maxValue(5)
-                    ->step(0.1),
+                    ->readOnly()
+                    ->dehydrated(false),
                 TextInput::make('review_count')
                     ->label('Số lượt đánh giá')
+                    ->helperText('Tự tính từ các đánh giá đã duyệt')
                     ->numeric()
                     ->default(0)
-                    ->required(),
+                    ->readOnly()
+                    ->dehydrated(false),
 
                 Select::make('status')
                     ->label('Trạng thái')

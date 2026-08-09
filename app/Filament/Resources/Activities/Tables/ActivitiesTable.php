@@ -21,8 +21,7 @@ class ActivitiesTable
                     ->sortable(),
                 TextColumn::make('causer.name')
                     ->label('Người thực hiện')
-                    ->placeholder('Hệ thống')
-                    ->searchable(),
+                    ->placeholder('Hệ thống'),
                 TextColumn::make('event')
                     ->label('Hành động')
                     ->badge()
