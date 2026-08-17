@@ -16,4 +16,12 @@ class ViewTour extends ViewRecord
             EditAction::make(),
         ];
     }
+    public function getTitle(): string
+    {
+        return 'Xem tour: '.$this->getRecord()->name;
+    }
+    public function getBreadcrumb(): string
+    {
+        return 'Xem chi tiết';
+    }
 }

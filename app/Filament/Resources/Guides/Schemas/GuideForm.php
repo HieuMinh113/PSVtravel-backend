@@ -79,7 +79,7 @@ class GuideForm
                     ->label('Lượt xem')
                     ->numeric()
                     ->default(0)
-                    ->readOnly()
+                    ->disabled()
                     ->dehydrated(false),
                 TextInput::make('sort_order')
                     ->label('Thứ tự')

@@ -55,13 +55,27 @@ class TourForm
                 TextInput::make('duration_days')
                     ->label('Số ngày')
                     ->numeric()
+                    ->minValue(1)
                     ->default(1)
+                    ->live(onBlur: true)
                     ->required(),
                 TextInput::make('duration_nights')
                     ->label('Số đêm')
                     ->numeric()
+                    ->minValue(0)
                     ->default(0)
-                    ->required(),
+                    ->required()
+                    ->rules([
+                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                            $ngay = (int) $get('duration_days');
+                            if ((int) $value > $ngay) {
+                                $fail('Số đêm không được nhiều hơn số ngày.');
+                            }
+                            if ((int) $value < $ngay - 1) {
+                                $fail('Số đêm phải bằng số ngày hoặc ít hơn 1 (VD: 3 ngày 2 đêm).');
+                            }
+                        },
+                    ]),
 
                 TextInput::make('adult_price')
                     ->label('Giá người lớn')
@@ -112,15 +126,16 @@ class TourForm
                     ->label('Đánh giá (sao)')
                     ->helperText('Tự tính từ các đánh giá đã duyệt')
                     ->numeric()
-                    ->readOnly()
-                    ->dehydrated(false),
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->visibleOn('edit'),
                 TextInput::make('review_count')
                     ->label('Số lượt đánh giá')
                     ->helperText('Tự tính từ các đánh giá đã duyệt')
                     ->numeric()
-                    ->default(0)
-                    ->readOnly()
-                    ->dehydrated(false),
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->visibleOn('edit'),
 
                 Select::make('status')
                     ->label('Trạng thái')

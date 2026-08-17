@@ -105,7 +105,7 @@ class BookingForm
                 ->default(0)
                 ->minValue(1)
                 ->suffix('₫')
-                ->readOnly()
+                ->disabled()
                 ->dehydrated()
                 ->required(),
 
@@ -129,7 +129,9 @@ class BookingForm
                     'paid' => 'Đã trả',
                 ])
                 ->default('unpaid')
-                ->required(),
+                ->required()
+                ->disabledOn('edit')
+                ->helperText('Tự tính từ các khoản đã thu ở tab Thanh toán'),
 
             Textarea::make('note')
                 ->label('Ghi chú của khách')

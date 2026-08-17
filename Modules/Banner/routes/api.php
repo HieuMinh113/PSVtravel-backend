@@ -1,3 +1,8 @@
 <?php
 
-// API công khai cho banner sẽ viết ở đây khi nối frontend React.
+use Illuminate\Support\Facades\Route;
+use Modules\Banner\Http\Controllers\Api\BannerApiController;
+
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::get('banners', [BannerApiController::class, 'index']);
+});

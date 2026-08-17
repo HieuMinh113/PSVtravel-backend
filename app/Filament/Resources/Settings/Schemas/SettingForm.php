@@ -30,6 +30,13 @@ class SettingForm
                     ->label('Giá trị')
                     ->maxLength(255)
                     ->columnSpanFull()
+                    ->tel(fn (?Setting $record): bool => $record?->key === 'hotline')
+                    ->rules(fn (?Setting $record): array => $record?->key === 'hotline'
+                        ? ['regex:/^[0-9\s]+$/']
+                        : [])
+                    ->validationMessages([
+                        'regex' => 'Hotline chỉ được chứa chữ số.',
+                    ])
                     ->visible(fn (?Setting $record): bool => in_array($record?->type, ['text', null], true)),
 
                 TextInput::make('value')

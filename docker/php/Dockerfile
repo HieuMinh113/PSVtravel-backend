@@ -30,6 +30,7 @@ RUN pecl install redis && docker-php-ext-enable redis
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-custom.ini
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/zz-custom.conf
 WORKDIR /var/www
 
 EXPOSE 9000

@@ -37,5 +37,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Modules\Tour\Models\TourItinerary::class, \Modules\Tour\Policies\TourItineraryPolicy::class);
         Gate::policy(\Modules\Tour\Models\TourImage::class, \Modules\Tour\Policies\TourImagePolicy::class);
         Gate::policy(\Spatie\Activitylog\Models\Activity::class, \App\Policies\ActivityPolicy::class);
-    }
+        Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
+        \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('booking', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by($request->ip());
+        });
+        }
+
 }

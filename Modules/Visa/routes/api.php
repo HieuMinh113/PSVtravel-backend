@@ -1,3 +1,9 @@
 <?php
 
-// API công khai cho tour sẽ viết ở đây khi nối frontend React.
+use Illuminate\Support\Facades\Route;
+use Modules\Visa\Http\Controllers\Api\VisaApiController;
+
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::get('visa-countries', [VisaApiController::class, 'index']);
+    Route::get('visa-countries/{slug}', [VisaApiController::class, 'show']);
+});

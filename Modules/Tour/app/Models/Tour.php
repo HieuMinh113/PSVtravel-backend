@@ -73,4 +73,8 @@ class Tour extends Model
     {
         return $this->belongsToMany(Category::class, 'category_tour');
     }
+    public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\Modules\Review\Models\Review::class);
+    }
 }
