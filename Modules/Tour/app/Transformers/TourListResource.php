@@ -28,6 +28,8 @@ class TourListResource extends JsonResource
             'rating' => $this->rating,
             'review_count' => $this->review_count,
             'is_featured' => $this->is_featured,
+            'next_start_date' => optional($this->departures->first())?->start_date?->format('d/m/Y'),
+            'next_seats_left' => optional($this->departures->first())?->seats_left,
             'updated_at' => $this->updated_at,
         ];
     }

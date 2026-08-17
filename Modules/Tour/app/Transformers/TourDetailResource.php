@@ -52,6 +52,7 @@ class TourDetailResource extends JsonResource
                 ->map(fn ($d) => [
                     'id' => $d->id,
                     'start_date' => $d->start_date->format('Y-m-d'),
+                    'start_date_display' => $d->start_date->format('d/m/Y'),
                     'price' => $d->price_override ?? $this->adult_price,
                     'seats_left' => $d->seats_left,
                 ]),
