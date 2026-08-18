@@ -14,9 +14,10 @@ class TourApiController extends Controller
     public function index(Request $request)
     {
         $query = Tour::query()->published()
-            ->with(['departures' => fn ($q) => $q->where('status', 'open')
-                ->whereDate('start_date', '>=', now())
-                ->orderBy('start_date')]);
+        ->with(['departures' => fn ($q) => $q
+        ->where('status', 'open')
+        ->whereDate('start_date', '>=', now())
+        ->orderBy('start_date')]);
 
         if (in_array($request->query('type'), ['domestic', 'abroad'], true)) {
             $query->where('type', $request->query('type'));
