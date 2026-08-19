@@ -45,6 +45,25 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\RateLimiter::for('booking', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by($request->ip());
         });
+                // Chống spam đăng ký: 3 lần/phút/IP
+        \Illuminate\Support\Facades\RateLimiter::for('register', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(3)->by($request->ip());
+        });
+
+        // Chống dò mã OTP: 10 lần/phút/IP
+        \Illuminate\Support\Facades\RateLimiter::for('otp', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by($request->ip());
+        });
+
+        // Chống dò mật khẩu: 5 lần/phút theo tài khoản + IP
+        \Illuminate\Support\Facades\RateLimiter::for('login-api', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(5)
+                ->by(\Illuminate\Support\Str::lower((string) $request->input('login')).'|'.$request->ip());
+        });
+                // Chống spam đánh giá: 3 bài/giờ/IP
+        \Illuminate\Support\Facades\RateLimiter::for('review', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());
+        });
         }
 
 }

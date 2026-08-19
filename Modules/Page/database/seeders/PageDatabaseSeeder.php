@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 use Modules\Page\Models\Page;
 use Modules\Page\Models\Setting;
 
-class PageSeeder extends Seeder
+class PageDatabaseSeeder extends Seeder
 {
     public function run(): void
     {

@@ -48,6 +48,7 @@ class BookingApiController extends Controller
         $booking = Booking::create([
             'tour_id' => $tour->id,
             'tour_departure_id' => $departure?->id,
+            'user_id' => auth('sanctum')->id(),
             'customer_name' => $data['customer_name'],
             'customer_phone' => $data['customer_phone'],
             'customer_email' => $data['customer_email'] ?? null,

@@ -67,6 +67,7 @@ class TourDetailResource extends JsonResource
                 ->take(20)
                 ->map(fn ($r) => [
                     'customer_name' => $r->customer_name,
+                    'is_verified' => (bool) $r->user_id,
                     'rating' => $r->rating,
                     'content' => $r->content,
                     'admin_reply' => $r->admin_reply,

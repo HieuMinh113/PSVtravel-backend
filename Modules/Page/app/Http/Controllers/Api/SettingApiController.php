@@ -7,10 +7,16 @@ use Modules\Page\Models\Setting;
 
 class SettingApiController extends Controller
 {
-    // GET /api/v1/settings — trả toàn bộ cấu hình dạng key => value
+    // Chỉ những nhóm này được phép lộ ra ngoài công khai.
+    // Cấu hình bí mật (khoá cổng thanh toán, SMTP...) hãy để group khác
+    // — mặc định sẽ KHÔNG bao giờ xuất hiện ở API này.
+    private const NHOM_CONG_KHAI = ['general', 'contact', 'social', 'seo'];
+
+    // GET /api/v1/settings — trả cấu hình công khai dạng key => value
     public function index()
     {
         $settings = Setting::query()
+            ->whereIn('group', self::NHOM_CONG_KHAI)
             ->get(['key', 'value', 'type'])
             ->mapWithKeys(function ($s) {
                 $value = $s->value;
