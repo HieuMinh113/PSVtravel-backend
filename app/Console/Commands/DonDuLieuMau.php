@@ -63,10 +63,27 @@ class DonDuLieuMau extends Command
 
         $this->newLine();
 
-        if (! $this->option('force') && ! $this->confirm('Xác nhận xoá? Thao tác này KHÔNG hoàn tác được.')) {
-            $this->line('Đã huỷ, không có gì bị xoá.');
+        if (! $this->option('force')) {
+            // Chạy qua `docker compose exec` trên Windows thường không có TTY thật,
+            // câu hỏi xác nhận hiện ra nhưng gõ gì cũng bị đọc thành "no".
+            // Bắt trường hợp đó và chỉ ra cách chạy đúng, thay vì im lặng huỷ.
+            if (! $this->input->isInteractive() || ! stream_isatty(STDIN)) {
+                $this->newLine();
+                $this->error('Terminal này không nhận được câu trả lời xác nhận.');
+                $this->line('Chạy lại kèm cờ --force để xoá thẳng:');
+                $this->newLine();
+                $this->line('  php artisan psv:don-du-lieu-mau --force');
+                $this->line('  php artisan psv:don-du-lieu-mau --don-hang --force   (xoá luôn đơn đặt tour)');
+                $this->newLine();
 
-            return self::SUCCESS;
+                return self::FAILURE;
+            }
+
+            if (! $this->confirm('Xác nhận xoá? Thao tác này KHÔNG hoàn tác được.')) {
+                $this->line('Đã huỷ, không có gì bị xoá.');
+
+                return self::SUCCESS;
+            }
         }
 
         $tong = 0;
