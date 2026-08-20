@@ -31,6 +31,7 @@ class SettingsTable
                         'contact' => 'Liên hệ',
                         'social' => 'Mạng xã hội',
                         'seo' => 'SEO',
+                        'legal' => 'Pháp lý',
                         default => 'Chung',
                     }),
             ])
@@ -45,6 +46,7 @@ class SettingsTable
                         'contact' => 'Liên hệ',
                         'social' => 'Mạng xã hội',
                         'seo' => 'SEO',
+                        'legal' => 'Pháp lý',
                     ]),
             ])
             ->recordActions([

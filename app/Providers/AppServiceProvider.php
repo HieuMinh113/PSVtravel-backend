@@ -64,6 +64,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\RateLimiter::for('review', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());
         });
+
+        // Chống dò mã đơn: 10 lần tra cứu/phút/IP
+        \Illuminate\Support\Facades\RateLimiter::for('lookup', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by($request->ip());
+        });
         }
 
 }

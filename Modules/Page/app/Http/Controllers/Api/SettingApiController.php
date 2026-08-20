@@ -10,7 +10,7 @@ class SettingApiController extends Controller
     // Chỉ những nhóm này được phép lộ ra ngoài công khai.
     // Cấu hình bí mật (khoá cổng thanh toán, SMTP...) hãy để group khác
     // — mặc định sẽ KHÔNG bao giờ xuất hiện ở API này.
-    private const NHOM_CONG_KHAI = ['general', 'contact', 'social', 'seo'];
+    private const NHOM_CONG_KHAI = ['general', 'contact', 'social', 'seo', 'legal'];
 
     // GET /api/v1/settings — trả cấu hình công khai dạng key => value
     public function index()
