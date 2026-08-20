@@ -71,6 +71,10 @@ return [
     // Đổi được qua biến APP_TIMEZONE trong .env nếu sau này cần.
     'timezone' => env('APP_TIMEZONE', 'Asia/Ho_Chi_Minh'),
 
+    // Địa chỉ website Next.js — dùng để đặt link trong email gửi khách.
+    // Lên production nhớ đổi trong .env, nếu không mail sẽ trỏ về localhost.
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

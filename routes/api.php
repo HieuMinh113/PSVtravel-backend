@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -21,3 +22,7 @@ Route::prefix('v1/auth')->group(function () {
         Route::get('bookings', [MyBookingController::class, 'index']);
     });
 });
+
+// Form liên hệ ngoài website — chống spam bằng giới hạn tần suất riêng
+Route::post('v1/contact', [ContactController::class, 'store'])
+    ->middleware('throttle:contact');

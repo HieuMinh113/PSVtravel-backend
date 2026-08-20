@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Modules\Tour\Models\TourImage::class, \Modules\Tour\Policies\TourImagePolicy::class);
         Gate::policy(\Spatie\Activitylog\Models\Activity::class, \App\Policies\ActivityPolicy::class);
         Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
+        Gate::policy(\App\Models\ContactMessage::class, \App\Policies\ContactMessagePolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
         });
@@ -68,6 +69,11 @@ class AppServiceProvider extends ServiceProvider
         // Chống dò mã đơn: 10 lần tra cứu/phút/IP
         \Illuminate\Support\Facades\RateLimiter::for('lookup', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by($request->ip());
+        });
+
+        // Chống spam form liên hệ: 3 tin/giờ/IP
+        \Illuminate\Support\Facades\RateLimiter::for('contact', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());
         });
         }
 

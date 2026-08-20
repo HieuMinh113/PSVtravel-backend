@@ -3,7 +3,11 @@
 namespace Modules\Booking\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\BookingMail;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Modules\Page\Models\Setting;
 use Modules\Booking\Http\Requests\StoreBookingRequest;
 use Modules\Booking\Models\Booking;
 use Modules\Tour\Models\Tour;
@@ -62,6 +66,8 @@ class BookingApiController extends Controller
             'note' => $data['note'] ?? null,
         ]);
 
+        $this->guiMail($booking);
+
         return response()->json([
             'message' => 'Đặt tour thành công! Chúng tôi sẽ liên hệ xác nhận trong thời gian sớm nhất.',
             'data' => [
@@ -72,5 +78,34 @@ class BookingApiController extends Controller
                 'status' => 'pending',
             ],
         ], 201);
+    }
+
+    /**
+     * Gửi thư cho khách (kèm mã đơn) và báo nội bộ có đơn mới.
+     *
+     * Mail lỗi KHÔNG được làm hỏng việc đặt tour: đơn đã lưu vào cơ sở dữ liệu
+     * rồi, ném lỗi ra đây chỉ khiến khách tưởng đặt thất bại và đặt lại lần nữa.
+     * Vì vậy bọc try/catch và chỉ ghi log.
+     */
+    private function guiMail(Booking $booking): void
+    {
+        $booking->loadMissing(['tour:id,name,duration_days', 'departure:id,start_date']);
+
+        try {
+            if ($booking->customer_email) {
+                Mail::to($booking->customer_email)
+                    ->send(new BookingMail($booking, BookingMail::NHAN_DON));
+            }
+
+            $mailNoiBo = Setting::query()->where('key', 'email')->value('value')
+                ?: config('mail.from.address');
+
+            if ($mailNoiBo) {
+                Mail::to($mailNoiBo)
+                    ->send(new BookingMail($booking, BookingMail::BAO_ADMIN));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Không gửi được mail đơn '.$booking->booking_code.': '.$e->getMessage());
+        }
     }
 }

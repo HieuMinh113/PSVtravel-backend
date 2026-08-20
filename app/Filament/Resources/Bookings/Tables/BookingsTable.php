@@ -4,6 +4,9 @@ namespace App\Filament\Resources\Bookings\Tables;
 
 use Filament\Forms\Components\Textarea;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BookingMail;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -146,9 +149,24 @@ class BookingsTable
                             return;
                         }
 
+                        // Báo cho khách là chỗ đã được giữ. Mail hỏng không được
+                        // làm hỏng việc xác nhận — chỗ đã trừ rồi.
+                        $daGuiMail = false;
+                        if ($record->customer_email) {
+                            try {
+                                $record->loadMissing(['tour:id,name,duration_days', 'departure:id,start_date']);
+                                Mail::to($record->customer_email)
+                                    ->send(new BookingMail($record, BookingMail::XAC_NHAN));
+                                $daGuiMail = true;
+                            } catch (\Throwable $e) {
+                                Log::error('Không gửi được mail xác nhận đơn '.$record->booking_code.': '.$e->getMessage());
+                            }
+                        }
+
                         Notification::make()
                             ->title('Đã xác nhận đơn')
-                            ->body('Số chỗ đã được trừ khỏi đợt khởi hành.')
+                            ->body('Số chỗ đã được trừ khỏi đợt khởi hành.'
+                                .($daGuiMail ? ' Đã gửi mail xác nhận cho khách.' : ''))
                             ->success()
                             ->send();
                     }),
