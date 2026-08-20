@@ -35,7 +35,7 @@ class BookingLookupController extends Controller
 
         $booking = Booking::query()
             ->where('booking_code', $ma)
-            ->with(['tour:id,slug,name,cover_image,type', 'departure:id,start_date,end_date'])
+            ->with(['tour:id,slug,name,cover_image,type,duration_days', 'departure:id,start_date'])
             ->first();
 
         // Trả về CÙNG một thông báo cho mọi trường hợp sai — không hé lộ
@@ -59,7 +59,9 @@ class BookingLookupController extends Controller
                     : asset('storage/'.$booking->tour->cover_image))
                 : null,
             'start_date' => $booking->departure?->start_date?->format('d/m/Y'),
-            'end_date' => $booking->departure?->end_date?->format('d/m/Y'),
+            // Đợt khởi hành chỉ lưu ngày đi; ngày về suy ra từ số ngày của tour
+            // (tour 3 ngày khởi hành 01/09 thì về ngày 03/09).
+            'end_date' => $this->ngayVe($booking),
             'adults' => $booking->adults,
             'children' => $booking->children,
             'total_price' => $booking->total_price,
@@ -78,6 +80,18 @@ class BookingLookupController extends Controller
             },
             'created_at' => $booking->created_at?->format('d/m/Y H:i'),
         ]]);
+    }
+
+    private function ngayVe(Booking $booking): ?string
+    {
+        $ngayDi = $booking->departure?->start_date;
+        $soNgay = (int) ($booking->tour?->duration_days ?? 0);
+
+        if (! $ngayDi || $soNgay < 1) {
+            return null;
+        }
+
+        return $ngayDi->copy()->addDays($soNgay - 1)->format('d/m/Y');
     }
 
     // So sánh số điện thoại bỏ qua định dạng: 0912..., +84912..., 84912... coi là một

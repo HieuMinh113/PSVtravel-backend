@@ -80,17 +80,45 @@ class TourForm
                 TextInput::make('adult_price')
                     ->label('Giá người lớn')
                     ->numeric()
+                    ->minValue(0)
                     ->default(0)
                     ->suffix('₫')
+                    ->live(onBlur: true)
                     ->required(),
                 TextInput::make('child_price')
                     ->label('Giá trẻ em')
                     ->numeric()
-                    ->suffix('₫'),
+                    ->minValue(0)
+                    ->suffix('₫')
+                    ->rules([
+                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                            $nguoiLon = (int) $get('adult_price');
+                            if ($value !== null && $value !== '' && (int) $value > $nguoiLon) {
+                                $fail('Giá trẻ em không được cao hơn giá người lớn.');
+                            }
+                        },
+                    ]),
                 TextInput::make('old_price')
                     ->label('Giá gốc (gạch ngang)')
+                    ->helperText('Giá trước khuyến mãi. Phải CAO HƠN giá người lớn thì mới hiện được phần trăm giảm.')
                     ->numeric()
-                    ->suffix('₫'),
+                    ->minValue(0)
+                    ->suffix('₫')
+                    ->rules([
+                        // Giá gốc thấp hơn giá bán thì trang tour sẽ hiện "giảm giá âm" —
+                        // khách nhìn thấy là mất tin ngay. Chặn từ lúc nhập.
+                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                            if ($value === null || $value === '') {
+                                return;
+                            }
+
+                            $nguoiLon = (int) $get('adult_price');
+
+                            if ((int) $value <= $nguoiLon) {
+                                $fail('Giá gốc phải cao hơn giá người lớn ('.number_format($nguoiLon, 0, ',', '.').'₫). Không có khuyến mãi thì để trống ô này.');
+                            }
+                        },
+                    ]),
 
                 TextInput::make('tag')
                     ->label('Nhãn (Bán chạy / Mới…)')

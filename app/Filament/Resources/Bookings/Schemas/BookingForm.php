@@ -109,6 +109,11 @@ class BookingForm
                 ->dehydrated()
                 ->required(),
 
+            // Trạng thái KHÔNG cho sửa tay ở bất kỳ đâu — kể cả khi tạo đơn mới.
+            // Trước đây ô này mở khi tạo đơn, nhân viên chọn thẳng "Đã xác nhận"
+            // là đơn được duyệt mà số chỗ của đợt khởi hành KHÔNG bị trừ, dẫn tới
+            // bán quá số chỗ. Mọi thay đổi trạng thái phải đi qua nút Xác nhận /
+            // Hoàn thành / Huỷ đơn ở danh sách, vì chỉ ở đó mới có logic cộng trừ chỗ.
             Select::make('status')
                 ->label('Trạng thái đơn')
                 ->options([
@@ -119,8 +124,9 @@ class BookingForm
                 ])
                 ->default('pending')
                 ->required()
-                ->disabledOn('edit')
-                ->helperText('Đổi trạng thái bằng nút Xác nhận / Huỷ đơn ở danh sách'),
+                ->disabled()
+                ->dehydrated()
+                ->helperText('Đơn mới luôn ở "Chờ xử lý". Đổi trạng thái bằng nút Xác nhận / Hoàn thành / Huỷ đơn ở danh sách.'),
             Select::make('payment_status')
                 ->label('Thanh toán')
                 ->options([

@@ -65,7 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Giờ Việt Nam. Nhật ký hoạt động, ngày đặt tour, hạn hiển thị banner...
+    // đều hiển thị theo múi giờ này. Việt Nam không đổi giờ theo mùa nên lưu
+    // trực tiếp giờ địa phương là an toàn.
+    // Đổi được qua biến APP_TIMEZONE trong .env nếu sau này cần.
+    'timezone' => env('APP_TIMEZONE', 'Asia/Ho_Chi_Minh'),
 
     /*
     |--------------------------------------------------------------------------

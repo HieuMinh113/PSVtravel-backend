@@ -152,6 +152,53 @@ class BookingsTable
                             ->success()
                             ->send();
                     }),
+                // BOOK-13: trước đây trạng thái "Hoàn thành" có trong danh sách
+                // nhưng không có luồng nào chuyển đơn sang trạng thái đó.
+                // Đơn đã đi xong phải đóng lại thì khách mới viết được đánh giá
+                // (API đánh giá chỉ nhận đơn confirmed/completed) và báo cáo doanh
+                // thu mới tách được đơn đã phục vụ với đơn còn đang chờ.
+                Action::make('complete')
+                    ->label('Hoàn thành')
+                    ->color('success')
+                    ->icon('heroicon-o-flag')
+                    ->visible(fn (Booking $record): bool => $record->status === 'confirmed')
+                    ->requiresConfirmation()
+                    ->modalHeading('Đánh dấu đơn đã hoàn thành')
+                    ->modalDescription(function (Booking $record): string {
+                        // Đợt khởi hành chỉ lưu ngày đi, ngày về suy ra từ số ngày của tour
+                        $ngayDi = $record->departure?->start_date;
+                        $soNgay = (int) ($record->tour?->duration_days ?? 0);
+                        $ngayVe = $ngayDi && $soNgay > 0 ? $ngayDi->copy()->addDays($soNgay - 1) : null;
+
+                        if ($ngayVe && $ngayVe->isFuture()) {
+                            return 'Lưu ý: đợt này tới ngày '.$ngayVe->format('d/m/Y')
+                                .' mới kết thúc. Chỉ đánh dấu hoàn thành khi khách đã thực sự đi xong.';
+                        }
+
+                        return 'Đơn sẽ được đóng lại. Số chỗ đã trừ trước đó vẫn giữ nguyên, không hoàn lại.';
+                    })
+                    ->modalSubmitActionLabel('Xác nhận hoàn thành')
+                    ->action(function (Booking $record): void {
+                        // Chốt chặn ở tầng dữ liệu: chỉ đơn đã xác nhận mới được
+                        // hoàn thành. Đơn chờ xử lý chưa trừ chỗ, đóng thẳng là sai.
+                        if ($record->status !== 'confirmed') {
+                            Notification::make()
+                                ->title('Không thể hoàn thành')
+                                ->body('Chỉ đơn đang ở trạng thái "Đã xác nhận" mới chuyển sang "Hoàn thành" được.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $record->update(['status' => 'completed']);
+
+                        Notification::make()
+                            ->title('Đã đóng đơn')
+                            ->body('Khách có thể gửi đánh giá cho tour này.')
+                            ->success()
+                            ->send();
+                    }),
                 ViewAction::make(),
                 Action::make('cancel')
                     ->label('Huỷ đơn')
