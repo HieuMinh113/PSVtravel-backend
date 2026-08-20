@@ -23,8 +23,14 @@ class BannersTable
             ->columns([
                 ImageColumn::make('image')
                     ->label('Ảnh'),
+                TextColumn::make('position')
+                    ->label('Vị trí')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => Banner::VI_TRI[$state] ?? 'Banner khuyến mãi (trang chủ)')
+                    ->color(fn (?string $state): string => $state === 'promo' || $state === null ? 'warning' : 'info'),
                 TextColumn::make('title')
                     ->label('Tiêu đề')
+                    ->placeholder('— ảnh vòng xoay —')
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('status')
@@ -72,6 +78,9 @@ class BannersTable
             ->defaultSort('sort_order')
             ->reorderable('sort_order')
             ->filters([
+                SelectFilter::make('position')
+                    ->label('Vị trí')
+                    ->options(Banner::VI_TRI),
                 SelectFilter::make('status')
                     ->label('Trạng thái')
                     ->options([

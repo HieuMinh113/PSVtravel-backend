@@ -11,8 +11,17 @@ class Banner extends Model
 {
     use LogsActivity, SoftDeletes;
 
+    // Các vị trí banner có thể đặt trên web. Thêm vị trí mới thì khai báo ở đây,
+    // form trong admin và API tự nhận theo danh sách này.
+    public const VI_TRI = [
+        'promo' => 'Banner khuyến mãi (trang chủ)',
+        'orbit_home' => 'Ảnh vòng xoay — Trang chủ',
+        'orbit_domestic' => 'Ảnh vòng xoay — Tour trong nước',
+        'orbit_abroad' => 'Ảnh vòng xoay — Tour nước ngoài',
+    ];
+
     protected $fillable = [
-        'title', 'subtitle', 'image', 'image_mobile', 'link',
+        'position', 'title', 'subtitle', 'image', 'image_mobile', 'link',
         'status', 'start_at', 'end_at', 'sort_order',
     ];
 
@@ -21,6 +30,12 @@ class Banner extends Model
         'end_at' => 'datetime',
         'sort_order' => 'integer',
     ];
+
+    // Lọc theo vị trí đặt banner
+    public function scopeViTri($query, string $viTri)
+    {
+        return $query->where('position', $viTri);
+    }
 
     // Banner đang thực sự hiển thị: đã bật + trong khoảng thời gian cho phép
     public function scopeDangHienThi($query)
@@ -34,7 +49,7 @@ class Banner extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['title', 'status', 'link', 'start_at', 'end_at', 'sort_order'])
+            ->logOnly(['position', 'title', 'status', 'link', 'start_at', 'end_at', 'sort_order'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('banner');
