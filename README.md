@@ -1,58 +1,140 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# PSV Travel — Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API và trang quản trị cho website đặt tour PSV Travel.
+Laravel 13 · Filament 5 · PostgreSQL 16 · Redis 7 · chạy bằng Docker.
 
-## About Laravel
+Frontend nằm ở repo riêng: `psvtravel-frontend`.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Dựng môi trường lần đầu
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Cần cài sẵn **Docker Desktop**. Không cần cài PHP hay PostgreSQL trên máy.
 
 ```bash
-composer require laravel/boost --dev
+git clone <url-repo> psvtravel-backend
+cd psvtravel-backend
 
-php artisan boost:install
+# 1. Tạo file cấu hình
+cp .env.example .env          # Windows PowerShell: copy .env.example .env
+
+# 2. Bật các container
+docker compose up -d --build  # lần đầu build mất khoảng 3-5 phút
+
+# 3. Cài thư viện PHP
+docker compose exec app composer install
+
+# 4. Sinh khoá ứng dụng
+docker compose exec app php artisan key:generate
+
+# 5. Tạo bảng trong cơ sở dữ liệu
+docker compose exec app php artisan migrate
+
+# 6. Tạo vai trò + tài khoản quản trị
+docker compose exec app php artisan db:seed --class=Database\\Seeders\\RoleSeeder
+
+# 7. Tạo trang tĩnh và các mục Cài đặt
+docker compose exec app php artisan db:seed --class="Modules\Page\Database\Seeders\PageDatabaseSeeder"
+
+# 8. Cho phép website đọc ảnh đã upload
+docker compose exec app php artisan storage:link
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Xong: trang quản trị ở **http://localhost:8000/admin**
 
-## Contributing
+### Tài khoản có sẵn sau bước 6
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Vai trò | Email | Mật khẩu |
+|---|---|---|
+| Toàn quyền | `admin@psvtravel.com` | `Admin@123456` |
+| Nhân viên (quyền hạn chế) | `nhanvien@psvtravel.com` | `NhanVien@123456` |
 
-## Code of Conduct
+> Đổi mật khẩu ngay khi đưa lên môi trường thật.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+## Dữ liệu để kiểm thử
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Muốn có sẵn tour, banner, đánh giá... để tester có cái mà bấm:
 
-## License
+```bash
+docker compose exec app php artisan db:seed --class=Database\\Seeders\\DemoSeeder
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Đây là **dữ liệu giả**, chỉ dùng trên máy dev và staging. Ảnh lấy từ picsum.photos nên cần có mạng.
+
+Xoá sạch để bắt đầu nhập dữ liệu thật:
+
+```bash
+docker compose exec app php artisan psv:don-du-lieu-mau --force
+docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --force   # xoá luôn đơn đặt tour
+```
+
+Lệnh này giữ nguyên tài khoản, phân quyền, Cài đặt và trang tĩnh.
+
+---
+
+## Xem mã OTP khi chưa cấu hình mail
+
+Mặc định `MAIL_MAILER=log`, mail không gửi đi đâu mà ghi vào file:
+
+```bash
+docker compose exec app tail -f storage/logs/laravel.log
+```
+
+Mã OTP nằm trong nội dung mail ghi ở đó. Muốn gửi mail thật thì mở phần Brevo trong `.env`.
+
+---
+
+## Lệnh hay dùng
+
+```bash
+docker compose exec app php artisan optimize:clear   # xoá cache khi sửa .env hoặc config
+docker compose exec app php artisan migrate:status   # xem migration nào đã chạy
+docker compose logs -f app                           # xem log ứng dụng
+docker compose down                                  # tắt (dữ liệu vẫn giữ)
+docker compose down -v                               # tắt và XOÁ SẠCH cơ sở dữ liệu
+```
+
+---
+
+## Lỗi hay gặp
+
+**`could not translate host name "postgres"`**
+Bạn đang chạy `php artisan` từ Windows chứ không phải trong container. Thêm `docker compose exec app` vào đầu lệnh.
+
+**`Class "Redis" not found`**
+Cũng do chạy ngoài container. PHP trên Windows không có extension redis.
+
+**Câu hỏi xác nhận (yes/no) gõ gì cũng thành "no"**
+Terminal Windows qua `docker compose exec` không có TTY thật. Thêm cờ `--force` vào lệnh.
+
+**Ảnh upload không hiện ở website**
+Chưa chạy `php artisan storage:link` (bước 8).
+
+**Website báo `ECONNREFUSED 127.0.0.1:8000`**
+Backend chưa bật. Chạy `docker compose up -d`.
+
+---
+
+## Cấu trúc
+
+Dự án chia module bằng `nwidart/laravel-modules`. Mỗi module tự chứa model, migration, controller API và routes:
+
+```
+Modules/
+  Tour/       tour, lịch trình, đợt khởi hành, ảnh
+  Booking/    đơn đặt tour, thanh toán, tra cứu đơn
+  Review/     đánh giá của khách
+  Banner/     banner khuyến mãi + ảnh vòng xoay
+  Visa/       dịch vụ visa
+  Flight/     hãng bay, vé máy bay
+  Guide/      cẩm nang du lịch
+  Moment/     khoảnh khắc du khách
+  Category/   danh mục tour
+  Page/       trang tĩnh + Cài đặt hệ thống
+```
+
+Giao diện quản trị (Filament) nằm ở `app/Filament/Resources/`, tách khỏi module.
+
+Toàn bộ API công khai có tiền tố `/api/v1`.
