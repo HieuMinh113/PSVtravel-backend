@@ -18,8 +18,10 @@ class TongQuanWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 1;
 
-    // Đếm lại mỗi 60 giây để người trực không phải tải lại trang
-    protected static ?string $pollingInterval = '60s';
+    // Đếm lại mỗi 60 giây để người trực không phải tải lại trang.
+    // KHÔNG static: lớp cha StatsOverviewWidget khai báo thuộc tính này ở dạng
+    // thường, khai báo lại thành static sẽ làm PHP dừng hẳn ứng dụng.
+    protected ?string $pollingInterval = '60s';
 
     protected function getStats(): array
     {

@@ -21,11 +21,12 @@ class DonMoiNhatWidget extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected static ?string $heading = 'Đơn cần xử lý';
-
     public function table(Table $table): Table
     {
         return $table
+            // Đặt tiêu đề qua builder thay vì thuộc tính $heading — thuộc tính
+            // đó đổi kiểu giữa các bản Filament, còn ->heading() thì không.
+            ->heading('Đơn cần xử lý')
             ->query(
                 Booking::query()
                     ->with(['tour:id,name'])
