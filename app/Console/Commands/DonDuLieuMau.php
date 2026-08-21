@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
 class DonDuLieuMau extends Command
 {
     protected $signature = 'psv:don-du-lieu-mau
-                            {--don-hang : Xoá luôn cả đơn đặt tour và thanh toán}
+                            {--don-hang : Xoá luôn đơn đặt tour, thanh toán và tin nhắn liên hệ}
                             {--force : Không hỏi xác nhận (dùng cho script tự động)}';
 
     protected $description = 'Xoá dữ liệu mẫu (tour, banner, review, cẩm nang...) để bắt đầu nhập dữ liệu thật';
@@ -37,10 +37,12 @@ class DonDuLieuMau extends Command
         'categories',
     ];
 
-    // Đơn hàng tách riêng: đây là dữ liệu KINH DOANH, xoá nhầm là mất lịch sử thật
+    // Tách riêng: đây là dữ liệu KINH DOANH do khách thật tạo ra,
+    // xoá nhầm là mất lịch sử không lấy lại được
     private const BANG_DON_HANG = [
         'payments',
         'bookings',
+        'contact_messages',
     ];
 
     public function handle(): int
@@ -58,7 +60,7 @@ class DonDuLieuMau extends Command
         $this->info('Giữ nguyên: tài khoản, phân quyền, cài đặt, trang tĩnh.');
 
         if (! $this->option('don-hang')) {
-            $this->line('Đơn đặt tour và thanh toán được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
+            $this->line('Đơn đặt tour, thanh toán và tin nhắn liên hệ được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
         }
 
         $this->newLine();
