@@ -33,6 +33,7 @@ class PageForm
                     ->label('Ảnh đầu trang')
                     ->image()
                     ->directory('pages')
+                    ->disk('public')
                     ->columnSpanFull(),
 
                 RichEditor::make('body')

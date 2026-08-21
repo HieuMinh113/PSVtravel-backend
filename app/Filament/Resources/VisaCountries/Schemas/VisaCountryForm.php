@@ -29,7 +29,8 @@ class VisaCountryForm
                 FileUpload::make('flag_image')
                     ->label('Ảnh cờ / ảnh đại diện')
                     ->image()
-                    ->directory('visa'),
+                    ->directory('visa')
+                    ->disk('public'),
                 Select::make('visa_type')
                     ->label('Loại visa')
                     ->options([

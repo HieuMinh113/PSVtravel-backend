@@ -43,6 +43,7 @@ class BannerForm
                         : 'Ảnh sẽ hiện trong khung vuông nhỏ. Nên cắt VUÔNG khoảng 600×600, chủ thể nằm giữa. Mỗi trang nên có 8–12 ảnh.')
                     ->image()
                     ->directory('banners')
+                    ->disk('public')
                     ->required()
                     ->columnSpanFull(),
                 FileUpload::make('image_mobile')
@@ -50,6 +51,7 @@ class BannerForm
                     ->helperText('Để trống thì dùng chung ảnh máy tính. Nên dùng ảnh dọc hơn, khoảng 800×1000')
                     ->image()
                     ->directory('banners')
+                    ->disk('public')
                     ->visible(fn (Get $get): bool => $get('position') === 'promo')
                     ->columnSpanFull(),
 

@@ -27,7 +27,8 @@ class AirlineForm
                 FileUpload::make('logo')
                     ->label('Logo')
                     ->image()
-                    ->directory('airlines'),
+                    ->directory('airlines')
+                    ->disk('public'),
                 TextInput::make('country')
                     ->label('Quốc gia')
                     ->maxLength(255),

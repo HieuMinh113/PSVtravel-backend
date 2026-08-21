@@ -59,7 +59,8 @@ class UserForm
                 FileUpload::make('avatar')
                     ->label('Ảnh đại diện')
                     ->image()
-                    ->directory('avatars'),
+                    ->directory('avatars')
+                    ->disk('public'),
 
                 Select::make('locale')
                     ->label('Ngôn ngữ')

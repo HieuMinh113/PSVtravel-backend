@@ -35,7 +35,8 @@ class CategoryForm
                 FileUpload::make('image')
                     ->label('Ảnh đại diện')
                     ->image()
-                    ->directory('categories'),
+                    ->directory('categories')
+                    ->disk('public'),
                 Select::make('status')
                     ->label('Trạng thái')
                     ->options([

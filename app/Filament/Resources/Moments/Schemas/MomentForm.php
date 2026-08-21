@@ -17,6 +17,7 @@ class MomentForm
                     ->label('Ảnh')
                     ->image()
                     ->directory('moments')
+                    ->disk('public')
                     ->required()
                     ->columnSpanFull(),
                 TextInput::make('caption')

@@ -47,6 +47,7 @@ class GuideForm
                     ->label('Ảnh bìa')
                     ->image()
                     ->directory('guides')
+                    ->disk('public')
                     ->columnSpanFull(),
 
                 Textarea::make('excerpt')

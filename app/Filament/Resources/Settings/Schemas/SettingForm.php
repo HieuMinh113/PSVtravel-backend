@@ -57,6 +57,7 @@ class SettingForm
                     ->label('Ảnh')
                     ->image()
                     ->directory('settings')
+                    ->disk('public')
                     ->columnSpanFull()
                     ->visible(fn (?Setting $record): bool => $record?->type === 'image'),
             ]);

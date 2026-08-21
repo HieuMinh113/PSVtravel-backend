@@ -26,6 +26,7 @@ class ImagesRelationManager extends RelationManager
                 ->label('Ảnh')
                 ->image()
                 ->directory('tours/gallery')
+                    ->disk('public')
                 ->required(),
             TextInput::make('alt')
                 ->label('Mô tả ảnh (alt)'),

@@ -126,7 +126,8 @@ class TourForm
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
                     ->image()
-                    ->directory('tours'),
+                    ->directory('tours')
+                    ->disk('public'),
 
                 TagsInput::make('highlights')
                     ->label('Điểm nổi bật')
