@@ -21,6 +21,26 @@ class TourDeparture extends Model
         'seats_left'     => 'integer',
     ];
 
+    /**
+     * Trạng thái luôn khớp với số chỗ còn lại.
+     *
+     * Trước đây sửa tay số chỗ từ 0 lên 30 mà trạng thái vẫn nằm ở "Hết chỗ" —
+     * đợt có chỗ nhưng khách không đặt được, mà nhân viên không hiểu vì sao.
+     *
+     * Ngoại lệ "closed": người quản trị chủ động đóng đợt (đủ đoàn, huỷ chuyến...)
+     * thì tôn trọng, không tự mở lại chỉ vì còn chỗ trống.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (TourDeparture $dot) {
+            if ($dot->status === 'closed') {
+                return;
+            }
+
+            $dot->status = $dot->seats_left > 0 ? 'open' : 'full';
+        });
+    }
+
     public function tour(): BelongsTo
     {
         return $this->belongsTo(Tour::class);
