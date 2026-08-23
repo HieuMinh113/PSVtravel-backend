@@ -84,6 +84,19 @@ class OtpService
             $otp->increment('attempts');
             $conLai = self::TOI_DA_NHAP_SAI - $otp->attempts;
 
+            // Hết lượt thì huỷ mã NGAY tại đây.
+            //
+            // Trước đây chỉ trừ số lượt rồi báo "Bạn còn 0 lần thử", phải tới
+            // lượt thứ 6 mới hiện "Mã đã bị huỷ" — người dùng đọc "còn 0 lần"
+            // mà vẫn thấy ô nhập, không biết phải xin mã mới.
+            if ($conLai <= 0) {
+                $otp->update(['consumed_at' => now()]);
+
+                throw ValidationException::withMessages([
+                    'code' => 'Bạn đã nhập sai '.self::TOI_DA_NHAP_SAI.' lần. Mã này đã bị huỷ, vui lòng bấm gửi lại mã mới.',
+                ]);
+            }
+
             throw ValidationException::withMessages([
                 'code' => "Mã xác thực không đúng. Bạn còn {$conLai} lần thử.",
             ]);
