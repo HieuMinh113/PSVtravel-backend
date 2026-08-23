@@ -79,7 +79,11 @@ class ToursTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    // Không cho xoá vĩnh viễn hàng loạt: chọn nhầm một tour
+                    // đang có đơn là mất trắng lịch sử giao dịch. Muốn xoá hẳn
+                    // thì mở từng tour, ở đó có kiểm tra đơn trước khi cho xoá.
+                    ForceDeleteBulkAction::make()
+                        ->visible(false),
                     RestoreBulkAction::make(),
                 ]),
             ]);

@@ -15,7 +15,7 @@ class Review extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'tour_id', 'user_id', 'customer_name', 'rating', 'content',
+        'tour_id', 'user_id', 'booking_id', 'customer_name', 'rating', 'content',
         'status', 'approved_by', 'approved_at', 'admin_reply',
     ];
 

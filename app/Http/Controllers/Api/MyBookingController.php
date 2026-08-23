@@ -21,12 +21,12 @@ class MyBookingController extends Controller
             ->latest('id')
             ->paginate(min((int) $request->query('per_page', 10), 30));
 
-        // Tour nào tài khoản này đã đánh giá rồi — lấy một lượt cho cả trang,
-        // không hỏi lại theo từng đơn.
-        $tourDaDanhGia = Review::query()
-            ->where('user_id', $userId)
-            ->whereIn('tour_id', $bookings->getCollection()->pluck('tour_id')->filter())
-            ->pluck('tour_id')
+        // Đơn nào đã có đánh giá — lấy một lượt cho cả trang, không hỏi lại
+        // theo từng đơn. Tính theo ĐƠN chứ không theo tour: khách đi lại cùng
+        // một tour ở đợt khác thì đơn mới vẫn được đánh giá.
+        $donDaDanhGia = Review::query()
+            ->whereIn('booking_id', $bookings->getCollection()->pluck('id'))
+            ->pluck('booking_id')
             ->all();
 
         return response()->json([
@@ -62,8 +62,8 @@ class MyBookingController extends Controller
                 // thì nút đổi thành trạng thái, không cho gửi trùng.
                 'co_the_danh_gia' => $b->status === 'completed'
                     && $b->tour_id
-                    && ! in_array($b->tour_id, $tourDaDanhGia, true),
-                'da_danh_gia' => $b->tour_id && in_array($b->tour_id, $tourDaDanhGia, true),
+                    && ! in_array($b->id, $donDaDanhGia, true),
+                'da_danh_gia' => in_array($b->id, $donDaDanhGia, true),
             ]),
             'meta' => [
                 'current_page' => $bookings->currentPage(),

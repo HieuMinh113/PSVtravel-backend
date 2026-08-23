@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Tours\Pages;
 
 use App\Filament\Resources\Tours\TourResource;
 use Filament\Actions\DeleteAction;
+use Modules\Tour\Models\Tour;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
@@ -18,7 +19,15 @@ class EditTour extends EditRecord
         return [
             ViewAction::make(),
             DeleteAction::make(),
-            ForceDeleteAction::make(),
+
+            // Xoá vĩnh viễn chỉ cho phép khi tour CHƯA có đơn nào.
+            //
+            // Cơ sở dữ liệu đã chặn ở tầng dưới, nhưng chặn ở đó thì người dùng
+            // nhận một lỗi SQL khó hiểu. Ẩn nút ngay từ đầu và nói rõ lý do.
+            ForceDeleteAction::make()
+                ->visible(fn (Tour $record): bool => $record->bookings()->count() === 0)
+                ->modalDescription('Tour này chưa có đơn đặt nào. Xoá vĩnh viễn sẽ không lấy lại được.'),
+
             RestoreAction::make(),
         ];
     }

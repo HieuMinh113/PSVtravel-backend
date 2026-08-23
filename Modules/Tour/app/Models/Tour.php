@@ -38,6 +38,12 @@ class Tour extends Model
         'sort_order'   => 'integer',
     ];
 
+    // Đơn đặt của tour — dùng để chặn xoá vĩnh viễn khi tour đã phát sinh giao dịch
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(\Modules\Booking\Models\Booking::class);
+    }
+
     public function departures(): HasMany
     {
         return $this->hasMany(TourDeparture::class);

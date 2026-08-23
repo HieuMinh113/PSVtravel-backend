@@ -37,9 +37,13 @@ class ReviewApiController extends Controller
         $tour = Tour::query()->where('slug', $slug)->firstOrFail();
         $userId = $request->user()->id;
 
-        if ($this->daDanhGia($userId, $tour->id)) {
+        // Đơn đã đi xong mà CHƯA đánh giá — mỗi đơn được một bài.
+        // Khách đi lại tour này ở đợt khác thì có đơn mới, viết được bài mới.
+        $donChuaDanhGia = $this->donChuaDanhGia($userId, $tour->id);
+
+        if ($donChuaDanhGia === null && $this->daDiTour($userId, $tour->id)) {
             return response()->json([
-                'data' => ['can_review' => false, 'reason' => 'Bạn đã đánh giá tour này rồi.'],
+                'data' => ['can_review' => false, 'reason' => 'Bạn đã đánh giá tất cả chuyến đi của tour này rồi.'],
             ]);
         }
 
@@ -70,16 +74,20 @@ class ReviewApiController extends Controller
             ], 403);
         }
 
-        // Chặn 2: mỗi tài khoản chỉ đánh giá 1 lần cho mỗi tour
-        if ($this->daDanhGia($user->id, $data['tour_id'])) {
+        // Chặn 2: mỗi ĐƠN chỉ được một đánh giá.
+        // Đi lại cùng tour ở đợt khác là đơn khác, vẫn viết được bài mới.
+        $don = $this->donChuaDanhGia($user->id, $data['tour_id']);
+
+        if (! $don) {
             return response()->json([
-                'message' => 'Bạn đã đánh giá tour này rồi.',
+                'message' => 'Bạn đã đánh giá tất cả chuyến đi của tour này rồi.',
             ], 409);
         }
 
         Review::create([
             'tour_id' => $data['tour_id'],
             'user_id' => $user->id,
+            'booking_id' => $don->id,
             'customer_name' => $user->name,   // lấy từ tài khoản, khách không tự đặt tên khác
             'rating' => $data['rating'],
             'content' => $data['content'],
@@ -100,11 +108,21 @@ class ReviewApiController extends Controller
             ->exists();
     }
 
-    private function daDanhGia(int $userId, int $tourId): bool
+    /**
+     * Đơn đã đi xong của người này cho tour này mà chưa có đánh giá nào.
+     * Trả về null nghĩa là mọi chuyến đi đều đã được đánh giá.
+     */
+    private function donChuaDanhGia(int $userId, int $tourId): ?Booking
     {
-        return Review::query()
+        return Booking::query()
             ->where('user_id', $userId)
             ->where('tour_id', $tourId)
-            ->exists();
+            ->whereIn('status', self::TRANG_THAI_HOP_LE)
+            ->whereNotExists(fn ($q) => $q
+                ->selectRaw('1')
+                ->from('reviews')
+                ->whereColumn('reviews.booking_id', 'bookings.id'))
+            ->oldest('id')
+            ->first();
     }
 }
