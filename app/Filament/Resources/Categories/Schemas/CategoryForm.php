@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Categories\Schemas;
 
+use Filament\Schemas\Components\Utilities\Get;
+use Modules\Category\Models\Category;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Str;
 use Filament\Forms\Components\FileUpload;
@@ -23,16 +25,39 @@ class CategoryForm
                         'abroad' => 'Nước ngoài',
                     ])
                     ->default('domestic')
+                    ->live()
                     ->required(),
                 TextInput::make('name')
                     ->label('Tên danh mục')
                     ->required()
                     ->maxLength(255)
-                    // Hai danh mục trùng tên thì người nhập tour không phân biệt
-                    // được chọn cái nào — chặn từ đầu.
-                    ->unique(ignoreRecord: true)
-                    ->validationMessages([
-                        'unique' => 'Đã có danh mục tên này rồi.',
+                    // Chặn trùng tên TRONG CÙNG MỘT NHÓM.
+                    //
+                    // Khác nhóm thì cho phép: "Trung Quốc" ở nhóm Nước ngoài và
+                    // một danh mục cùng tên ở nhóm Trong nước là hai thứ khác
+                    // nhau, người nhập tour vẫn phân biệt được nhờ nhóm.
+                    //
+                    // Viết thành luật tường minh thay vì ->unique() vì Category
+                    // dùng xoá mềm: ->unique() so cả với danh mục đã nằm trong
+                    // thùng rác, chặn lưu mà người dùng không hiểu vì sao — đúng
+                    // hiện tượng "chặn lưu nhưng không hiện thông báo".
+                    ->rules([
+                        fn (Get $get, ?Category $record): \Closure => function (string $attribute, $value, \Closure $fail) use ($get, $record) {
+                            if (blank($value)) {
+                                return;
+                            }
+
+                            $daCo = Category::query()
+                                ->where('type', $get('type'))
+                                ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim((string) $value))])
+                                ->when($record, fn ($q) => $q->whereKeyNot($record->getKey()))
+                                ->exists();
+
+                            if ($daCo) {
+                                $nhom = $get('type') === 'abroad' ? 'Nước ngoài' : 'Trong nước';
+                                $fail('Nhóm "'.$nhom.'" đã có danh mục tên này rồi. Đổi tên khác hoặc chọn nhóm khác.');
+                            }
+                        },
                     ])
                     ->live(onBlur: true)
                     ->afterStateUpdated(function (string $operation, $state, Set $set) {

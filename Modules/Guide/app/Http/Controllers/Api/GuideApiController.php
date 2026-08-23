@@ -55,11 +55,23 @@ class GuideApiController extends Controller
             return response()->json(['message' => 'Không tìm thấy bài viết.'], 404);
         }
 
-        // Một người đọc lại bài trong vòng 1 giờ chỉ tính 1 lượt — tránh việc
-        // bấm F5 liên tục thổi phồng con số.
+        // Một người đọc lại bài trong vòng N phút chỉ tính 1 lượt — tránh việc
+        // bấm F5 liên tục thổi phồng con số. Ba người KHÁC NHAU cùng đọc thì
+        // vẫn tính đủ 3, vì khoá tính theo địa chỉ IP của từng người.
+        //
+        // Đặt LUOT_XEM_CACH_NHAU_PHUT=0 trong .env để tắt hẳn khi cần kiểm thử
+        // (một máy bấm nhiều lần vẫn tính từng lượt).
+        $cachNhauPhut = (int) env('LUOT_XEM_CACH_NHAU_PHUT', 60);
+
+        if ($cachNhauPhut < 1) {
+            $guide->increment('view_count');
+
+            return response()->json(['view_count' => $guide->view_count]);
+        }
+
         $khoa = 'luot-xem:'.$guide->id.':'.sha1((string) $request->ip());
 
-        if (Cache::add($khoa, true, now()->addHour())) {
+        if (Cache::add($khoa, true, now()->addMinutes($cachNhauPhut))) {
             $guide->increment('view_count');
         }
 
