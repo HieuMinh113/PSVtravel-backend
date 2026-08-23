@@ -89,11 +89,40 @@ Mã OTP nằm trong nội dung mail ghi ở đó. Muốn gửi mail thật thì 
 ## Lệnh hay dùng
 
 ```bash
-docker compose exec app php artisan optimize:clear   # xoá cache khi sửa .env hoặc config
+docker compose exec app php artisan optimize         # xoá cache CŨ và tạo lại — chạy sau mỗi lần pull
+docker compose exec app php artisan filament:optimize # tăng tốc trang quản trị, xem mục dưới
 docker compose exec app php artisan migrate:status   # xem migration nào đã chạy
 docker compose logs -f app                           # xem log ứng dụng
 docker compose down                                  # tắt (dữ liệu vẫn giữ)
 docker compose down -v                               # tắt và XOÁ SẠCH cơ sở dữ liệu
+```
+
+---
+
+## Trang quản trị chạy chậm
+
+Website khách xem là HTML dựng sẵn nên nhanh. Trang quản trị (Filament) dựng lại
+bằng PHP ở mỗi lần bấm, chạm tới hàng nghìn file — trên Docker Windows mỗi lượt
+đọc file phải đi qua cầu nối giữa Windows và Linux nên rất tốn.
+
+Ba lệnh này giải quyết phần lớn:
+
+```bash
+docker compose exec app composer dump-autoload --optimize
+docker compose exec app php artisan optimize
+docker compose exec app php artisan filament:optimize
+```
+
+`filament:optimize` là lệnh quan trọng nhất mà hay bị bỏ sót: nó gom sẵn danh
+sách component và biểu tượng của Filament. Không có nó, mỗi lần mở một trang
+quản trị là hệ thống phải đi dò lại toàn bộ.
+
+**Sau khi chạy ba lệnh trên, sửa mã sẽ không thấy đổi ngay.** Muốn quay lại chế
+độ phát triển bình thường:
+
+```bash
+docker compose exec app php artisan optimize:clear
+docker compose exec app php artisan filament:optimize-clear
 ```
 
 ---
