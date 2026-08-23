@@ -16,6 +16,10 @@ class TourListResource extends JsonResource
             'type' => $this->type,
             'region' => $this->region,
             'country' => $this->country,
+            // Danh sách slug danh mục để trang danh sách lọc được khi khách bấm
+            // vào một điểm đến ở trang chủ. Chỉ trả khi đã nạp sẵn quan hệ,
+            // tránh N+1 khi liệt kê nhiều tour.
+            'category_slugs' => $this->whenLoaded('categories', fn () => $this->categories->pluck('slug')),
             'duration_days' => $this->duration_days,
             'duration_nights' => $this->duration_nights,
             'departure_from' => $this->departure_from,
