@@ -2,6 +2,7 @@
 
 namespace Modules\Guide\Http\Controllers\Api;
 
+use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Guide\Models\Guide;
@@ -37,10 +38,32 @@ class GuideApiController extends Controller
             ->where('slug', $slug)
             ->firstOrFail();
 
-        // Tăng lượt xem — không ghi vào nhật ký (view_count không nằm trong logOnly)
-        $guide->increment('view_count');
-
+        // KHÔNG tăng lượt xem ở đây. Next.js dựng sẵn trang này và giữ bản
+        // dựng trong 60 giây (ISR), nên 3 người mở bài trong cùng một phút thì
+        // API chỉ được gọi đúng 1 lần — đếm ở đây là đếm số lần dựng lại trang,
+        // không phải số lượt người đọc. Việc đếm chuyển sang ghiNhanLuotXem()
+        // do trình duyệt gọi riêng.
         return new GuideDetailResource($guide);
+    }
+
+    // POST /api/v1/guides/{slug}/view — trình duyệt gọi khi bài thực sự mở ra
+    public function ghiNhanLuotXem(Request $request, string $slug)
+    {
+        $guide = Guide::query()->dangHienThi()->where('slug', $slug)->first();
+
+        if (! $guide) {
+            return response()->json(['message' => 'Không tìm thấy bài viết.'], 404);
+        }
+
+        // Một người đọc lại bài trong vòng 1 giờ chỉ tính 1 lượt — tránh việc
+        // bấm F5 liên tục thổi phồng con số.
+        $khoa = 'luot-xem:'.$guide->id.':'.sha1((string) $request->ip());
+
+        if (Cache::add($khoa, true, now()->addHour())) {
+            $guide->increment('view_count');
+        }
+
+        return response()->json(['view_count' => $guide->view_count]);
     }
 
     // GET /api/v1/guides-slugs — cho generateStaticParams của Next

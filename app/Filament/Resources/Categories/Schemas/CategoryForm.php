@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Categories\Schemas;
 
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Str;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -25,13 +27,30 @@ class CategoryForm
                 TextInput::make('name')
                     ->label('Tên danh mục')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Hai danh mục trùng tên thì người nhập tour không phân biệt
+                    // được chọn cái nào — chặn từ đầu.
+                    ->unique(ignoreRecord: true)
+                    ->validationMessages([
+                        'unique' => 'Đã có danh mục tên này rồi.',
+                    ])
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (string $operation, $state, Set $set) {
+                        if ($operation === 'create') {
+                            $set('slug', Str::slug((string) $state));
+                        }
+                    }),
                 TextInput::make('slug')
                     ->label('Đường dẫn (slug)')
-                    ->helperText('Không dấu, viết thường. VD: mien-trung')
+                    ->helperText('Tự điền theo tên danh mục. Chỉ gồm chữ thường không dấu, số và dấu gạch ngang.')
                     ->required()
                     ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::slug((string) $state))
+                    ->rule('regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/')
+                    ->validationMessages([
+                        'regex' => 'Đường dẫn chỉ được gồm chữ thường không dấu, số và dấu gạch ngang. VD: mien-trung',
+                    ]),
                 FileUpload::make('image')
                     ->label('Ảnh đại diện')
                     ->image()

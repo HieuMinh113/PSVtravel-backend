@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Filament\Resources\Tours\RelationManagers;
+use Modules\Tour\Models\TourDeparture;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -28,8 +29,35 @@ class DeparturesRelationManager extends RelationManager
                 ->displayFormat('d/m/Y')
                 ->minDate(now()->startOfDay())
                 ->maxDate(now()->addYears(3))
-                ->helperText('Chỉ chọn được từ hôm nay trở đi')
-                ->required(),
+                ->helperText('Chỉ chọn được từ hôm nay trở đi. Mỗi tour chỉ có một đợt cho một ngày.')
+                ->required()
+                // Bảng tour_departures có ràng buộc duy nhất (tour_id, start_date).
+                // Trước đây form không kiểm tra nên chọn trùng ngày là để cơ sở dữ
+                // liệu ném lỗi ra — người dùng nhận nguyên trang 500 thay vì một
+                // câu thông báo. Kiểm ở đây để báo ngay tại ô nhập.
+                ->rules([
+                    function (?TourDeparture $record): \Closure {
+                        $tourId = $this->getOwnerRecord()->getKey();
+
+                        return function (string $attribute, $value, \Closure $fail) use ($tourId, $record) {
+                            if (! $value) {
+                                return;
+                            }
+
+                            $daCo = TourDeparture::query()
+                                ->where('tour_id', $tourId)
+                                ->whereDate('start_date', $value)
+                                ->when($record, fn ($q) => $q->whereKeyNot($record->getKey()))
+                                ->exists();
+
+                            if ($daCo) {
+                                $fail('Tour này đã có đợt khởi hành ngày '
+                                    .\Illuminate\Support\Carbon::parse($value)->format('d/m/Y')
+                                    .'. Chọn ngày khác hoặc sửa đợt đã có.');
+                            }
+                        };
+                    },
+                ]),
             TextInput::make('price_override')
                 ->label('Giá riêng đợt này')
                 ->helperText('Để trống nếu dùng giá mặc định của tour')

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Tours\Schemas;
 
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Str;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -19,13 +21,31 @@ class TourForm
                 TextInput::make('name')
                     ->label('Tên tour')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Gõ tên xong tự điền slug — trước đây bỏ trống slug là form
+                    // chặn không cho lưu, bắt người nhập tự nghĩ ra đường dẫn.
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (string $operation, $state, Set $set) {
+                        // Chỉ tự điền khi TẠO MỚI. Sửa tour đã đăng mà đổi slug
+                        // là gãy hết link cũ và mất thứ hạng tìm kiếm.
+                        if ($operation === 'create') {
+                            $set('slug', Str::slug((string) $state));
+                        }
+                    }),
                 TextInput::make('slug')
                     ->label('Đường dẫn (slug)')
-                    ->helperText('Dùng trên URL, không dấu, viết thường. VD: tour-da-nang-3-ngay')
+                    ->helperText('Tự điền theo tên tour. Chỉ gồm chữ thường không dấu, số và dấu gạch ngang.')
                     ->required()
                     ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Chuẩn hoá trước khi lưu: nhập "Bến Tre" thì thành "ben-tre".
+                    // Trước đây chữ hoa và dấu tiếng Việt vẫn lưu được, tạo ra
+                    // đường dẫn hỏng trên trình duyệt.
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::slug((string) $state))
+                    ->rule('regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/')
+                    ->validationMessages([
+                        'regex' => 'Đường dẫn chỉ được gồm chữ thường không dấu, số và dấu gạch ngang. VD: tour-da-nang-3-ngay',
+                    ]),
 
                 Select::make('type')
                     ->label('Loại tour')

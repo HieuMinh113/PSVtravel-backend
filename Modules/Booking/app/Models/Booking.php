@@ -45,9 +45,12 @@ class Booking extends Model
         });
     }
 
+    // withTrashed: tour bị xoá mềm thì đơn cũ vẫn phải giữ được tên tour.
+    // Không có nó, xoá một tour đang có đơn là mọi đơn liên quan hiện trống
+    // trơn ở cột Tour — nhân viên không còn biết khách đã đặt cái gì.
     public function tour(): BelongsTo
     {
-        return $this->belongsTo(Tour::class);
+        return $this->belongsTo(Tour::class)->withTrashed();
     }
 
     public function departure(): BelongsTo
