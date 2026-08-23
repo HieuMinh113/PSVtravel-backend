@@ -11,10 +11,13 @@ class PageApiController extends Controller
     // GET /api/v1/pages/{slug}
     public function show(string $slug)
     {
-        $page = Page::query()
-            ->where('status', 'published')
-            ->where('slug', $slug)
-            ->firstOrFail();
+        // Không lọc theo status ở đây.
+        //
+        // Các trang chính sách bắt buộc phải tồn tại trên website ngay cả khi
+        // bộ phận pháp chế chưa soạn xong nội dung — cơ quan quản lý vào kiểm
+        // tra mà gặp 404 là trượt hồ sơ. Trang chưa đăng thì vẫn trả về, chỉ là
+        // phần nội dung rỗng, và frontend hiện dòng "đang cập nhật".
+        $page = Page::query()->where('slug', $slug)->firstOrFail();
 
         return new PageResource($page);
     }

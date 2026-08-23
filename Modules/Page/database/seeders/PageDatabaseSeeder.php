@@ -16,6 +16,7 @@ class PageDatabaseSeeder extends Seeder
             ['slug' => 'privacy', 'title' => 'Chính sách bảo mật'],
             ['slug' => 'terms', 'title' => 'Điều khoản sử dụng'],
             ['slug' => 'payment-policy', 'title' => 'Chính sách thanh toán'],
+            ['slug' => 'cancellation-policy', 'title' => 'Chính sách huỷ & hoàn tiền'],
             ['slug' => 'faq', 'title' => 'Câu hỏi thường gặp'],
         ];
 
