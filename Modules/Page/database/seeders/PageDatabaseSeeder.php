@@ -30,7 +30,7 @@ class PageDatabaseSeeder extends Seeder
         $cauHinh = [
             ['key' => 'company_name', 'label' => 'Tên công ty', 'group' => 'general', 'type' => 'text', 'value' => 'PSV Travel'],
             ['key' => 'hotline', 'label' => 'Hotline', 'group' => 'contact', 'type' => 'text', 'value' => '1900 1177'],
-            ['key' => 'email', 'label' => 'Email liên hệ', 'group' => 'contact', 'type' => 'text', 'value' => 'hi@psvtravel.vn'],
+            ['key' => 'email', 'label' => 'Email liên hệ', 'group' => 'contact', 'type' => 'text', 'value' => 'hi@psvtravel.com'],
             ['key' => 'address', 'label' => 'Địa chỉ', 'group' => 'contact', 'type' => 'textarea'],
             ['key' => 'working_hours', 'label' => 'Giờ làm việc', 'group' => 'contact', 'type' => 'text'],
             ['key' => 'tax_code', 'label' => 'Mã số thuế', 'group' => 'general', 'type' => 'text'],
