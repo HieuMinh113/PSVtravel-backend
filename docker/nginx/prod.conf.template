@@ -16,7 +16,7 @@ server {
 
     # Let's Encrypt đặt tệp kiểm chứng vào đây khi cấp và gia hạn chứng chỉ
     location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+        root /var/certbot;
     }
 
     location / {

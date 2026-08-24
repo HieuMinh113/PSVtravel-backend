@@ -95,7 +95,10 @@ services:
       - ./:/var/www:ro
       - ./docker/nginx/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
       - psv_certs:/etc/letsencrypt
-      - psv_acme:/var/www/certbot
+      # Thư mục xác thực Let's Encrypt phải nằm NGOÀI /var/www.
+      # /var/www được gắn chỉ-đọc, mà Docker cần tạo được thư mục con để làm
+      # điểm gắn — gắn lồng vào trong sẽ lỗi "read-only file system".
+      - psv_acme:/var/certbot
     networks: [psv]
     depends_on: [app, frontend]
 
@@ -105,12 +108,12 @@ services:
     restart: unless-stopped
     volumes:
       - psv_certs:/etc/letsencrypt
-      - psv_acme:/var/www/certbot
+      - psv_acme:/var/certbot
     # Thử gia hạn mỗi 12 tiếng. Let's Encrypt cấp chứng chỉ 90 ngày và chỉ
     # thực sự gia hạn khi còn dưới 30 ngày, nên chạy thường xuyên là vô hại.
     entrypoint: >
       sh -c "trap exit TERM;
-      while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+      while :; do certbot renew --webroot -w /var/certbot --quiet;
       sleep 12h & wait $${!}; done"
 
 networks:

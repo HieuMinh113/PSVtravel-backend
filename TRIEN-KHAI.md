@@ -340,7 +340,7 @@ docker compose -f docker-compose.prod.yml up -d --build nginx
 
 # 3. Xin chứng chỉ thật cho cả ba tên miền
 docker compose -f docker-compose.prod.yml run --rm certbot certonly \
-  --webroot -w /var/www/certbot \
+  --webroot -w /var/certbot \
   -d $PSV_DOMAIN -d www.$PSV_DOMAIN -d $PSV_API_DOMAIN \
   --email hieuvadanh091@gmail.com --agree-tos --no-eff-email --force-renewal
 
