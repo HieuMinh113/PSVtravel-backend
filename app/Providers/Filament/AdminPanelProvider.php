@@ -27,6 +27,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // Ghi ten thuong hieu thang vao day thay vi de Filament lay
+            // config('app.name'). Neu .env tren may nao do con APP_NAME=Laravel
+            // thi trang quan tri van hien dung "PSV Travel".
+            ->brandName('PSV Travel')
             ->login()
             ->colors([
                 'primary' => Color::Amber,
