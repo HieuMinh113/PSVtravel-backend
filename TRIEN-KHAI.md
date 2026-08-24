@@ -3,7 +3,7 @@
 Hướng dẫn cho VPS Ubuntu 24.04. Làm lần lượt từ trên xuống, mỗi bước chạy xong
 mới sang bước sau.
 
-Thay `psvtravel.vn` bằng tên miền thật của bạn ở mọi chỗ xuất hiện.
+Thay `psvtravel.com` bằng tên miền thật của bạn ở mọi chỗ xuất hiện.
 
 ---
 
@@ -105,8 +105,8 @@ Vào trang quản lý tên miền (Mắt Bão), thêm hai bản ghi:
 Chờ 5–30 phút rồi kiểm tra trên VPS:
 
 ```bash
-dig +short psvtravel.vn
-dig +short api.psvtravel.vn
+dig +short psvtravel.com
+dig +short api.psvtravel.com
 ```
 
 Cả hai phải trả về `103.109.187.16`. **Chưa đúng thì đừng sang bước xin chứng
@@ -245,7 +245,7 @@ lại thì có ngay, khỏi phải chờ.
 
 ## Bước 10 — Đổi mật khẩu quản trị NGAY
 
-Mở `https://api.psvtravel.vn/admin` và đăng nhập:
+Mở `https://api.psvtravel.com/admin` và đăng nhập:
 
 ```
 admin@psvtravel.com  /  Admin@123456
@@ -322,6 +322,6 @@ docker system prune -af        # dọn ảnh Docker cũ khi đầy ổ đĩa
 | Web trắng trang | `$C logs --tail=50 app` |
 | Lỗi 502 | `$C ps` — container `app` hoặc `frontend` có `Up` không |
 | Ảnh admin upload không hiện | `$C exec app php artisan storage:link` |
-| HTTPS báo không an toàn | `$C logs certbot`, và kiểm tra `dig +short psvtravel.vn` |
+| HTTPS báo không an toàn | `$C logs certbot`, và kiểm tra `dig +short psvtravel.com` |
 | Đầy ổ đĩa | `docker system prune -af` rồi `du -sh /opt/psvtravel/backups` |
 | Sửa `.env` mà không thấy đổi | `$C exec app php artisan optimize` |

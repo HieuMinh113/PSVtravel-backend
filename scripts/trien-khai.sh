@@ -53,8 +53,8 @@ $COMPOSE exec -T app php artisan up
 echo
 echo "==> Kiểm tra"
 sleep 3
-MA_API=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_API_DOMAIN:-api.psvtravel.vn}/api/v1/settings" || echo 000)
-MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_DOMAIN:-psvtravel.vn}/" || echo 000)
+MA_API=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_API_DOMAIN:-api.psvtravel.com}/api/v1/settings" || echo 000)
+MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_DOMAIN:-psvtravel.com}/" || echo 000)
 echo "    API: $MA_API    Website: $MA_WEB"
 
 if [ "$MA_API" = "200" ] && [ "$MA_WEB" = "200" ]; then
