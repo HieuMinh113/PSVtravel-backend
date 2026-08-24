@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tours\Schemas;
 
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Str;
 use Filament\Forms\Components\FileUpload;
@@ -54,10 +55,24 @@ class TourForm
                         'abroad' => 'Nước ngoài',
                     ])
                     ->default('domestic')
+                    // Đổi loại tour thì ô Danh mục phải đổi theo, xem ghi chú dưới
+                    ->live()
+                    ->afterStateUpdated(fn (Set $set) => $set('categories', []))
                     ->required(),
                 Select::make('categories')
-                    ->label('Danh mục')
-                    ->relationship('categories', 'name')
+                    ->label('Danh mục (điểm đến)')
+                    ->helperText('Danh mục quyết định tour hiện ở mục nào trên menu và nút lọc ngoài web.')
+                    // Chỉ cho chọn danh mục CÙNG NHÓM với tour.
+                    //
+                    // Danh mục giờ là thứ dựng nên mega menu và nút lọc ngoài
+                    // web, nên gán tour trong nước vào danh mục "Hàn Quốc" sẽ
+                    // tạo ra mục menu bấm vào không ra tour nào. Lọc sẵn ở đây
+                    // để không chọn nhầm được.
+                    ->relationship(
+                        'categories',
+                        'name',
+                        fn ($query, Get $get) => $query->where('type', $get('type') ?: 'domestic')
+                    )
                     ->multiple()
                     ->preload()
                     ->searchable(),
