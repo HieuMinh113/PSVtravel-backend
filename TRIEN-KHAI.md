@@ -62,6 +62,9 @@ systemd-detect-virt
 - Trả về `openvz` hoặc `lxc` → **dừng lại**, VPS này không chạy Docker được,
   liên hệ VinaHost đổi sang gói KVM.
 
+> Nếu bạn lỡ bỏ qua bước này cũng không sao: lệnh `docker run --rm hello-world`
+> ở Bước 2 chạy được cũng đủ chứng minh VPS chạy Docker tốt.
+
 ---
 
 ## Bước 1b — Tạo tài khoản riêng, khoá đăng nhập root
@@ -149,8 +152,27 @@ Xong. Từ giờ đăng nhập bằng `ssh psv@103.109.187.16`.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
+```
+
+> **Chú ý hộp thoại tím hỏi về `sshd_config`.** Nếu hiện ra màn hình
+> *"A new version of configuration file /etc/ssh/sshd_config is available, but
+> the version installed currently has been locally modified"*, bấm **mũi tên
+> xuống một lần** để chọn **`keep the local version currently installed`** rồi
+> Enter. Chọn dòng mặc định (`install the package maintainer's version`) sẽ ghi
+> đè file, xoá mất `PermitRootLogin no` vừa đặt ở Bước 1b.
+>
+> Còn hộp thoại hỏi *"Which services should be restarted?"* thì cứ Enter chọn
+> `<Ok>`, cái đó vô hại.
+
+```bash
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker psv
+sudo usermod -aG docker $USER
+```
+
+Kiểm tra tài khoản đã vào nhóm `docker` chưa — cuối dòng phải có tên `psv`:
+
+```bash
+getent group docker
 ```
 
 Thoát ra rồi đăng nhập lại để nhóm `docker` có hiệu lực:
@@ -169,13 +191,24 @@ docker run --rm hello-world
 
 ## Bước 3 — Tường lửa
 
+Bản Ubuntu của VinaHost không cài sẵn ufw:
+
 ```bash
-sudo ufw allow OpenSSH
+sudo apt install -y ufw
+```
+
+Mở cổng theo đúng thứ tự này — cổng 22 (SSH) phải mở **trước** khi bật tường
+lửa, nếu không bạn bị ngắt kết nối và không vào lại được:
+
+```bash
+sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw --force enable
 sudo ufw status
 ```
+
+`ufw status` phải hiện `Status: active` và đủ ba cổng 22, 80, 443.
 
 > **Lưu ý quan trọng:** Docker publish cổng **đi vòng qua UFW**. Nghĩa là nếu
 > file compose có `ports: 5432:5432` thì UFW chặn cũng vô ích, cả Internet vẫn
