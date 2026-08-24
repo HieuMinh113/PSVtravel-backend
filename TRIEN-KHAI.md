@@ -339,7 +339,10 @@ docker compose -f docker-compose.prod.yml run --rm --entrypoint "\
 docker compose -f docker-compose.prod.yml up -d --build nginx
 
 # 3. Xin chứng chỉ thật cho cả ba tên miền
-docker compose -f docker-compose.prod.yml run --rm certbot certonly \
+#    --entrypoint certbot là BẮT BUỘC: dịch vụ certbot trong compose có sẵn
+#    entrypoint là vòng lặp tự gia hạn. Thiếu cờ này thì tham số bên dưới bị
+#    nuốt mất, container chạy vòng lặp rồi ngủ 12 tiếng, trông như bị treo.
+docker compose -f docker-compose.prod.yml run --rm --entrypoint certbot certbot certonly \
   --webroot -w /var/certbot \
   -d $PSV_DOMAIN -d www.$PSV_DOMAIN -d $PSV_API_DOMAIN \
   --email hieuvadanh091@gmail.com --agree-tos --no-eff-email --force-renewal
