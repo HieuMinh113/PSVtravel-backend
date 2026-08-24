@@ -266,10 +266,16 @@ cp .env.production.example .env
 Sinh ba chuỗi bí mật:
 
 ```bash
-openssl rand -base64 32    # dùng cho DB_PASSWORD
-openssl rand -base64 32    # dùng cho REDIS_PASSWORD
-docker compose -f docker-compose.prod.yml run --rm app php artisan key:generate --show
+echo "base64:$(openssl rand -base64 32)"   # dùng cho APP_KEY
+openssl rand -base64 32                    # dùng cho DB_PASSWORD
+openssl rand -base64 32                    # dùng cho REDIS_PASSWORD
 ```
+
+> APP_KEY phải giữ nguyên cả chữ `base64:` ở đầu.
+>
+> Không dùng `php artisan key:generate` ở bước này được: artisan cần thư mục
+> `vendor/` mà thư mục đó phải cài xong ở Bước 6b mới có. Lệnh `openssl` trên
+> sinh ra đúng dạng khoá mà Laravel cần.
 
 ```bash
 nano .env
@@ -286,6 +292,26 @@ Khoá quyền đọc file `.env`:
 ```bash
 chmod 600 .env
 ```
+
+---
+
+## Bước 6b — Cài thư viện PHP
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm app composer install --no-dev --optimize-autoloader
+```
+
+Lần đầu lệnh này phải build ảnh Docker cho PHP — mất khoảng 10–15 phút, phần
+lâu nhất là biên dịch thư viện xử lý ảnh `gd`. Những lần sau chỉ vài giây.
+
+Kiểm tra xong chưa:
+
+```bash
+ls vendor/autoload.php
+```
+
+Ra đường dẫn là được. Không có file này thì mọi lệnh `php artisan` sau đây đều
+báo `Failed opening required '/var/www/vendor/autoload.php'`.
 
 ---
 
