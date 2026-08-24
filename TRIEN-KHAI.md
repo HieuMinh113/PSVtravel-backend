@@ -352,20 +352,34 @@ docker compose -f docker-compose.prod.yml run --rm --entrypoint "\
 #    lần đầu mất 5–10 phút, cứ để chạy.
 docker compose -f docker-compose.prod.yml up -d --build nginx
 
-# 3. Xin chứng chỉ thật cho cả ba tên miền
+# 3. Xoá chứng chỉ tạm.
+#    Certbot từ chối ghi vào thư mục live/ mà nó không tự tạo, báo
+#    "live directory exists for ...". nginx vẫn chạy bình thường sau lệnh này
+#    vì đã nạp chứng chỉ vào bộ nhớ — nhưng ĐỪNG restart nginx cho tới khi có
+#    chứng chỉ thật ở bước 4.
+docker compose -f docker-compose.prod.yml run --rm --entrypoint sh certbot -c \
+  "rm -rf /etc/letsencrypt/live/$PSV_DOMAIN /etc/letsencrypt/archive/$PSV_DOMAIN /etc/letsencrypt/renewal/$PSV_DOMAIN.conf"
+
+# 4. Xin chứng chỉ thật cho cả ba tên miền
 #    --entrypoint certbot là BẮT BUỘC: dịch vụ certbot trong compose có sẵn
 #    entrypoint là vòng lặp tự gia hạn. Thiếu cờ này thì tham số bên dưới bị
 #    nuốt mất, container chạy vòng lặp rồi ngủ 12 tiếng, trông như bị treo.
 docker compose -f docker-compose.prod.yml run --rm --entrypoint certbot certbot certonly \
   --webroot -w /var/certbot \
   -d $PSV_DOMAIN -d www.$PSV_DOMAIN -d $PSV_API_DOMAIN \
-  --email hieuvadanh091@gmail.com --agree-tos --no-eff-email --force-renewal
+  --email hieuvadanh091@gmail.com --agree-tos --no-eff-email
 
-# 4. Nạp lại nginx với chứng chỉ thật
+# 5. Nạp lại nginx với chứng chỉ thật
 docker compose -f docker-compose.prod.yml restart nginx
 ```
 
 Chứng chỉ tự gia hạn — container `certbot` kiểm tra 12 tiếng một lần.
+
+> **Nếu báo lỗi DNSSEC** (`DNSSEC: Bogus: validation failure ... nodata proof
+> failed`): tên miền có bản ghi DS ở registry nhưng nameserver không ký. Vào
+> trang quản lý tên miền tắt mục **Bảo mật DNS / DNSSEC**, chờ vài tiếng cho
+> bản ghi DS được gỡ (`dig +short DS psvtravel.com @8.8.8.8` ra rỗng) rồi chạy
+> lại. Đây là lỗi cấu hình tên miền, không sửa được từ máy chủ.
 
 ---
 
