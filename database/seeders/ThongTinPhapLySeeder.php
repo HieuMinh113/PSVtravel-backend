@@ -37,8 +37,16 @@ class ThongTinPhapLySeeder extends Seeder
             'address' => '529 Huỳnh Tấn Phát, Phường Tân Thuận, Quận 7, TP. Hồ Chí Minh',
         ];
 
+        // updateOrCreate chứ không phải update().
+        //
+        // update() chỉ sửa dòng ĐÃ CÓ. Trên máy chủ mới toanh, bảng settings còn
+        // rỗng nên mọi câu update khớp 0 dòng — seeder vẫn báo "đã cập nhật" mà
+        // thực tế không ghi được gì, cả khối pháp lý ở chân trang trống trơn.
         foreach ($thongTin as $key => $value) {
-            Setting::query()->where('key', $key)->update(['value' => $value]);
+            Setting::query()->updateOrCreate(
+                ['key' => $key],
+                ['value' => $value],
+            );
         }
 
         $this->command->info('Đã cập nhật thông tin pháp lý và liên hệ của công ty.');
