@@ -263,6 +263,20 @@ cd /opt/psvtravel/psvtravel-backend
 cp .env.production.example .env
 ```
 
+> **Phải điền xong `.env` TRƯỚC khi chạy bất kỳ lệnh `docker compose` nào.**
+>
+> Postgres ghi mật khẩu vào ổ đĩa ngay lần khởi động đầu tiên và không bao giờ
+> đọc lại biến môi trường nữa. Lỡ khởi động container khi `.env` còn là
+> `ĐIỀN_VÀO_ĐÂY` thì sau này Laravel báo
+> `password authentication failed for user "psvtravel"`, và cách sửa là phải
+> xoá volume dựng lại:
+>
+> ```bash
+> docker compose -f docker-compose.prod.yml down
+> docker volume rm psvtravel-backend_psv_pgdata
+> docker compose -f docker-compose.prod.yml up -d
+> ```
+
 Sinh ba chuỗi bí mật:
 
 ```bash
