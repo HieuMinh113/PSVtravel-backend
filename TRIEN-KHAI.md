@@ -509,3 +509,27 @@ docker system prune -af        # dọn ảnh Docker cũ khi đầy ổ đĩa
 | HTTPS báo không an toàn | `$C logs certbot`, và kiểm tra `dig +short psvtravel.com` |
 | Đầy ổ đĩa | `docker system prune -af` rồi `du -sh /opt/psvtravel/backups` |
 | Sửa `.env` mà không thấy đổi | `$C exec app php artisan optimize` |
+| Web hiện ra nhưng trống dữ liệu, không đăng nhập được | `$C logs --tail=30 frontend` — thấy `UND_ERR_CONNECT_TIMEOUT` thì xem mục dưới |
+
+### Web trống dữ liệu và không đăng nhập được
+
+Log frontend đầy dòng `Không gọi được API: ... UND_ERR_CONNECT_TIMEOUT`.
+
+Container Next.js gọi API qua tên miền công khai, nên gói tin phải đi ra
+Internet rồi vòng ngược về chính IP của VPS. Nhiều nhà cung cấp chặn kiểu đi
+vòng này (hairpin NAT).
+
+`docker-compose.prod.yml` đã xử lý sẵn bằng `aliases` trong phần `nginx`: bên
+trong mạng Docker, ba tên miền trỏ thẳng vào container nginx. Kiểm tra còn
+nguyên không:
+
+```bash
+grep -A6 "aliases" docker-compose.prod.yml
+$C exec frontend wget -qO- https://api.psvtravel.com/api/v1/settings
+```
+
+Lệnh sau phải in ra JSON. Không ra thì tạo lại nginx:
+
+```bash
+$C up -d --force-recreate nginx
+```

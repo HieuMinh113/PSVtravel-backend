@@ -99,7 +99,22 @@ services:
       # /var/www được gắn chỉ-đọc, mà Docker cần tạo được thư mục con để làm
       # điểm gắn — gắn lồng vào trong sẽ lỗi "read-only file system".
       - psv_acme:/var/certbot
-    networks: [psv]
+    networks:
+      psv:
+        # Bên trong mạng Docker, ba tên miền này trỏ thẳng vào container nginx.
+        #
+        # Không có mấy dòng này, container Next.js gọi https://api.psvtravel.com
+        # sẽ đi ra Internet rồi phải vòng ngược về chính IP của VPS. Nhiều nhà
+        # cung cấp chặn kiểu đi vòng đó (hairpin NAT), kết quả là mọi lời gọi
+        # API đều treo rồi UND_ERR_CONNECT_TIMEOUT — web hiện ra nhưng trống
+        # rỗng và không đăng nhập được.
+        #
+        # Có alias thì gói tin đi thẳng sang nginx trong mạng nội bộ. Tên miền
+        # vẫn khớp chứng chỉ HTTPS nên không phải bỏ mã hoá hay sửa code.
+        aliases:
+          - ${PSV_DOMAIN}
+          - www.${PSV_DOMAIN}
+          - ${PSV_API_DOMAIN}
     depends_on: [app, frontend]
 
   certbot:
