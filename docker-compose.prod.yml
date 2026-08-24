@@ -1,0 +1,124 @@
+# Cấu hình chạy THẬT trên máy chủ. Khác bản dev ở ba điểm quan trọng:
+#
+#   1. KHÔNG mở cổng Postgres và Redis ra ngoài. Docker publish cổng đi vòng
+#      qua tường lửa UFW — mở 5432/6379 trên máy có IP công khai là mời người
+#      lạ vào đọc cả CSDL lẫn phiên đăng nhập.
+#   2. Mật khẩu lấy từ file .env, không viết cứng trong file này.
+#   3. Có thêm frontend (Next.js) và certbot (chứng chỉ HTTPS).
+#
+# Chạy:  docker compose -f docker-compose.prod.yml up -d
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: psv_app
+    restart: unless-stopped
+    working_dir: /var/www
+    env_file: .env
+    volumes:
+      - ./:/var/www
+    networks: [psv]
+    depends_on: [postgres, redis]
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: psv_queue
+    restart: unless-stopped
+    working_dir: /var/www
+    env_file: .env
+    # --max-time=3600: worker tự thoát sau 1 giờ rồi được restart, tránh rò rỉ
+    # bộ nhớ tích tụ. --tries=3 để mail lỗi thử lại chứ không mất luôn.
+    command: php artisan queue:work --tries=3 --backoff=5 --max-time=3600
+    volumes:
+      - ./:/var/www
+    networks: [psv]
+    depends_on: [postgres, redis]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: psv_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - psv_pgdata:/var/lib/postgresql/data
+    networks: [psv]
+    # Cố ý KHÔNG có mục ports — chỉ các container trong mạng psv gọi được
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: psv_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - psv_redisdata:/data
+    networks: [psv]
+    # Cũng không mở cổng
+
+  frontend:
+    build:
+      context: ../psvtravel-frontend
+      dockerfile: Dockerfile
+      args:
+        # Trình duyệt của khách gọi thẳng vào đây nên phải là tên miền công khai
+        NEXT_PUBLIC_API_URL: https://${PSV_API_DOMAIN}/api/v1
+        NEXT_PUBLIC_SITE_URL: https://${PSV_DOMAIN}
+    container_name: psv_frontend
+    restart: unless-stopped
+    networks: [psv]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: psv_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PSV_DOMAIN: ${PSV_DOMAIN}
+      PSV_API_DOMAIN: ${PSV_API_DOMAIN}
+      # Chỉ thay các biến bắt đầu bằng PSV_ — không đụng vào $host, $uri...
+      # của chính nginx trong file cấu hình.
+      NGINX_ENVSUBST_FILTER: "PSV_"
+    volumes:
+      - ./:/var/www:ro
+      - ./docker/nginx/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - psv_certs:/etc/letsencrypt
+      - psv_acme:/var/www/certbot
+    networks: [psv]
+    depends_on: [app, frontend]
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: psv_certbot
+    restart: unless-stopped
+    volumes:
+      - psv_certs:/etc/letsencrypt
+      - psv_acme:/var/www/certbot
+    # Thử gia hạn mỗi 12 tiếng. Let's Encrypt cấp chứng chỉ 90 ngày và chỉ
+    # thực sự gia hạn khi còn dưới 30 ngày, nên chạy thường xuyên là vô hại.
+    entrypoint: >
+      sh -c "trap exit TERM;
+      while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+      sleep 12h & wait $${!}; done"
+
+networks:
+  psv:
+    driver: bridge
+
+volumes:
+  psv_pgdata:
+  psv_redisdata:
+  psv_certs:
+  psv_acme:
