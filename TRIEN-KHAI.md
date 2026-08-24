@@ -7,15 +7,52 @@ Thay `psvtravel.com` bằng tên miền thật của bạn ở mọi chỗ xuấ
 
 ---
 
-## Bước 0 — Kiểm tra VPS chạy được Docker
+## Bước 0 — Mở cửa sổ dòng lệnh và đăng nhập vào VPS
 
-Đăng nhập vào VPS:
+Tất cả các lệnh trong tài liệu này đều gõ vào **một cửa sổ đen** trên máy tính
+của bạn, đang kết nối tới VPS. Cách mở:
 
-```bash
+**Trên Windows:** bấm phím `Windows`, gõ `powershell`, mở **Windows PowerShell**.
+
+Lấy mật khẩu: vào trang VinaHost → Dịch vụ → VPS của bạn → dòng **Mật khẩu**,
+bấm nút con mắt màu xanh để hiện, bôi đen rồi Ctrl+C.
+
+Trong PowerShell gõ:
+
+```
 ssh root@103.109.187.16
 ```
 
-Kiểm tra nền tảng ảo hoá:
+Lần đầu nó hỏi:
+
+```
+The authenticity of host '103.109.187.16' can't be established.
+ED25519 key fingerprint is SHA256:...
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+
+Gõ `yes` rồi Enter. Sau đó nó hỏi mật khẩu:
+
+```
+root@103.109.187.16's password:
+```
+
+Bấm **chuột phải** để dán (Ctrl+V không dùng được ở đây), rồi Enter.
+
+> Lúc dán mật khẩu **màn hình không hiện gì cả** — không có dấu sao, không có
+> chấm. Đó là bình thường, không phải bàn phím hỏng. Cứ dán rồi Enter.
+
+Vào được sẽ thấy dòng nhắc như:
+
+```
+root@vps59781:~#
+```
+
+Từ giờ, "chạy lệnh" nghĩa là gõ vào sau dấu `#` này rồi Enter.
+
+---
+
+## Bước 1 — Kiểm tra VPS chạy được Docker
 
 ```bash
 systemd-detect-virt
@@ -27,35 +64,84 @@ systemd-detect-virt
 
 ---
 
-## Bước 1 — Tạo tài khoản riêng, khoá đăng nhập root
+## Bước 1b — Tạo tài khoản riêng, khoá đăng nhập root
 
 Đăng nhập bằng `root` là thói quen nguy hiểm: gõ nhầm một lệnh là hỏng máy, và
 mọi công cụ dò mật khẩu trên Internet đều thử `root` đầu tiên.
 
+**1. Tạo tài khoản mới:**
+
 ```bash
 adduser psv
-usermod -aG sudo psv
-
-# Chép khoá SSH sang tài khoản mới (nếu bạn đăng nhập bằng khoá)
-rsync --archive --chown=psv:psv ~/.ssh /home/psv
 ```
 
-Mở một cửa sổ terminal **mới** và thử `ssh psv@103.109.187.16`. Vào được rồi
-mới làm tiếp — nếu không sẽ tự khoá mình ra ngoài.
+Nó hỏi mật khẩu — **tự đặt một mật khẩu mới, dài và khó đoán**, gõ hai lần
+(màn hình vẫn không hiện gì). Sau đó hỏi họ tên, số phòng, số điện thoại...
+cứ Enter bỏ qua hết, cuối cùng gõ `Y` rồi Enter.
+
+**Ghi mật khẩu này lại ngay** — mất là không vào được VPS nữa.
+
+**2. Cho tài khoản đó quyền quản trị:**
+
+```bash
+usermod -aG sudo psv
+```
+
+**3. Cài fail2ban để chặn dò mật khẩu:**
+
+```bash
+apt update && apt install -y fail2ban
+systemctl enable --now fail2ban
+```
+
+Sau 5 lần nhập sai mật khẩu, địa chỉ IP đó bị chặn 10 phút. Cần thiết vì VPS
+đang cho đăng nhập bằng mật khẩu.
+
+**4. Thử tài khoản mới TRƯỚC KHI khoá root:**
+
+Mở một cửa sổ PowerShell **mới** (giữ nguyên cửa sổ cũ, đừng đóng), gõ:
+
+```
+ssh psv@103.109.187.16
+```
+
+Nhập mật khẩu bạn vừa đặt ở mục 1. Vào được sẽ thấy dòng nhắc đổi thành:
+
+```
+psv@vps59781:~$
+```
+
+> Dấu `$` thay vì `#` nghĩa là đang dùng tài khoản thường — đúng rồi.
+> **Chưa vào được thì đừng làm bước 5**, quay lại cửa sổ cũ kiểm tra lại.
+
+**5. Khoá đăng nhập root:**
+
+Ở cửa sổ mới (tài khoản psv), chạy:
 
 ```bash
 sudo nano /etc/ssh/sshd_config
 ```
 
-Sửa hai dòng:
+Nó hỏi mật khẩu — nhập mật khẩu của `psv`. Một trình soạn thảo văn bản mở ra.
+Dùng phím mũi tên tìm dòng có chữ `PermitRootLogin`, sửa thành:
+
 ```
 PermitRootLogin no
-PasswordAuthentication no    # chỉ đặt no nếu bạn đã dùng khoá SSH
 ```
+
+Dòng đó có thể đang là `#PermitRootLogin prohibit-password` — xoá dấu `#` ở
+đầu và sửa phần sau thành `no`.
+
+Lưu và thoát: `Ctrl+O` → Enter → `Ctrl+X`.
 
 ```bash
 sudo systemctl restart ssh
 ```
+
+Xong. Từ giờ đăng nhập bằng `ssh psv@103.109.187.16`.
+
+> Các bước sau cần quyền quản trị, nên nhiều lệnh phải thêm `sudo` ở đầu.
+> Tài liệu đã ghi sẵn.
 
 ---
 
@@ -67,7 +153,13 @@ curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker psv
 ```
 
-Đăng xuất rồi đăng nhập lại để nhóm `docker` có hiệu lực, sau đó kiểm tra:
+Thoát ra rồi đăng nhập lại để nhóm `docker` có hiệu lực:
+
+```bash
+exit
+```
+
+Rồi ở PowerShell gõ lại `ssh psv@103.109.187.16`. Kiểm tra Docker chạy được:
 
 ```bash
 docker run --rm hello-world
@@ -94,7 +186,8 @@ sudo ufw status
 
 ## Bước 4 — Trỏ tên miền
 
-Vào trang quản lý tên miền (Mắt Bão), thêm hai bản ghi:
+Vào trang quản lý tên miền `psvtravel.com` (nơi bạn mua tên miền), tìm mục
+**Quản lý DNS** hoặc **DNS Records**, thêm **ba** bản ghi:
 
 | Loại | Tên | Trỏ tới |
 |------|-----|---------|
@@ -105,6 +198,7 @@ Vào trang quản lý tên miền (Mắt Bão), thêm hai bản ghi:
 Chờ 5–30 phút rồi kiểm tra trên VPS:
 
 ```bash
+sudo apt install -y dnsutils
 dig +short psvtravel.com
 dig +short api.psvtravel.com
 ```
