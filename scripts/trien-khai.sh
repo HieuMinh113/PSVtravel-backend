@@ -16,6 +16,23 @@ COMPOSE="docker compose -f docker-compose.prod.yml"
 
 cd "$THU_MUC_BE"
 
+# Gặp lỗi giữa chừng thì PHẢI tắt thông báo bảo trì trước khi thoát.
+#
+# Bước 2 bật bảo trì, mà từ bản này việc đóng ảnh sẽ DỪNG LẠI nếu không gọi
+# được API (thà dừng còn hơn cho ra trang rỗng). Không có bẫy này thì lỗi build
+# đồng nghĩa với website nằm trong màn hình bảo trì cho tới khi có người phát
+# hiện ra.
+don_dep() {
+    local ma=$?
+    if [ $ma -ne 0 ]; then
+        echo
+        echo "!! Triển khai DỪNG ở giữa chừng. Đang tắt thông báo bảo trì..."
+        $COMPOSE exec -T app php artisan up || true
+        echo "   Website đã chạy lại bằng phiên bản CŨ. Xem lỗi phía trên."
+    fi
+}
+trap don_dep EXIT
+
 echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
 ./scripts/sao-luu-csdl.sh
 

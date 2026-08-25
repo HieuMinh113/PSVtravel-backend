@@ -576,6 +576,24 @@ Rồi chạy lại. Từ bản cập nhật ngày 25/08/2026 lỗi này không t
 chỉ đổi **nhóm** sang `www-data` thay vì đổi chủ sở hữu, nên PHP vẫn ghi được
 mà git vẫn cập nhật được.
 
+### Trang tour hiện "0 tour phù hợp", F5 mấy lần mới hết
+
+Từ bản cập nhật 25/08/2026 lỗi này không còn xảy ra. Nguyên nhân cũ:
+
+Khi gọi API thất bại, mã nguồn nuốt lỗi rồi trả về danh sách rỗng. Trang vẫn
+"dựng thành công" với 0 tour — và **Next lưu lại đúng cái trang rỗng đó**, phục
+vụ cho mọi khách trong 60 giây. Một cú chớp mạng vài chục mili giây biến thành
+một phút cả website báo không có tour. Việc dựng lại chạy ngầm mỗi khi có người
+truy cập, nên trúng cú chớp nào là bản rỗng thay thế bản tốt — bất kể lúc nào,
+không riêng sau khi triển khai.
+
+Giờ dữ liệu bắt buộc (tour, danh mục) được thử lại 3 lần; vẫn hỏng thì ném lỗi
+để Next **bỏ lần dựng đó và giữ nguyên bản tốt trước đó**.
+
+Hệ quả cần biết: nếu API thật sự chết lúc đóng ảnh Docker thì **việc triển khai
+sẽ dừng lại** kèm thông báo lỗi, thay vì cho ra trang rỗng. Script tự tắt thông
+báo bảo trì, website chạy tiếp bằng phiên bản cũ. Sửa cho API sống rồi chạy lại.
+
 ### Web trống dữ liệu và không đăng nhập được
 
 Log frontend đầy dòng `Không gọi được API: ... UND_ERR_CONNECT_TIMEOUT`.
