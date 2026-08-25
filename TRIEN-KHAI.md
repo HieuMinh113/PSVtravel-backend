@@ -535,6 +535,24 @@ docker system prune -af        # dọn ảnh Docker cũ khi đầy ổ đĩa
 | Sửa `.env` mà không thấy đổi | `$C exec app php artisan optimize` |
 | Web hiện ra nhưng trống dữ liệu, không đăng nhập được | `$C logs --tail=30 frontend` — thấy `UND_ERR_CONNECT_TIMEOUT` thì xem mục dưới |
 
+### git báo `Permission denied` khi cập nhật mã nguồn
+
+```
+error: unable to unlink old 'storage/logs/.gitignore': Permission denied
+fatal: Could not reset index file to revision 'FETCH_HEAD'.
+```
+
+Thư mục `storage` và `bootstrap/cache` bị đổi chủ sở hữu sang `www-data`. Trả
+lại quyền cho tài khoản máy chủ:
+
+```bash
+sudo chown -R psv:psv /opt/psvtravel/psvtravel-backend
+```
+
+Rồi chạy lại. Từ bản cập nhật ngày 25/08/2026 lỗi này không tái diễn: container
+chỉ đổi **nhóm** sang `www-data` thay vì đổi chủ sở hữu, nên PHP vẫn ghi được
+mà git vẫn cập nhật được.
+
 ### Web trống dữ liệu và không đăng nhập được
 
 Log frontend đầy dòng `Không gọi được API: ... UND_ERR_CONNECT_TIMEOUT`.
