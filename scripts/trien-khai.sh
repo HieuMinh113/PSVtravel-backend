@@ -33,10 +33,19 @@ don_dep() {
 }
 trap don_dep EXIT
 
-echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
-./scripts/sao-luu-csdl.sh
+# Chính file script này nằm trong repo, nên bước lấy mã nguồn có thể thay đổi
+# nó ngay giữa lúc đang chạy. Bash đọc file theo vị trí byte chứ không nạp
+# toàn bộ vào bộ nhớ, nên phiên bản mới KHÔNG có tác dụng ở lần chạy này —
+# đã xảy ra thật: bản sửa thứ tự các bước nằm trên đĩa mà lần chạy đó vẫn theo
+# thứ tự cũ.
+#
+# Cách xử lý: lần gọi đầu chỉ sao lưu và lấy mã nguồn, rồi tự khởi động lại
+# bằng đúng file vừa tải về.
+if [ "${PSV_DA_LAY_MA:-0}" != "1" ]; then
+    echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
+    ./scripts/sao-luu-csdl.sh
 
-echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
+    echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
 # Dùng fetch + reset --hard chứ không phải pull.
 #
 # Máy chủ là nơi CHẠY, không phải nơi sửa code — nó phải khớp đúng nhánh trên
@@ -45,10 +54,16 @@ echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
 #
 # reset --hard chỉ động vào file git theo dõi: .env, vendor/ và thư mục ảnh
 # upload đều nằm ngoài git nên không bị mất.
-for DIR in "$THU_MUC_BE" "$THU_MUC_FE"; do
-    git -C "$DIR" fetch origin "$NHANH"
-    git -C "$DIR" reset --hard FETCH_HEAD
-done
+    for DIR in "$THU_MUC_BE" "$THU_MUC_FE"; do
+        git -C "$DIR" fetch origin "$NHANH"
+        git -C "$DIR" reset --hard FETCH_HEAD
+    done
+
+    # Bỏ bẫy trước khi nhảy sang bản mới, nếu không nó tưởng đang lỗi
+    trap - EXIT
+    export PSV_DA_LAY_MA=1
+    exec "$0" "$@"
+fi
 
 echo "==> 2/8  Đóng lại ảnh Docker"
 # CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
