@@ -535,6 +535,29 @@ docker system prune -af        # dọn ảnh Docker cũ khi đầy ổ đĩa
 | Sửa `.env` mà không thấy đổi | `$C exec app php artisan optimize` |
 | Web hiện ra nhưng trống dữ liệu, không đăng nhập được | `$C logs --tail=30 frontend` — thấy `UND_ERR_CONNECT_TIMEOUT` thì xem mục dưới |
 
+### Đăng ký tài khoản báo "Server Error", không nhận được mail
+
+```bash
+$C exec app sh -c 'grep -a "production.ERROR" $(ls -t storage/logs/*.log | head -1) | tail -n 3 | cut -c1-400'
+```
+
+| Thông báo trong log | Cách sửa |
+|---|---|
+| `The "tls" scheme is not supported` | Sửa `.env`: `MAIL_SCHEME=smtp` (không phải `tls`) |
+| `535 Authentication failed` | Sai `MAIL_USERNAME` / `MAIL_PASSWORD` |
+| `Sender not valid` | Chưa xác thực tên miền `psvtravel.com` bên Brevo |
+
+Sau khi sửa `.env` **phải tạo lại container**, restart suông không đủ:
+
+```bash
+$C up -d --force-recreate app queue
+$C exec app php artisan optimize
+```
+
+Mail OTP gửi đồng bộ trong lúc xử lý đăng ký, nên SMTP hỏng là cả yêu cầu đăng
+ký hỏng theo — đó là lý do lỗi hiện ra dưới dạng "Server Error" chứ không phải
+"không gửi được mail".
+
 ### git báo `Permission denied` khi cập nhật mã nguồn
 
 ```
