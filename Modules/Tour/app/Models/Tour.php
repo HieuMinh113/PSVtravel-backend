@@ -56,7 +56,9 @@ class Tour extends Model
 
     public function images(): HasMany
     {
-        return $this->hasMany(TourImage::class)->orderBy('sort_order');
+        // Thêm id làm tiêu chí phụ: nhiều ảnh cùng "Thứ tự = 0" thì Postgres trả
+        // về theo thứ tự ngẫu nhiên, mỗi lần tải trang một khác.
+        return $this->hasMany(TourImage::class)->orderBy('sort_order')->orderBy('id');
     }
 
     // Chỉ lấy tour đang hiển thị công khai

@@ -43,6 +43,10 @@ class TourDetailResource extends JsonResource
                 'day_number' => $it->day_number,
                 'title' => $it->title,
                 'description' => $it->description,
+                // Ảnh của riêng ngày này, đúng thứ tự nhân viên đã sắp trong admin
+                'images' => collect($it->images ?? [])
+                    ->map(fn ($path) => str_starts_with($path, 'http') ? $path : asset('storage/'.$path))
+                    ->values(),
             ]),
 
             // Chỉ đợt còn hiệu lực, còn chỗ

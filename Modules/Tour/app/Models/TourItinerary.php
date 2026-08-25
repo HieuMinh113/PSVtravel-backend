@@ -8,12 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TourItinerary extends Model
 {
     protected $fillable = [
-        'tour_id', 'day_number', 'title', 'description', 'sort_order',
+        'tour_id', 'day_number', 'title', 'description', 'images', 'sort_order',
     ];
 
     protected $casts = [
         'day_number' => 'integer',
         'sort_order' => 'integer',
+        // Danh sách đường dẫn ảnh của riêng ngày này
+        'images' => 'array',
     ];
 
     public function tour(): BelongsTo

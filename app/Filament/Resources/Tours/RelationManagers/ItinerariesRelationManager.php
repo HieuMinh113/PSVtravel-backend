@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tours\RelationManagers;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -31,7 +32,21 @@ class ItinerariesRelationManager extends RelationManager
                 ->columnSpanFull(),
             Textarea::make('description')
                 ->label('Nội dung')
-                ->rows(4)
+                ->rows(6)
+                ->helperText('Gõ "Sáng:", "Trưa:", "Chiều:", "Tối:" ở đầu mỗi buổi — ngoài web sẽ tự tách thành từng đoạn riêng cho dễ đọc.')
+                ->columnSpanFull(),
+
+            FileUpload::make('images')
+                ->label('Ảnh của ngày này')
+                ->helperText('Kéo thả để sắp xếp. Ảnh hiện đúng thứ tự này ngoài web.')
+                ->image()
+                ->multiple()
+                ->reorderable()
+                ->appendFiles()
+                ->imageEditor()
+                ->directory('tours/lich-trinh')
+                ->maxFiles(10)
+                ->maxSize(4096)
                 ->columnSpanFull(),
             TextInput::make('sort_order')
                 ->label('Thứ tự')
@@ -50,6 +65,10 @@ class ItinerariesRelationManager extends RelationManager
                 TextColumn::make('title')
                     ->label('Tiêu đề')
                     ->wrap(),
+                TextColumn::make('images')
+                    ->label('Số ảnh')
+                    ->formatStateUsing(fn ($state): string => (string) count((array) $state))
+                    ->badge(),
             ])
             ->defaultSort('day_number')
             ->headerActions([
