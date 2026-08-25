@@ -70,6 +70,24 @@ services:
     build:
       context: ../psvtravel-frontend
       dockerfile: Dockerfile
+      # Lúc build, Next dựng sẵn nội dung các trang nên PHẢI gọi được API.
+      #
+      # Container build không nằm trong mạng Docker nội bộ, nên bí danh
+      # api.psvtravel.com trỏ vào nginx không áp dụng ở đây. Nó gọi ra Internet
+      # rồi phải vòng ngược về chính VPS — kiểu đi vòng mà nhà cung cấp chặn.
+      # Hậu quả: mọi trang dựng sẵn ra đời rỗng, khách bấm chuyển trang thấy
+      # trắng trơn, F5 mới có (lúc đó trang đã được dựng lại ở máy chủ).
+      #
+      # Hai dòng dưới cho container build dùng mạng của máy chủ và hiểu
+      # api.psvtravel.com chính là máy này — gói tin đi thẳng vào nginx ở cổng
+      # 443, tên miền vẫn khớp chứng chỉ nên không phải bỏ mã hoá.
+      #
+      # Cần nginx đang chạy lúc build. Script triển khai luôn build khi hệ
+      # thống đã chạy nên không sao; chỉ lần cài đặt đầu tiên là chưa có,
+      # khi đó trang tự dựng lại sau 60 giây.
+      network: host
+      extra_hosts:
+        - "${PSV_API_DOMAIN}:127.0.0.1"
       args:
         # Trình duyệt của khách gọi thẳng vào đây nên phải là tên miền công khai
         NEXT_PUBLIC_API_URL: https://${PSV_API_DOMAIN}/api/v1

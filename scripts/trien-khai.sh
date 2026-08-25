@@ -39,6 +39,11 @@ echo "==> 2/8  Bật thông báo bảo trì"
 $COMPOSE exec -T app php artisan down --retry=60 || true
 
 echo "==> 3/8  Đóng lại ảnh Docker"
+# nginx phải đang chạy trước khi build frontend: lúc build, Next gọi API qua
+# https://api.psvtravel.com và container build được trỏ tên miền đó về chính
+# máy này (xem ghi chú trong docker-compose.prod.yml). nginx chưa chạy thì
+# trang dựng sẵn ra đời rỗng.
+$COMPOSE up -d nginx >/dev/null 2>&1 || true
 # Frontend BẮT BUỘC build lại mỗi lần: địa chỉ API được nhúng thẳng vào mã
 # JavaScript lúc build, không đọc lúc chạy.
 $COMPOSE build app queue frontend
@@ -64,6 +69,12 @@ $COMPOSE exec -T app php artisan queue:restart
 
 echo "==> 8/8  Tắt thông báo bảo trì"
 $COMPOSE exec -T app php artisan up
+
+# Gọi trước vài trang chính để máy chủ dựng lại nội dung mới ngay, khách đầu
+# tiên khỏi phải chờ.
+for DUONG in "" "/tour-trong-nuoc" "/tour-nuoc-ngoai"; do
+    curl -s -o /dev/null "https://${PSV_DOMAIN:-psvtravel.com}${DUONG}" || true
+done
 
 echo
 echo "==> Kiểm tra"
