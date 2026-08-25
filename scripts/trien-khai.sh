@@ -50,22 +50,36 @@ for DIR in "$THU_MUC_BE" "$THU_MUC_FE"; do
     git -C "$DIR" reset --hard FETCH_HEAD
 done
 
-echo "==> 2/8  Bật thông báo bảo trì"
-# --render dùng trang bảo trì đẹp thay vì dòng chữ trống trơn.
-# Bỏ qua nếu lệnh lỗi: web đang chạy vẫn hơn là dừng deploy vì cái này.
-$COMPOSE exec -T app php artisan down --retry=60 || true
-
-echo "==> 3/8  Đóng lại ảnh Docker"
-# nginx phải đang chạy trước khi build frontend: lúc build, Next gọi API qua
-# https://api.psvtravel.com và container build được trỏ tên miền đó về chính
-# máy này (xem ghi chú trong docker-compose.prod.yml). nginx chưa chạy thì
-# trang dựng sẵn ra đời rỗng.
+echo "==> 2/8  Đóng lại ảnh Docker"
+# CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
+#
+# Lúc build, Next gọi API để dựng sẵn nội dung các trang. Nếu website đang
+# trong chế độ bảo trì thì Laravel trả 503 cho MỌI lời gọi, nên mọi trang dựng
+# ra đều rỗng. Website chạy lên với các trang không có tour, khách phải F5 vài
+# lần chờ máy chủ dựng lại mới thấy. Trước đây script bật bảo trì ngay từ đầu
+# nên lần triển khai nào cũng tự tạo ra lỗi đó.
+#
+# Bảo trì chỉ cần bọc quanh phần thật sự nguy hiểm — đổi cấu trúc cơ sở dữ liệu
+# và khởi động lại dịch vụ — chứ không phải cả quá trình build dài 5–8 phút.
+# Nhờ vậy thời gian website ngừng phục vụ giảm từ vài phút xuống vài chục giây.
+#
+# nginx phải đang chạy: container build gọi API qua https://api.psvtravel.com
+# và được trỏ tên miền đó về chính máy này (xem docker-compose.prod.yml).
 $COMPOSE up -d nginx >/dev/null 2>&1 || true
+
 # Frontend BẮT BUỘC build lại mỗi lần: địa chỉ API được nhúng thẳng vào mã
 # JavaScript lúc build, không đọc lúc chạy.
 $COMPOSE build app queue frontend
 
+echo "==> 3/8  Bật thông báo bảo trì"
+# Từ đây trở đi mới thật sự nguy hiểm: thay thư viện PHP, đổi cấu trúc cơ sở
+# dữ liệu, khởi động lại dịch vụ. Ảnh Docker đã đóng xong ở trên nên khoảng
+# ngừng phục vụ chỉ còn vài chục giây thay vì cả 5–8 phút build.
+$COMPOSE exec -T app php artisan down --retry=60 || true
+
 echo "==> 4/8  Cài thư viện PHP"
+# Chạy trong lúc bảo trì: thay thư viện ngay dưới chân một tiến trình đang
+# phục vụ khách có thể làm hỏng vài yêu cầu đang dở.
 $COMPOSE run --rm --no-deps app composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> 5/8  Cập nhật cấu trúc cơ sở dữ liệu"
@@ -92,20 +106,3 @@ $COMPOSE exec -T app php artisan up
 for DUONG in "" "/tour-trong-nuoc" "/tour-nuoc-ngoai"; do
     curl -s -o /dev/null "https://${PSV_DOMAIN:-psvtravel.com}${DUONG}" || true
 done
-
-echo
-echo "==> Kiểm tra"
-sleep 3
-MA_API=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_API_DOMAIN:-api.psvtravel.com}/api/v1/settings" || echo 000)
-MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_DOMAIN:-psvtravel.com}/" || echo 000)
-echo "    API: $MA_API    Website: $MA_WEB"
-
-if [ "$MA_API" = "200" ] && [ "$MA_WEB" = "200" ]; then
-    echo "    Xong. Website đã chạy phiên bản mới."
-else
-    echo
-    echo "    !! Có gì đó không ổn. Xem log:"
-    echo "       $COMPOSE logs --tail=50 app"
-    echo "       $COMPOSE logs --tail=50 frontend"
-    exit 1
-fi

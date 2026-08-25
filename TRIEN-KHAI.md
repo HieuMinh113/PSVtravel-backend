@@ -483,17 +483,25 @@ cd /opt/psvtravel/psvtravel-backend && ./scripts/trien-khai.sh
 
 Script tự làm 8 việc theo đúng thứ tự:
 
-| Bước | Việc |
-|---|---|
-| 0 | Sao lưu cơ sở dữ liệu |
-| 1 | Lấy mã nguồn mới của **cả hai** repo |
-| 2 | Bật thông báo bảo trì |
-| 3 | Đóng lại ảnh Docker (gồm build lại frontend) |
-| 4 | Cài thư viện PHP |
-| 5 | Cập nhật cấu trúc cơ sở dữ liệu |
-| 6 | Khởi động lại dịch vụ |
-| 7 | Nạp lại bộ nhớ đệm, khởi động lại worker gửi mail |
-| 8 | Tắt bảo trì rồi kiểm tra web có lên không |
+| Bước | Việc | Web có phục vụ khách? |
+|---|---|---|
+| 0 | Sao lưu cơ sở dữ liệu | Có |
+| 1 | Lấy mã nguồn mới của **cả hai** repo | Có |
+| 2 | Đóng lại ảnh Docker (gồm build frontend, 5–8 phút) | **Có** |
+| 3 | Bật thông báo bảo trì | Không |
+| 4 | Cài thư viện PHP | Không |
+| 5 | Cập nhật cấu trúc cơ sở dữ liệu | Không |
+| 6 | Khởi động lại dịch vụ | Không |
+| 7 | Nạp lại bộ nhớ đệm, khởi động lại worker gửi mail | Không |
+| 8 | Tắt bảo trì, gọi trước các trang chính, kiểm tra | Có |
+
+> **Vì sao build nằm NGOÀI khoảng bảo trì.** Lúc build, Next gọi API để dựng
+> sẵn nội dung các trang. Nếu website đang bảo trì thì Laravel trả 503 cho mọi
+> lời gọi, mọi trang dựng ra đều rỗng, và website chạy lên với các trang không
+> có tour — khách phải F5 vài lần chờ máy chủ dựng lại mới thấy.
+>
+> Bảo trì chỉ bọc quanh phần thật sự nguy hiểm, nên khoảng ngừng phục vụ chỉ
+> còn vài chục giây thay vì cả 5–8 phút.
 
 Chạy khoảng 5–8 phút. Cuối cùng in ra mã trạng thái của API và website — cả hai
 là `200` thì xong.
