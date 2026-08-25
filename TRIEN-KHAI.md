@@ -471,15 +471,39 @@ cd /opt/psvtravel/psvtravel-backend && ./scripts/sao-luu-csdl.sh
 
 ## Cập nhật website sau này
 
-Sau khi push mã mới lên nhánh `main`:
+Mở PowerShell trên máy Windows, đăng nhập VPS rồi chạy **một lệnh duy nhất**:
 
-```bash
-cd /opt/psvtravel/psvtravel-backend
-./scripts/trien-khai.sh
+```
+ssh psv@103.109.187.16
 ```
 
-Script tự sao lưu CSDL, kéo mã mới của cả hai repo, build lại, chạy migration,
-khởi động lại dịch vụ và kiểm tra web có lên không.
+```bash
+cd /opt/psvtravel/psvtravel-backend && ./scripts/trien-khai.sh
+```
+
+Script tự làm 8 việc theo đúng thứ tự:
+
+| Bước | Việc |
+|---|---|
+| 0 | Sao lưu cơ sở dữ liệu |
+| 1 | Lấy mã nguồn mới của **cả hai** repo |
+| 2 | Bật thông báo bảo trì |
+| 3 | Đóng lại ảnh Docker (gồm build lại frontend) |
+| 4 | Cài thư viện PHP |
+| 5 | Cập nhật cấu trúc cơ sở dữ liệu |
+| 6 | Khởi động lại dịch vụ |
+| 7 | Nạp lại bộ nhớ đệm, khởi động lại worker gửi mail |
+| 8 | Tắt bảo trì rồi kiểm tra web có lên không |
+
+Chạy khoảng 5–8 phút. Cuối cùng in ra mã trạng thái của API và website — cả hai
+là `200` thì xong.
+
+Mặc định script lấy nhánh `claude/github-repos-exploration-1izvgb`. Muốn lấy
+nhánh khác thì truyền tên nhánh:
+
+```bash
+./scripts/trien-khai.sh main
+```
 
 ---
 

@@ -7,7 +7,9 @@
 # chừng còn hơn chạy tới cùng với CSDL đã đổi mà mã nguồn thì chưa.
 set -euo pipefail
 
-NHANH="${1:-main}"
+# Nhánh đang phát triển. Truyền tên nhánh khác làm tham số nếu cần:
+#   ./scripts/trien-khai.sh main
+NHANH="${1:-claude/github-repos-exploration-1izvgb}"
 THU_MUC_BE="$(cd "$(dirname "$0")/.." && pwd)"
 THU_MUC_FE="$(dirname "$THU_MUC_BE")/psvtravel-frontend"
 COMPOSE="docker compose -f docker-compose.prod.yml"
@@ -18,8 +20,18 @@ echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
 ./scripts/sao-luu-csdl.sh
 
 echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
-git -C "$THU_MUC_BE" pull origin "$NHANH"
-git -C "$THU_MUC_FE" pull origin "$NHANH"
+# Dùng fetch + reset --hard chứ không phải pull.
+#
+# Máy chủ là nơi CHẠY, không phải nơi sửa code — nó phải khớp đúng nhánh trên
+# GitHub. Dùng pull thì chỉ cần một commit lỡ tay trên máy chủ là git báo
+# "divergent branches" và dừng giữa chừng.
+#
+# reset --hard chỉ động vào file git theo dõi: .env, vendor/ và thư mục ảnh
+# upload đều nằm ngoài git nên không bị mất.
+for DIR in "$THU_MUC_BE" "$THU_MUC_FE"; do
+    git -C "$DIR" fetch origin "$NHANH"
+    git -C "$DIR" reset --hard FETCH_HEAD
+done
 
 echo "==> 2/8  Bật thông báo bảo trì"
 # --render dùng trang bảo trì đẹp thay vì dòng chữ trống trơn.
@@ -38,6 +50,9 @@ echo "==> 5/8  Cập nhật cấu trúc cơ sở dữ liệu"
 $COMPOSE run --rm app php artisan migrate --force
 
 echo "==> 6/8  Khởi động lại các dịch vụ"
+# --force-recreate cho frontend: ảnh Docker mới chỉ có tác dụng khi container
+# được tạo lại, restart suông thì vẫn chạy ảnh cũ.
+$COMPOSE up -d --remove-orphans --force-recreate frontend
 $COMPOSE up -d --remove-orphans
 
 echo "==> 7/8  Nạp lại bộ nhớ đệm"
