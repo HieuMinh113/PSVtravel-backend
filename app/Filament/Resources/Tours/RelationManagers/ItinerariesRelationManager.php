@@ -33,7 +33,7 @@ class ItinerariesRelationManager extends RelationManager
             Textarea::make('description')
                 ->label('Nội dung')
                 ->rows(6)
-                ->helperText('Gõ "Sáng:", "Trưa:", "Chiều:", "Tối:" ở đầu mỗi buổi — ngoài web sẽ tự tách thành từng đoạn riêng cho dễ đọc.')
+                ->helperText('Gõ "Sáng:", "Trưa:", "Chiều:", "Tối:" ở đầu mỗi buổi — ngoài web tự tách thành từng đoạn riêng. Bọc tên điểm tham quan trong dấu sao để in đậm, ví dụ: tham quan *Tòa nhà Quốc Hội*.')
                 ->columnSpanFull(),
 
             FileUpload::make('images')
