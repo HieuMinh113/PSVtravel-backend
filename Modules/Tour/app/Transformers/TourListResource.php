@@ -41,10 +41,20 @@ class TourListResource extends JsonResource
             // nhìn một dãy ngày là biết tour chạy đều, dễ chọn hơn hẳn so với
             // một ngày lẻ. Quan hệ departures đã được lọc còn mở, còn hạn và
             // sắp theo ngày ngay ở controller.
+            //
+            // Trả về dạng Y-m-d chứ không phải d/m: giao diện còn phải SO SÁNH
+            // với ngày khách chọn ở ô tìm kiếm, mà d/m thì không có năm nên
+            // không so được. Việc hiển thị d/m để bên giao diện lo.
             'departure_dates' => $this->departures->take(self::SO_NGAY_HIEN)
-                ->map(fn ($d) => $d->start_date->format('d/m'))
+                ->map(fn ($d) => $d->start_date->format('Y-m-d'))
                 ->values(),
             'departure_count' => $this->departures->count(),
+            // Đợt XA NHẤT còn mở. Khách tìm "khởi hành từ ngày X" thì tour hợp
+            // lệ khi còn ít nhất một đợt từ ngày X trở đi — tức là đợt xa nhất
+            // phải >= X. Chỉ cần một mốc này, khỏi gửi cả trăm ngày về máy khách.
+            'last_departure_date' => optional($this->departures->last())?->start_date?->format('Y-m-d'),
+            // Số chỗ trống nhiều nhất trong các đợt còn mở, để lọc theo số khách.
+            'max_seats_left' => $this->departures->max('seats_left'),
             'updated_at' => $this->updated_at,
         ];
     }
