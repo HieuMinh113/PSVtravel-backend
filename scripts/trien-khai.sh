@@ -116,8 +116,60 @@ $COMPOSE exec -T app php artisan queue:restart
 echo "==> 8/8  Tắt thông báo bảo trì"
 $COMPOSE exec -T app php artisan up
 
+# Website đã chạy lại. Từ đây có lỗi cũng không phải chuyện bảo trì nữa, bỏ bẫy
+# đi để phần kiểm tra bên dưới không in ra câu "đang tắt thông báo bảo trì".
+trap - EXIT
+
+WEB="https://${PSV_DOMAIN:-psvtravel.com}"
+API="https://${PSV_API_DOMAIN:-api.psvtravel.com}"
+
 # Gọi trước vài trang chính để máy chủ dựng lại nội dung mới ngay, khách đầu
 # tiên khỏi phải chờ.
 for DUONG in "" "/tour-trong-nuoc" "/tour-nuoc-ngoai"; do
-    curl -s -o /dev/null "https://${PSV_DOMAIN:-psvtravel.com}${DUONG}" || true
+    curl -s -o /dev/null "$WEB$DUONG" || true
 done
+
+echo
+echo "==> Kiểm tra"
+sleep 3
+
+MA_API=$(curl -s -o /dev/null -w "%{http_code}" "$API/api/v1/settings" || echo 000)
+MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "$WEB/" || echo 000)
+echo "    API: $MA_API    Website: $MA_WEB"
+
+# Mã 200 KHÔNG đủ để nói là xong.
+#
+# Đúng cái bẫy đã cắn ba lần: trang dựng ra rỗng vẫn trả về 200 tử tế, khách mở
+# lên thấy "0 tour phù hợp" mà nhật ký không có lấy một dòng lỗi. Nên phải đếm
+# xem trang có thật sự chứa tour không.
+#
+# Danh sách tour do trình duyệt dựng nên chuỗi HTML không có thẻ tour, nhưng dữ
+# liệu tour thì luôn nằm trong đó — "categorySlugs" là dấu vết chắc chắn nhất.
+dem_tour() {
+    # || true là BẮT BUỘC: script bật set -o pipefail, mà grep không tìm thấy gì
+    # thì trả mã 1 — đúng trường hợp cần cảnh báo. Thiếu nó thì script chết ngay
+    # tại dòng này và không in ra lấy một chữ giải thích.
+    curl -s "$WEB$1" | grep -o 'categorySlugs' | wc -l || true
+}
+SO_NN=$(dem_tour /tour-nuoc-ngoai)
+SO_TN=$(dem_tour /tour-trong-nuoc)
+echo "    Tour dựng sẵn trong trang — nước ngoài: $SO_NN    trong nước: $SO_TN"
+
+if [ "$MA_API" != "200" ] || [ "$MA_WEB" != "200" ]; then
+    echo
+    echo "    !! Website không phản hồi. Xem nhật ký:"
+    echo "       $COMPOSE logs --tail=50 app"
+    echo "       $COMPOSE logs --tail=50 frontend"
+    exit 1
+fi
+
+if [ "$SO_NN" -eq 0 ] || [ "$SO_TN" -eq 0 ]; then
+    echo
+    echo "    !! Website trả về 200 nhưng TRANG DỰNG RA KHÔNG CÓ TOUR NÀO."
+    echo "       Khách mở lên sẽ thấy \"0 tour phù hợp\" và phải F5 vài lần."
+    echo "       Thường là do lúc đóng ảnh Docker không gọi được API."
+    echo "       Xem nhật ký:  $COMPOSE logs --tail=50 frontend"
+    exit 1
+fi
+
+echo "    Xong. Website đã chạy phiên bản mới."
