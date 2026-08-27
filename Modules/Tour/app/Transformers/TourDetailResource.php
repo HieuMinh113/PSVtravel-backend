@@ -27,9 +27,23 @@ class TourDetailResource extends JsonResource
                 ? (str_starts_with($this->cover_image, 'http') ? $this->cover_image : asset('storage/'.$this->cover_image))
                 : null,
             'highlights' => $this->highlights ?? [],
-            'included' => $this->included ?? [],
-            'excluded' => $this->excluded ?? [],
+            // Tách lúc trả về: tour nhập từ trước có cả đoạn văn dồn vào MỘT
+            // mục kèm dấu ➢, để nguyên thì ngoài web thành một dòng dài chạy
+            // tràn khỏi khung.
+            'included' => \Modules\Tour\Models\Tour::tachTungMuc($this->included ?? []),
+            'excluded' => \Modules\Tour\Models\Tour::tachTungMuc($this->excluded ?? []),
             'cancellation_policy' => $this->cancellation_policy,
+
+            // Khối "Những thông tin cần lưu ý" ở cuối trang tour.
+            // Mục để trống nội dung thì không gửi ra — khách bấm vào một dòng
+            // rỗng sẽ tưởng trang bị lỗi.
+            'notes' => collect($this->notes ?? [])
+                ->filter(fn ($muc) => filled($muc['title'] ?? null) && filled($muc['content'] ?? null))
+                ->map(fn ($muc) => [
+                    'title' => $muc['title'],
+                    'content' => $muc['content'],
+                ])
+                ->values(),
             'description' => $this->description,
             'rating' => $this->rating,
             'review_count' => $this->review_count,

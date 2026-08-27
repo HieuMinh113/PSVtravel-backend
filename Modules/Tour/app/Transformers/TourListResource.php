@@ -7,6 +7,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class TourListResource extends JsonResource
 {
+    /** Số ngày khởi hành hiện trên thẻ tour; còn nữa thì gộp thành nhãn "+n". */
+    private const SO_NGAY_HIEN = 5;
+
     public function toArray(Request $request): array
     {
         return [
@@ -34,6 +37,14 @@ class TourListResource extends JsonResource
             'is_featured' => $this->is_featured,
             'next_start_date' => optional($this->departures->first())?->start_date?->format('d/m/Y'),
             'next_seats_left' => optional($this->departures->first())?->seats_left,
+            // Dãy ngày khởi hành sắp tới cho thẻ tour ngoài trang danh sách:
+            // nhìn một dãy ngày là biết tour chạy đều, dễ chọn hơn hẳn so với
+            // một ngày lẻ. Quan hệ departures đã được lọc còn mở, còn hạn và
+            // sắp theo ngày ngay ở controller.
+            'departure_dates' => $this->departures->take(self::SO_NGAY_HIEN)
+                ->map(fn ($d) => $d->start_date->format('d/m'))
+                ->values(),
+            'departure_count' => $this->departures->count(),
             'updated_at' => $this->updated_at,
         ];
     }

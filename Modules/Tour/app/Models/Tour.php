@@ -20,7 +20,7 @@ class Tour extends Model
         'adult_price', 'child_price', 'old_price',
         'tag', 'cover_image',
         'highlights', 'included', 'excluded',
-        'cancellation_policy', 'description',
+        'cancellation_policy', 'notes', 'description',
         'rating', 'review_count',
         'status', 'is_featured', 'sort_order',
     ];
@@ -29,6 +29,7 @@ class Tour extends Model
         'highlights'   => 'array',
         'included'     => 'array',
         'excluded'     => 'array',
+        'notes'        => 'array',
         'adult_price'  => 'integer',
         'child_price'  => 'integer',
         'old_price'    => 'integer',
@@ -37,6 +38,30 @@ class Tour extends Model
         'is_featured'  => 'boolean',
         'sort_order'   => 'integer',
     ];
+
+    /**
+     * Tách một danh sách (bao gồm / không bao gồm) thành từng mục riêng.
+     *
+     * Dùng ở CẢ HAI đầu:
+     *  - lúc lưu trong admin, để dán nguyên đoạn từ file chương trình tour vào
+     *    là ra đúng từng mục;
+     *  - lúc trả về cho website, để những tour đã nhập từ trước — cả đoạn văn
+     *    dồn thành MỘT mục có dấu ➢ ở giữa — hiện ra đúng, khỏi phải mở từng
+     *    tour ra lưu lại.
+     */
+    public static function tachTungMuc($gia): array
+    {
+        if (is_array($gia)) {
+            $gia = implode("\n", $gia);
+        }
+
+        return collect(preg_split('/[\r\n➢▪•]+/u', (string) $gia))
+            // Cắt khoảng trắng và dấu gạch đầu dòng, GIỮ dấu chấm cuối câu.
+            ->map(fn ($dong) => trim($dong, " \t\u{00A0}-"))
+            ->filter()
+            ->values()
+            ->all();
+    }
 
     // Đơn đặt của tour — dùng để chặn xoá vĩnh viễn khi tour đã phát sinh giao dịch
     public function bookings(): HasMany

@@ -6,15 +6,47 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\Str;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use Modules\Tour\Models\Tour;
 
 class TourForm
 {
+    /** Đầu mục thường gặp, điền sẵn cho tour mới để đỡ phải gõ lại từ đầu. */
+    private const MUC_THUONG_DUNG = [
+        'Thông tin Visa',
+        'Lưu ý giá trẻ em',
+        'Điều kiện thanh toán',
+        'Điều kiện đăng ký',
+        'Lưu ý về chuyển hoặc huỷ tour',
+        'Điều kiện huỷ tour ngày thường',
+        'Điều kiện huỷ tour ngày lễ, Tết',
+        'Trường hợp bất khả kháng',
+        'Liên hệ',
+    ];
+
+    /** Mảng trong CSDL -> ô nhập nhiều dòng. */
+    private static function ghepDong($state): string
+    {
+        return is_array($state) ? implode("\n", $state) : (string) ($state ?? '');
+    }
+
+    /**
+     * Ô nhập nhiều dòng -> mảng lưu vào CSDL.
+     *
+     * Tách cả theo xuống dòng lẫn dấu ➢ / • / ▪ để dán thẳng từ file chương
+     * trình tour vào là ra đúng từng mục, khỏi phải ngồi cắt tay.
+     */
+    private static function tachDong($state): array
+    {
+        return Tour::tachTungMuc($state);
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -168,18 +200,58 @@ class TourForm
                     ->label('Điểm nổi bật')
                     ->helperText('Gõ từng ý rồi nhấn Enter')
                     ->columnSpanFull(),
-                TagsInput::make('included')
+                // Nhập MỖI DÒNG MỘT MỤC thay vì ô thẻ.
+                //
+                // Ô thẻ buộc nhân viên gõ từng mục rồi Enter; dán nguyên đoạn văn
+                // từ file chương trình tour vào thì cả đoạn thành MỘT thẻ khổng lồ,
+                // ra ngoài web hiện thành một dòng dài chạy tràn khỏi khung —
+                // đã xảy ra thật với tour Singapore.
+                Textarea::make('included')
                     ->label('Dịch vụ bao gồm')
-                    ->helperText('Gõ từng mục rồi nhấn Enter')
+                    ->helperText('Mỗi dòng một mục. Dán từ file chương trình tour cũng được, dấu ➢ sẽ tự tách dòng.')
+                    ->rows(6)
+                    ->formatStateUsing(fn ($state) => self::ghepDong($state))
+                    ->dehydrateStateUsing(fn ($state) => self::tachDong($state))
                     ->columnSpanFull(),
-                TagsInput::make('excluded')
+                Textarea::make('excluded')
                     ->label('Không bao gồm')
-                    ->helperText('Gõ từng mục rồi nhấn Enter')
+                    ->helperText('Mỗi dòng một mục. Dán từ file chương trình tour cũng được, dấu ➢ sẽ tự tách dòng.')
+                    ->rows(6)
+                    ->formatStateUsing(fn ($state) => self::ghepDong($state))
+                    ->dehydrateStateUsing(fn ($state) => self::tachDong($state))
                     ->columnSpanFull(),
 
                 Textarea::make('cancellation_policy')
                     ->label('Chính sách huỷ tour')
+                    ->helperText('Hiện thành một mục trong khối "Những thông tin cần lưu ý" ở cuối trang tour.')
                     ->rows(4)
+                    ->columnSpanFull(),
+
+                // Khối xếp gấp ở cuối trang tour. Mỗi tour một bộ riêng.
+                Repeater::make('notes')
+                    ->label('Những thông tin cần lưu ý')
+                    ->helperText('Mỗi mục là một dòng khách bấm vào để mở ra. Kéo thả để đổi thứ tự. Mục bỏ trống nội dung sẽ không hiện ra ngoài web.')
+                    ->schema([
+                        TextInput::make('title')
+                            ->label('Tên mục')
+                            ->required()
+                            ->maxLength(255),
+                        Textarea::make('content')
+                            ->label('Nội dung')
+                            ->rows(5),
+                    ])
+                    // Tour mới mở ra đã có sẵn khung mục thường dùng, nhân viên
+                    // chỉ điền nội dung thay vì tự nhớ đủ 8 đầu mục.
+                    ->default(fn () => array_map(
+                        fn ($ten) => ['title' => $ten, 'content' => ''],
+                        self::MUC_THUONG_DUNG,
+                    ))
+                    ->itemLabel(fn (array $state) => $state['title'] ?? 'Mục mới')
+                    ->collapsed()
+                    ->collapsible()
+                    ->reorderable()
+                    ->cloneable()
+                    ->addActionLabel('Thêm mục')
                     ->columnSpanFull(),
                 Textarea::make('description')
                     ->label('Mô tả')
