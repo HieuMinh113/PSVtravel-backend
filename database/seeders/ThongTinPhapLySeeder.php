@@ -30,6 +30,16 @@ class ThongTinPhapLySeeder extends Seeder
             // chính là dãy số này.
             'business_registration' => '0314542363',
             'business_registration_place' => 'Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh',
+
+            // Giấy phép kinh doanh dịch vụ lữ hành quốc tế (INBOUND + OUTBOUND),
+            // cấp lần 5, tháng 7/2026. Đây là giấy phép BẮT BUỘC phải công bố
+            // với doanh nghiệp bán tour ra nước ngoài — khác hoàn toàn giấy
+            // đăng ký doanh nghiệp ở trên.
+            'license_number' => '79-769/2020/CDLQGVN-GP LHQT',
+            'license_issuer' => 'Cục Du lịch Quốc gia Việt Nam',
+
+            // Không còn hiện ở chân trang (giấy phép lữ hành nói lên nhiều hơn),
+            // nhưng vẫn giữ lại để dùng cho hợp đồng và hoá đơn.
             'legal_representative' => 'Nguyễn Anh Dũng',
 
             // --- Liên hệ ---
@@ -51,8 +61,7 @@ class ThongTinPhapLySeeder extends Seeder
 
         $this->command->info('Đã cập nhật thông tin pháp lý và liên hệ của công ty.');
         $this->command->newLine();
-        $this->command->warn('Còn hai ô CỐ Ý để trống, điền trong admin khi có giấy tờ:');
-        $this->command->line('  • Số giấy phép lữ hành  — Cục Du lịch / Sở Du lịch cấp, KHÁC giấy ĐKDN');
+        $this->command->warn('Còn một ô CỐ Ý để trống, điền trong admin khi có:');
         $this->command->line('  • Link Bộ Công Thương   — có sau khi thông báo tại online.gov.vn');
     }
 }
