@@ -106,6 +106,24 @@ echo "==> 6/8  Khởi động lại các dịch vụ"
 $COMPOSE up -d --remove-orphans --force-recreate frontend
 $COMPOSE up -d --remove-orphans
 
+# Nạp lại cấu hình nginx SAU KHI các container kia đã lên.
+#
+# Bắt buộc, không phải cho chắc. Cấu hình dùng tên container:
+#   fastcgi_pass app:9000;   proxy_pass http://frontend:3000;
+# nginx phân giải những tên này ĐÚNG MỘT LẦN lúc nạp cấu hình rồi giữ nguyên
+# địa chỉ IP đó suốt đời tiến trình. Container nào được TẠO LẠI sẽ nhận IP
+# mới, nginx vẫn gửi vào IP cũ đã chết và trả 502 mãi mãi cho tới khi có người
+# tự nạp lại.
+#
+# Bình thường ảnh Docker không đổi nên container chỉ "Running", không tạo lại,
+# nên lỗi này ẩn mình. Nó chỉ lộ ra khi ảnh PHP phải dựng lại từ đầu — đã xảy
+# ra thật ngày 03/09/2026: API chết 502 trong khi website vẫn 200.
+#
+# reload chứ không restart: nginx thay tiến trình con êm, khách đang tải trang
+# không bị ngắt giữa chừng. Reload không xong (nginx chưa chạy chẳng hạn) thì
+# khởi động lại hẳn — thà chớp một nhịp còn hơn để nguyên 502.
+$COMPOSE exec -T nginx nginx -s reload || $COMPOSE restart nginx
+
 echo "==> 7/8  Nạp lại bộ nhớ đệm"
 $COMPOSE exec -T app php artisan optimize
 $COMPOSE exec -T app php artisan filament:optimize
@@ -131,10 +149,24 @@ done
 
 echo
 echo "==> Kiểm tra"
-sleep 3
 
-MA_API=$(curl -s -o /dev/null -w "%{http_code}" "$API/api/v1/settings" || echo 000)
-MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "$WEB/" || echo 000)
+# Thử lại vài lần thay vì đo đúng một phát.
+#
+# Container vừa được tạo lại cần vài giây mới nhận yêu cầu — PHP-FPM phải khởi
+# động, Laravel phải nạp cấu hình. Đo một phát rồi kết luận "hỏng" là báo động
+# giả, mà báo động giả vài lần thì lần thật sẽ bị bỏ qua.
+doi_ma_200() {
+    local dia_chi="$1" ma=000
+    for _ in 1 2 3 4 5 6; do
+        ma=$(curl -s -o /dev/null -w "%{http_code}" "$dia_chi" || echo 000)
+        [ "$ma" = "200" ] && break
+        sleep 5
+    done
+    echo "$ma"
+}
+
+MA_API=$(doi_ma_200 "$API/api/v1/settings")
+MA_WEB=$(doi_ma_200 "$WEB/")
 echo "    API: $MA_API    Website: $MA_WEB"
 
 # Mã 200 KHÔNG đủ để nói là xong.
@@ -157,9 +189,15 @@ echo "    Tour dựng sẵn trong trang — nước ngoài: $SO_NN    trong nư�
 
 if [ "$MA_API" != "200" ] || [ "$MA_WEB" != "200" ]; then
     echo
-    echo "    !! Website không phản hồi. Xem nhật ký:"
-    echo "       $COMPOSE logs --tail=50 app"
-    echo "       $COMPOSE logs --tail=50 frontend"
+    echo "    !! Website không phản hồi."
+    if [ "$MA_API" = "502" ] || [ "$MA_WEB" = "502" ]; then
+        echo "       502 = nginx không gọi được vào phía sau. Thử nạp lại nginx:"
+        echo "         $COMPOSE exec -T nginx nginx -s reload"
+    fi
+    echo "       Xem nhật ký:"
+    echo "         $COMPOSE logs --tail=50 nginx"
+    echo "         $COMPOSE logs --tail=50 app"
+    echo "         $COMPOSE logs --tail=50 frontend"
     exit 1
 fi
 
