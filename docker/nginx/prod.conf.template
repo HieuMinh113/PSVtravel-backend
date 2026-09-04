@@ -32,6 +32,13 @@ server {
     http2 on;
     server_name ${PSV_DOMAIN} www.${PSV_DOMAIN};
 
+    # Gộp về một tên miền chuẩn: www chuyển hẳn (301) sang không-www. Trước đây
+    # www trả 200 (bản kiểm tra kỹ thuật bắt được), thẻ canonical có bù nhưng
+    # 301 dứt khoát hơn, tránh Google coi hai địa chỉ là hai trang.
+    if ($host = www.${PSV_DOMAIN}) {
+        return 301 https://${PSV_DOMAIN}$request_uri;
+    }
+
     ssl_certificate     /etc/letsencrypt/live/${PSV_DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${PSV_DOMAIN}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;

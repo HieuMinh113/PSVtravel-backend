@@ -10,9 +10,28 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Category\Models\Category;
+use App\Jobs\PingIndexNow;
 class Tour extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
+
+    // Khi một tour ĐANG BÁN được lưu, báo IndexNow để Bing/Yandex lập chỉ mục
+    // ngay trang đó (Bing nuôi ChatGPT/Copilot). Chạy trong hàng đợi nên không
+    // làm chậm thao tác lưu; chỉ ping ở môi trường thật để khỏi nhiễu khi seed.
+    protected static function booted(): void
+    {
+        static::saved(function (self $tour) {
+            if ($tour->status !== 'published' || ! app()->isProduction()) {
+                return;
+            }
+            $goc = rtrim((string) config('app.frontend_url'), '/');
+            $muc = $tour->type === 'abroad' ? 'tour-nuoc-ngoai' : 'tour-trong-nuoc';
+            PingIndexNow::dispatch([
+                "{$goc}/{$muc}/{$tour->slug}",
+                "{$goc}/{$muc}",
+            ]);
+        });
+    }
 
     protected $fillable = [
         'slug', 'name', 'type', 'region', 'country',
