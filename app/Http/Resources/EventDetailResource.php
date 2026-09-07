@@ -13,6 +13,7 @@ class EventDetailResource extends JsonResource
             'slug' => $this->slug,
             'title' => $this->title,
             'summary' => $this->summary,
+            'audience' => array_values($this->audience ?? []),
             'cover_image' => $this->anh($this->cover_image),
             'gallery' => collect($this->gallery ?? [])
                 ->map(fn ($p) => $this->anh($p))

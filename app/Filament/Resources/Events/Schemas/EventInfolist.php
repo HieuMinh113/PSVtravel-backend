@@ -20,6 +20,12 @@ class EventInfolist
                     ->columnSpanFull(),
                 TextEntry::make('title')->label('Tên gói'),
                 TextEntry::make('slug')->label('Đường dẫn'),
+                TextEntry::make('audience')
+                    ->label('Phù hợp với')
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(fn (?string $state): string => \App\Models\Event::DOI_TUONG[$state] ?? $state)
+                    ->placeholder('—'),
                 TextEntry::make('group_size')->label('Số người phù hợp')->placeholder('—'),
                 TextEntry::make('duration')->label('Thời lượng')->placeholder('—'),
                 TextEntry::make('location')->label('Địa điểm gợi ý')->placeholder('—'),

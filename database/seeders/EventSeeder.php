@@ -16,6 +16,7 @@ class EventSeeder extends Seeder
             [
                 'title' => 'Team Building Bãi Biển 2N1Đ',
                 'slug' => 'team-building-bai-bien-2n1d',
+                'audience' => ['doanh-nghiep'],
                 'summary' => 'Gói team building biển trọn gói cho doanh nghiệp: trò chơi vận động, gala dinner và nghỉ dưỡng.',
                 'includes' => [
                     'MC & ê-kíp trò chơi team building chuyên nghiệp',
@@ -34,6 +35,7 @@ class EventSeeder extends Seeder
             [
                 'title' => 'Gala Dinner & Year End Party',
                 'slug' => 'gala-dinner-year-end-party',
+                'audience' => ['doanh-nghiep'],
                 'summary' => 'Tổ chức tiệc cuối năm, vinh danh nhân viên, kết hợp ăn uống và giải trí trọn gói.',
                 'includes' => [
                     'Lên kịch bản & dẫn chương trình',
@@ -52,6 +54,7 @@ class EventSeeder extends Seeder
             [
                 'title' => 'Company Trip Đà Lạt 3N2Đ',
                 'slug' => 'company-trip-da-lat-3n2d',
+                'audience' => ['doanh-nghiep', 'gia-dinh'],
                 'summary' => 'Chuyến đi gắn kết cho công ty: nghỉ dưỡng, tham quan và hoạt động nhóm nhẹ nhàng.',
                 'includes' => [
                     'Xe đưa đón khứ hồi',

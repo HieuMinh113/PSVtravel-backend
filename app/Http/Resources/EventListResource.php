@@ -13,6 +13,7 @@ class EventListResource extends JsonResource
             'slug' => $this->slug,
             'title' => $this->title,
             'summary' => $this->summary,
+            'audience' => array_values($this->audience ?? []),
             'cover_image' => $this->anh($this->cover_image),
             'group_size' => $this->group_size,
             'duration' => $this->duration,

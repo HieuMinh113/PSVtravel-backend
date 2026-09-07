@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -38,6 +39,13 @@ class EventForm
                     ->validationMessages([
                         'regex' => 'Slug chỉ gồm chữ thường, số và dấu gạch ngang (không dấu, không khoảng trắng).',
                     ]),
+
+                CheckboxList::make('audience')
+                    ->label('Phù hợp với')
+                    ->helperText('Chọn một hoặc nhiều nhóm khách phù hợp với gói này')
+                    ->options(\App\Models\Event::DOI_TUONG)
+                    ->columns(3)
+                    ->columnSpanFull(),
 
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')

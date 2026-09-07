@@ -14,13 +14,21 @@ class Event extends Model
 {
     use LogsActivity, SoftDeletes;
 
+    // Đối tượng phù hợp của gói
+    public const DOI_TUONG = [
+        'gia-dinh' => 'Gia đình',
+        'doanh-nghiep' => 'Doanh nghiệp',
+        'ca-nhan' => 'Cá nhân',
+    ];
+
     protected $fillable = [
-        'title', 'slug', 'summary', 'cover_image', 'gallery', 'description',
+        'title', 'slug', 'summary', 'audience', 'cover_image', 'gallery', 'description',
         'includes', 'group_size', 'duration', 'location', 'price_note',
         'is_featured', 'status', 'sort_order',
     ];
 
     protected $casts = [
+        'audience' => 'array',
         'gallery' => 'array',
         'includes' => 'array',
         'is_featured' => 'boolean',

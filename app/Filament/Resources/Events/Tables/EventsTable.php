@@ -26,6 +26,12 @@ class EventsTable
                     ->label('Tên gói')
                     ->searchable()
                     ->wrap(),
+                TextColumn::make('audience')
+                    ->label('Phù hợp với')
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(fn (?string $state): string => \App\Models\Event::DOI_TUONG[$state] ?? $state)
+                    ->placeholder('—'),
                 TextColumn::make('group_size')
                     ->label('Số người')
                     ->placeholder('—'),
