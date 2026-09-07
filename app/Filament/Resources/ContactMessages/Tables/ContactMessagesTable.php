@@ -26,6 +26,11 @@ class ContactMessagesTable
                     ->label('Nhận lúc')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
+                TextColumn::make('source')
+                    ->label('Nguồn')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => ContactMessage::NGUON[$state] ?? 'Liên hệ')
+                    ->color(fn (?string $state): string => $state === 'team_building' ? 'warning' : 'gray'),
                 TextColumn::make('name')
                     ->label('Khách')
                     ->weight('semibold')
@@ -59,6 +64,9 @@ class ContactMessagesTable
                 SelectFilter::make('status')
                     ->label('Trạng thái')
                     ->options(ContactMessage::TRANG_THAI),
+                SelectFilter::make('source')
+                    ->label('Nguồn')
+                    ->options(ContactMessage::NGUON),
                 TrashedFilter::make()->label('Đã xoá'),
             ])
             ->recordActions([

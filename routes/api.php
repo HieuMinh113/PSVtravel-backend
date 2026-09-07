@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -26,3 +27,14 @@ Route::prefix('v1/auth')->group(function () {
 // Form liên hệ ngoài website — chống spam bằng giới hạn tần suất riêng
 Route::post('v1/contact', [ContactController::class, 'store'])
     ->middleware('throttle:contact');
+
+// Yêu cầu tổ chức sự kiện / team building — dùng chung giới hạn với form liên hệ
+Route::post('v1/team-building', [ContactController::class, 'teamBuilding'])
+    ->middleware('throttle:contact');
+
+// Gói sự kiện / team building — công khai để website dựng trang
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::get('events', [EventController::class, 'index']);
+    Route::get('events-slugs', [EventController::class, 'slugs']);
+    Route::get('events/{slug}', [EventController::class, 'show']);
+});
