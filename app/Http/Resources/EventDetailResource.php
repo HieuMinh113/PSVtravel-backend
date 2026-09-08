@@ -25,6 +25,19 @@ class EventDetailResource extends JsonResource
                 ->map(fn ($x) => is_string($x) ? trim($x) : $x)
                 ->filter()
                 ->values(),
+            'itinerary' => collect($this->itinerary ?? [])
+                ->map(fn ($ngay) => [
+                    'title' => $ngay['title'] ?? '',
+                    'description' => $ngay['description'] ?? '',
+                    'images' => collect($ngay['images'] ?? [])
+                        ->map(fn ($p) => $this->anh($p))
+                        ->filter()
+                        ->values(),
+                ])
+                ->filter(fn ($ngay) => ($ngay['title'] ?? '') !== '' || ($ngay['description'] ?? '') !== '' || count($ngay['images']) > 0)
+                ->values(),
+            'rating' => $this->rating ? (float) $this->rating : null,
+            'review_count' => (int) $this->review_count,
             'group_size' => $this->group_size,
             'duration' => $this->duration,
             'location' => $this->location,

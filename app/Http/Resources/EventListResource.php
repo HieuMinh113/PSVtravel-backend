@@ -19,6 +19,8 @@ class EventListResource extends JsonResource
             'duration' => $this->duration,
             'location' => $this->location,
             'price_note' => $this->price_note,
+            'rating' => $this->rating ? (float) $this->rating : null,
+            'review_count' => (int) $this->review_count,
             'is_featured' => (bool) $this->is_featured,
         ];
     }

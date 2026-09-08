@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Events\Schemas;
 
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -54,13 +55,13 @@ class EventForm
                     ->disk('public')
                     ->columnSpanFull(),
                 FileUpload::make('gallery')
-                    ->label('Thư viện ảnh')
+                    ->label('Hình ảnh thực tế')
                     ->image()
                     ->multiple()
                     ->reorderable()
                     ->directory('events')
                     ->disk('public')
-                    ->helperText('Có thể kéo thả để sắp lại thứ tự ảnh')
+                    ->helperText('Ảnh thực tế của chương trình. Để trống thì web tự lấy ảnh từ các ngày trong "Chương trình theo ngày".')
                     ->columnSpanFull(),
 
                 Textarea::make('summary')
@@ -85,6 +86,31 @@ class EventForm
 
                 RichEditor::make('description')
                     ->label('Giới thiệu chi tiết')
+                    ->columnSpanFull(),
+
+                Repeater::make('itinerary')
+                    ->label('Chương trình theo ngày')
+                    ->helperText('Mỗi mục là một ngày. Gói 1 buổi (gala…) có thể bỏ trống khối này.')
+                    ->addActionLabel('Thêm ngày')
+                    ->reorderable()
+                    ->collapsible()
+                    ->itemLabel(fn (array $state): ?string => $state['title'] ?? null)
+                    ->schema([
+                        TextInput::make('title')
+                            ->label('Tiêu đề ngày')
+                            ->placeholder('VD: Ngày 1 — Di chuyển & trò chơi bãi biển')
+                            ->maxLength(255),
+                        Textarea::make('description')
+                            ->label('Mô tả')
+                            ->rows(3),
+                        FileUpload::make('images')
+                            ->label('Ảnh của ngày này')
+                            ->image()
+                            ->multiple()
+                            ->reorderable()
+                            ->directory('events')
+                            ->disk('public'),
+                    ])
                     ->columnSpanFull(),
 
                 TextInput::make('group_size')

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventReviewController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -37,4 +38,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('events', [EventController::class, 'index']);
     Route::get('events-slugs', [EventController::class, 'slugs']);
     Route::get('events/{slug}', [EventController::class, 'show']);
+    Route::get('events/{slug}/reviews', [EventReviewController::class, 'index']);
 });
+
+// Khách gửi đánh giá gói sự kiện — chờ admin duyệt; giới hạn tần suất riêng
+Route::post('v1/events/{slug}/reviews', [EventReviewController::class, 'store'])
+    ->middleware('throttle:review');

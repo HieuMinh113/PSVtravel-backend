@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -23,17 +24,27 @@ class Event extends Model
 
     protected $fillable = [
         'title', 'slug', 'summary', 'audience', 'cover_image', 'gallery', 'description',
-        'includes', 'group_size', 'duration', 'location', 'price_note',
+        'includes', 'itinerary', 'group_size', 'duration', 'location', 'price_note',
         'is_featured', 'status', 'sort_order',
+        // rating/review_count KHÔNG nằm ở đây: chỉ EventReview tự cập nhật qua
+        // updateQuietly, admin không nhập tay.
     ];
 
     protected $casts = [
         'audience' => 'array',
         'gallery' => 'array',
         'includes' => 'array',
+        'itinerary' => 'array',
+        'rating' => 'float',
+        'review_count' => 'integer',
         'is_featured' => 'boolean',
         'sort_order' => 'integer',
     ];
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(EventReview::class);
+    }
 
     public function scopeDangHienThi($query)
     {
