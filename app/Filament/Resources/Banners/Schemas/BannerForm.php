@@ -44,7 +44,7 @@ class BannerForm
                     })
                     ->helperText(fn (Get $get): string => match ($get('position')) {
                         'promo' => 'Nên dùng ảnh ngang, khoảng 1920×700',
-                        'popup' => 'Poster bật lên giữa màn hình, khung tỉ lệ dọc 4:5. Nên up ảnh 800×1000 (hoặc đúng tỉ lệ 4:5) để không bị cắt; ảnh khác tỉ lệ sẽ được cắt cho vừa khung.',
+                        'popup' => 'Poster bật lên giữa màn hình, hiện NGUYÊN tấm theo đúng tỉ lệ ảnh (không cắt), tự thu vừa màn hình. Poster dọc nhiều chữ vẫn đọc đủ. Nên dùng ảnh dọc ~800×1000 trở lên cho nét.',
                         default => 'Ảnh sẽ hiện trong khung vuông nhỏ. Nên cắt VUÔNG khoảng 600×600, chủ thể nằm giữa. Mỗi trang nên có 8–12 ảnh.',
                     })
                     ->image()
