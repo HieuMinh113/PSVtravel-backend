@@ -15,6 +15,7 @@ class Banner extends Model
     // form trong admin và API tự nhận theo danh sách này.
     public const VI_TRI = [
         'promo' => 'Banner khuyến mãi (trang chủ)',
+        'popup' => 'Poster popup (bật lên khi mở web)',
         'orbit_home' => 'Ảnh vòng xoay — Trang chủ',
         'orbit_domestic' => 'Ảnh vòng xoay — Tour trong nước',
         'orbit_abroad' => 'Ảnh vòng xoay — Tour nước ngoài',
