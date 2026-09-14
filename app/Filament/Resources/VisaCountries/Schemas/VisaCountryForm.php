@@ -75,6 +75,9 @@ class VisaCountryForm
 
                 RichEditor::make('description')
                     ->label('Mô tả chi tiết')
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('visa/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 TextInput::make('sort_order')

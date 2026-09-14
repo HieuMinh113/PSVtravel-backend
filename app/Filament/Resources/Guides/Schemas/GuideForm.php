@@ -58,6 +58,11 @@ class GuideForm
                     ->columnSpanFull(),
                 RichEditor::make('content')
                     ->label('Nội dung bài viết')
+                    // Bật tải ảnh: nút ảnh trên thanh công cụ lưu vào disk public
+                    // (storage/app/public) để ảnh hiện được ra ngoài website.
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('guides/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 Select::make('status')

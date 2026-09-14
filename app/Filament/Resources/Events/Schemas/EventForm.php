@@ -86,6 +86,9 @@ class EventForm
 
                 RichEditor::make('description')
                     ->label('Giới thiệu chi tiết')
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('events/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 Repeater::make('itinerary')

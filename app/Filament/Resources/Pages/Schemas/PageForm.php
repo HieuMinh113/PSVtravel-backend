@@ -38,6 +38,9 @@ class PageForm
 
                 RichEditor::make('body')
                     ->label('Nội dung trang')
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('pages/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 TextInput::make('meta_title')
