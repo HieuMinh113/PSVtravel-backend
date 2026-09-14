@@ -90,7 +90,9 @@ class Tour extends Model
 
     public function departures(): HasMany
     {
-        return $this->hasMany(TourDeparture::class);
+        // Luôn sắp theo ngày khởi hành tăng dần: ngày gần nhất lên đầu, để danh
+        // sách chọn ngày trên web đúng thứ tự thời gian (không theo thứ tự nhập).
+        return $this->hasMany(TourDeparture::class)->orderBy('start_date');
     }
 
     public function itineraries(): HasMany
