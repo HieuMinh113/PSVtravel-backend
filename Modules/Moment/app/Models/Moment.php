@@ -14,10 +14,13 @@ class Moment extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'image', 'caption', 'customer_name', 'tour_id', 'status', 'sort_order',
+        'image', 'gallery', 'caption', 'customer_name', 'tour_id', 'status', 'sort_order',
     ];
 
-    protected $casts = ['sort_order' => 'integer'];
+    protected $casts = [
+        'sort_order' => 'integer',
+        'gallery' => 'array',
+    ];
 
     public function tour(): BelongsTo
     {

@@ -14,11 +14,23 @@ class MomentForm
         return $schema
             ->components([
                 FileUpload::make('image')
-                    ->label('Ảnh')
+                    ->label('Ảnh chính')
+                    ->helperText('Ảnh đại diện hiển thị ngoài trang')
                     ->image()
+                    ->imageEditor()
                     ->directory('moments')
                     ->disk('public')
                     ->required()
+                    ->columnSpanFull(),
+                FileUpload::make('gallery')
+                    ->label('Ảnh phụ (bộ sưu tập)')
+                    ->helperText('Có thể thêm nhiều ảnh — kéo thả để sắp thứ tự. Khách bấm vào khoảnh khắc sẽ xem được tất cả.')
+                    ->image()
+                    ->multiple()
+                    ->reorderable()
+                    ->appendFiles()
+                    ->directory('moments')
+                    ->disk('public')
                     ->columnSpanFull(),
                 TextInput::make('caption')
                     ->label('Chú thích')
