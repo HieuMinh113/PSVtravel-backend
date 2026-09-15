@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
+use App\Http\Controllers\Api\TeamMemberController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -44,3 +45,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 // Khách gửi đánh giá gói sự kiện — chờ admin duyệt; giới hạn tần suất riêng
 Route::post('v1/events/{slug}/reviews', [EventReviewController::class, 'store'])
     ->middleware('throttle:review');
+
+// Đội ngũ / ban lãnh đạo — công khai để trang Về chúng tôi dựng
+Route::get('v1/team-members', [TeamMemberController::class, 'index'])
+    ->middleware('throttle:api');
