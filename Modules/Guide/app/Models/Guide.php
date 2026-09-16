@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Tour\Models\Tour;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -15,7 +16,7 @@ class Guide extends Model
 
     protected $fillable = [
         'title', 'slug', 'excerpt', 'content', 'cover_image',
-        'author_id', 'category', 'view_count', 'status', 'published_at', 'sort_order',
+        'author_id', 'category', 'tour_id', 'view_count', 'status', 'published_at', 'sort_order',
     ];
 
     protected $casts = [
@@ -27,6 +28,11 @@ class Guide extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    public function tour(): BelongsTo
+    {
+        return $this->belongsTo(Tour::class);
     }
 
     public function scopeDangHienThi($query)

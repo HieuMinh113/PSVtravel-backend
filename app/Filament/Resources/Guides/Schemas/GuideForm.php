@@ -43,6 +43,14 @@ class GuideForm
                     ->searchable()
                     ->preload(),
 
+                Select::make('tour_id')
+                    ->label('Gắn tour để đặt')
+                    ->helperText('Chọn tour liên quan — bài viết sẽ hiện ô đặt tour bên phải. Để trống nếu không gắn.')
+                    ->relationship('tour', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->columnSpanFull(),
+
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
                     ->image()

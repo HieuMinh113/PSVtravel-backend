@@ -34,7 +34,7 @@ class GuideApiController extends Controller
     {
         $guide = Guide::query()
             ->dangHienThi()
-            ->with('author:id,name')
+            ->with(['author:id,name', 'tour.departures'])
             ->where('slug', $slug)
             ->firstOrFail();
 
