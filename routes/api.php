@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AboutImageController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
@@ -48,4 +49,8 @@ Route::post('v1/events/{slug}/reviews', [EventReviewController::class, 'store'])
 
 // Đội ngũ / ban lãnh đạo — công khai để trang Về chúng tôi dựng
 Route::get('v1/team-members', [TeamMemberController::class, 'index'])
+    ->middleware('throttle:api');
+
+// Ảnh trang "Về chúng tôi" — admin quản lý, hiển thị công khai
+Route::get('v1/about-images', [AboutImageController::class, 'index'])
     ->middleware('throttle:api');
