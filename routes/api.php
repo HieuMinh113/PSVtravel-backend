@@ -3,6 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AboutImageController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\DestinationController;
+use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\JobPostingController;
+use App\Http\Controllers\Api\PartnerController;
+use App\Http\Controllers\Api\PromotionController;
+use App\Http\Controllers\Api\SubscriberController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
 use App\Http\Controllers\Api\TeamMemberController;
@@ -54,3 +60,20 @@ Route::get('v1/team-members', [TeamMemberController::class, 'index'])
 // Ảnh trang "Về chúng tôi" — admin quản lý, hiển thị công khai
 Route::get('v1/about-images', [AboutImageController::class, 'index'])
     ->middleware('throttle:api');
+
+// Nội dung marketing công khai — admin quản lý
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::get('promotions', [PromotionController::class, 'index']);
+    Route::get('destinations', [DestinationController::class, 'index']);
+    Route::get('destinations-slugs', [DestinationController::class, 'slugs']);
+    Route::get('destinations/{slug}', [DestinationController::class, 'show']);
+    Route::get('faqs', [FaqController::class, 'index']);
+    Route::get('jobs', [JobPostingController::class, 'index']);
+    Route::get('jobs-slugs', [JobPostingController::class, 'slugs']);
+    Route::get('jobs/{slug}', [JobPostingController::class, 'show']);
+    Route::get('partners', [PartnerController::class, 'index']);
+});
+
+// Khách đăng ký nhận ưu đãi — chống spam bằng giới hạn tần suất của form liên hệ
+Route::post('v1/subscribe', [SubscriberController::class, 'store'])
+    ->middleware('throttle:contact');
