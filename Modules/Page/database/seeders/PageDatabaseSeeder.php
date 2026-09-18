@@ -36,9 +36,11 @@ class PageDatabaseSeeder extends Seeder
             ['key' => 'tax_code', 'label' => 'Mã số thuế', 'group' => 'general', 'type' => 'text'],
             ['key' => 'logo', 'label' => 'Logo', 'group' => 'general', 'type' => 'image'],
             ['key' => 'facebook', 'label' => 'Facebook', 'group' => 'social', 'type' => 'url'],
+            ['key' => 'instagram', 'label' => 'Instagram', 'group' => 'social', 'type' => 'url'],
             ['key' => 'zalo', 'label' => 'Zalo', 'group' => 'social', 'type' => 'text'],
             ['key' => 'youtube', 'label' => 'YouTube', 'group' => 'social', 'type' => 'url'],
             ['key' => 'tiktok', 'label' => 'TikTok', 'group' => 'social', 'type' => 'url'],
+            ['key' => 'footer_intro', 'label' => 'Giới thiệu ngắn (chân trang)', 'group' => 'contact', 'type' => 'textarea', 'value' => 'Đồng hành cùng bạn trên mọi hành trình — từ những bãi biển Việt Nam trong xanh đến những vùng đất mới lạ khắp thế giới.'],
             ['key' => 'seo_title', 'label' => 'Tiêu đề mặc định (SEO)', 'group' => 'seo', 'type' => 'text'],
             ['key' => 'seo_description', 'label' => 'Mô tả mặc định (SEO)', 'group' => 'seo', 'type' => 'textarea'],
 
