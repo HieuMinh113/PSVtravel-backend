@@ -19,9 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:3000',
-    ],
+    // Danh sách tên miền web được phép gọi API từ trình duyệt. Ở production
+    // đặt biến CORS_ALLOWED_ORIGINS (ngăn cách bằng dấu phẩy), ví dụ:
+    //   CORS_ALLOWED_ORIGINS=https://psvtravel.vn,https://www.psvtravel.vn
+    // Không đặt thì mặc định cho localhost để chạy dev.
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')),
+    ))),
 
     'allowed_origins_patterns' => [],
 
