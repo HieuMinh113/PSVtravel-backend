@@ -40,19 +40,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
         Gate::policy(\App\Models\ContactMessage::class, \App\Policies\ContactMessagePolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
-            $ip = (string) $request->ip();
-
-            // Bỏ giới hạn cho gọi nội bộ (loopback / mạng riêng) — ví dụ Next.js
-            // dựng sẵn trang gọi API khi triển khai.
-            if (\Symfony\Component\HttpFoundation\IpUtils::checkIp($ip, ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1'])) {
-                return \Illuminate\Cache\RateLimiting\Limit::none();
-            }
-
-            // Khách thật vẫn giới hạn, nhưng nâng trần vì đây là API đọc (GET) đã
-            // cache: lúc build, Next.js bắn hàng loạt request để dựng ~80 trang;
-            // trần 60/phút cũ làm build văng 429. 600/phút đủ chặn lạm dụng mà
-            // không cản build.
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($ip);
+            // API đọc (GET) đã cache: 600 lần/phút/IP đủ chặn lạm dụng mà không cản
+            // lúc build (Next.js dựng ~80 trang bắn nhiều request). Nhờ TrustProxies,
+            // $request->ip() là IP THẬT của khách nên giới hạn tính đúng theo từng người.
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($request->ip());
         });
 
         \Illuminate\Support\Facades\RateLimiter::for('booking', function (\Illuminate\Http\Request $request) {
