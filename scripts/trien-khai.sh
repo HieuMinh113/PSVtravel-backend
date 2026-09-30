@@ -146,6 +146,21 @@ $COMPOSE exec -T app php artisan filament:optimize
 # Thiếu dòng này thì mail xác nhận đơn vẫn dùng mẫu cũ.
 $COMPOSE exec -T app php artisan queue:restart
 
+# Trả quyền ghi cho PHP-FPM — BẮT BUỘC sau mọi lệnh artisan ở trên.
+#
+# Các lệnh "exec"/"run" chạy dưới quyền root nên file chúng tạo ra (view đã
+# biên dịch, file log trong ngày, bootstrap/cache) thuộc root và chỉ root ghi
+# được. PHP-FPM chạy dưới www-data: đụng tới là "Permission denied" → toàn bộ
+# API và trang quản trị trả 500 dù code không sai. Đã xảy ra ngày 30/09/2026.
+# Bước sửa quyền trong entrypoint chỉ chạy lúc container khởi động, tức là
+# TRƯỚC các lệnh trên, nên không cứu được.
+$COMPOSE exec -T app sh -c 'chgrp -R www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache'
+
+# Nạp lại PHP-FPM để xoá OPcache. Thư viện PHP vừa được thay dưới chân tiến
+# trình đang chạy; OPcache chỉ kiểm tra file đổi mỗi 60 giây nên trong khoảng
+# đó mã cũ và mã mới trộn lẫn. USR2 = nạp lại êm, không rớt yêu cầu đang dở.
+$COMPOSE exec -T app sh -c 'kill -USR2 1' || $COMPOSE restart app
+
 echo "==> 8/8  Tắt thông báo bảo trì"
 $COMPOSE exec -T app php artisan up
 
