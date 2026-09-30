@@ -122,7 +122,22 @@ $COMPOSE up -d --remove-orphans
 # reload chứ không restart: nginx thay tiến trình con êm, khách đang tải trang
 # không bị ngắt giữa chừng. Reload không xong (nginx chưa chạy chẳng hạn) thì
 # khởi động lại hẳn — thà chớp một nhịp còn hơn để nguyên 502.
-$COMPOSE exec -T nginx nginx -s reload || $COMPOSE restart nginx
+#
+# PHẢI dựng lại cấu hình từ template trước khi reload. Ảnh nginx chỉ biến
+# docker/nginx/prod.conf.template thành /etc/nginx/conf.d/default.conf MỘT LẦN
+# lúc container khởi động; "nginx -s reload" suông chỉ nạp lại bản đã dựng cũ,
+# nên mọi chỉnh sửa trong template (header bảo mật...) không bao giờ có hiệu
+# lực cho tới lần nginx tình cờ bị khởi động lại.
+# Dựng lại → nginx -t kiểm tra → hợp lệ mới reload. Cấu hình mới lỗi thì DỪNG
+# ở đó: nginx vẫn chạy cấu hình cũ trong bộ nhớ, website không sập.
+if $COMPOSE exec -T nginx true 2>/dev/null; then
+    if ! $COMPOSE exec -T nginx sh -c '/docker-entrypoint.d/20-envsubst-on-templates.sh >/dev/null && nginx -t -q && nginx -s reload'; then
+        echo "!! Cấu hình nginx mới KHÔNG hợp lệ (xem lỗi ở trên). nginx vẫn chạy cấu hình cũ." >&2
+        echo "!! Sửa docker/nginx/prod.conf.template rồi chạy lại script — ĐỪNG restart nginx trước khi sửa." >&2
+    fi
+else
+    $COMPOSE restart nginx
+fi
 
 echo "==> 7/8  Nạp lại bộ nhớ đệm"
 $COMPOSE exec -T app php artisan optimize
