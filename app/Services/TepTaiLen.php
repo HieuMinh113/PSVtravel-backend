@@ -11,8 +11,12 @@ namespace App\Services;
  * lên rồi gửi link cho quản trị viên để chiếm quyền. Chỉ nhận ảnh raster.
  *
  * (nginx cũng đã chặn chạy mã trong /storage/ — đây là lớp bảo vệ thứ hai.)
+ *
+ * KHÔNG nhận AVIF: bộ tối ưu ảnh của Next.js từng có lỗ chạy mã từ xa khi xử
+ * lý tệp AVIF (GHSA-2xp9-vwfh-vxw4). Đã nâng bản vá, nhưng JPG/PNG/WebP đã đủ
+ * dùng — không nhận định dạng từng là cửa vào thì bớt hẳn một mặt tấn công.
  */
 class TepTaiLen
 {
-    public const ANH = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+    public const ANH = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 }
