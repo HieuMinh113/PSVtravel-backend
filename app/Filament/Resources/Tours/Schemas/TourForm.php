@@ -192,7 +192,7 @@ class TourForm
                     ->maxLength(255),
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('tours')
                     ->disk('public'),
 

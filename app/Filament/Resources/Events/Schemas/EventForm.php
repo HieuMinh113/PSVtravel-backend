@@ -50,7 +50,7 @@ class EventForm
 
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('events')
                     ->disk('public')
                     ->columnSpanFull(),
@@ -64,7 +64,7 @@ class EventForm
                     ->columnSpanFull(),
                 FileUpload::make('gallery')
                     ->label('Hình ảnh thực tế')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->multiple()
                     ->reorderable()
                     ->directory('events')
@@ -116,7 +116,7 @@ class EventForm
                             ->rows(3),
                         FileUpload::make('images')
                             ->label('Ảnh của ngày này')
-                            ->image()
+                            ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                             ->multiple()
                             ->reorderable()
                             ->directory('events')

@@ -12,9 +12,12 @@
         $co = $dam ? '16px' : '13.5px';
         $canNang = $dam ? '700' : '600';
 
+        // e(): nội dung như tên khách là do khách TỰ NHẬP — không escape thì ai đó
+        // đặt tour với tên chứa thẻ HTML (vd. một nút "Xác nhận thanh toán" dẫn
+        // tới trang giả) sẽ chèn được nó vào email hệ thống gửi cho nhân viên.
         return '<tr>
-            <td style="padding:9px 0; font-size:13px; color:rgba(15,42,66,.6); white-space:nowrap;">'.$nhan.'</td>
-            <td align="right" style="padding:9px 0 9px 14px; font-size:'.$co.'; font-weight:'.$canNang.'; color:'.$mau.';">'.$giaTri.'</td>
+            <td style="padding:9px 0; font-size:13px; color:rgba(15,42,66,.6); white-space:nowrap;">'.e($nhan).'</td>
+            <td align="right" style="padding:9px 0 9px 14px; font-size:'.$co.'; font-weight:'.$canNang.'; color:'.$mau.';">'.e($giaTri).'</td>
         </tr>';
     };
 @endphp

@@ -16,7 +16,7 @@ class AboutImageForm
                 FileUpload::make('image')
                     ->label('Ảnh')
                     ->helperText('Ảnh hoạt động, hậu trường, đội ngũ... hiển thị ở trang "Về chúng tôi"')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->imageEditor()
                     ->directory('about')
                     ->disk('public')

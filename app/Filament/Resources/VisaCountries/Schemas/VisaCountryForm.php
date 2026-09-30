@@ -28,7 +28,7 @@ class VisaCountryForm
 
                 FileUpload::make('flag_image')
                     ->label('Ảnh cờ / ảnh đại diện')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('visa')
                     ->disk('public'),
                 Select::make('visa_type')

@@ -78,7 +78,7 @@ class CategoryForm
                     ]),
                 FileUpload::make('image')
                     ->label('Ảnh đại diện')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('categories')
                     ->disk('public'),
                 Select::make('status')

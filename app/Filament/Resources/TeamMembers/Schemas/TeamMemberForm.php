@@ -30,7 +30,7 @@ class TeamMemberForm
 
                 FileUpload::make('photo')
                     ->label('Ảnh')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->avatar()
                     ->imageEditor()
                     ->directory('team')

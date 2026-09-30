@@ -22,7 +22,7 @@ class PromotionForm
                     ->columnSpanFull(),
                 FileUpload::make('image')
                     ->label('Ảnh')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->imageEditor()
                     ->directory('promotions')
                     ->disk('public')

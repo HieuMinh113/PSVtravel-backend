@@ -29,7 +29,7 @@ class DestinationForm
                     ->maxLength(255),
                 FileUpload::make('image')
                     ->label('Ảnh đại diện')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->imageEditor()
                     ->directory('destinations')
                     ->disk('public')

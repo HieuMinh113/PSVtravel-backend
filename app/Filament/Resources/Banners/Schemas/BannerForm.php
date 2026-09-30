@@ -47,7 +47,7 @@ class BannerForm
                         'popup' => 'Poster bật lên giữa màn hình, hiện NGUYÊN tấm theo đúng tỉ lệ ảnh (không cắt), tự thu vừa màn hình. Poster dọc nhiều chữ vẫn đọc đủ. Nên dùng ảnh dọc ~800×1000 trở lên cho nét.',
                         default => 'Ảnh sẽ hiện trong khung vuông nhỏ. Nên cắt VUÔNG khoảng 600×600, chủ thể nằm giữa. Mỗi trang nên có 8–12 ảnh.',
                     })
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('banners')
                     ->disk('public')
                     ->required()
@@ -55,7 +55,7 @@ class BannerForm
                 FileUpload::make('image_mobile')
                     ->label(fn (Get $get): string => $get('position') === 'popup' ? 'Ảnh poster (điện thoại)' : 'Ảnh banner (điện thoại)')
                     ->helperText('Để trống thì dùng chung ảnh máy tính. Nên dùng ảnh dọc hơn, khoảng 800×1000')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('banners')
                     ->disk('public')
                     ->visible(fn (Get $get): bool => in_array($get('position'), ['promo', 'popup'], true))

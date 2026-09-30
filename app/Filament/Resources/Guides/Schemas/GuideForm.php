@@ -53,7 +53,7 @@ class GuideForm
 
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('guides')
                     ->disk('public')
                     ->columnSpanFull(),

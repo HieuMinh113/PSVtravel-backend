@@ -31,7 +31,7 @@ class PageForm
 
                 FileUpload::make('hero_image')
                     ->label('Ảnh đầu trang')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('pages')
                     ->disk('public')
                     ->columnSpanFull(),

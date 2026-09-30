@@ -65,6 +65,10 @@ server {
     location /_next/static/ {
         proxy_pass http://frontend:3000;
         add_header Cache-Control "public, max-age=31536000, immutable";
+        # LƯU Ý nginx: khối nào tự khai add_header thì KHÔNG kế thừa add_header
+        # của server — phải ghi lại header bảo mật, không thì tệp tĩnh mất HSTS.
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         access_log off;
     }
 
@@ -117,6 +121,19 @@ server {
         access_log off;
         expires 30d;
         add_header Cache-Control "public, max-age=2592000";
+
+        # Khối này có add_header riêng nên KHÔNG kế thừa header bảo mật của
+        # server (luật của nginx) — trước đây tệp upload mất sạch HSTS, nosniff…
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()" always;
+        # Tệp người dùng tải lên KHÔNG BAO GIỜ được chạy mã. Thư mục này nằm
+        # cùng tên miền với trang /admin: một ảnh SVG chứa JavaScript mở trực
+        # tiếp sẽ chạy với quyền của admin đang đăng nhập. "sandbox" + cấm
+        # script vô hiệu hoá điều đó; ảnh nhúng qua <img> vẫn hiển thị bình thường.
+        add_header Content-Security-Policy "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox" always;
 
         # Không bao giờ chạy mã trong thư mục người dùng tải lên
         location ~ \.(php|phtml|phar|sh|py|cgi)$ {

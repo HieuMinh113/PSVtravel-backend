@@ -65,7 +65,7 @@ class SettingForm
 
                 FileUpload::make('value')
                     ->label('Ảnh')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('settings')
                     ->disk('public')
                     ->columnSpanFull()

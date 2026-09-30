@@ -19,7 +19,7 @@ class PartnerForm
                     ->maxLength(255),
                 FileUpload::make('logo')
                     ->label('Logo')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('partners')
                     ->disk('public')
                     ->required()

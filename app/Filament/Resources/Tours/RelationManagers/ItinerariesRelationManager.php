@@ -39,7 +39,7 @@ class ItinerariesRelationManager extends RelationManager
             FileUpload::make('images')
                 ->label('Ảnh của ngày này')
                 ->helperText('Kéo thả để sắp xếp. Ảnh hiện đúng thứ tự này ngoài web.')
-                ->image()
+                ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                 ->multiple()
                 ->reorderable()
                 ->appendFiles()
