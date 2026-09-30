@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,9 +16,12 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Models\Concerns\HasActivity;
 use Spatie\Activitylog\Support\LogOptions;
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
     use HasActivity, HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
+
+    // 2FA của trang quản trị (Filament): khoá bí mật + mã khôi phục, đều mã hoá khi lưu
+    use InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery;
 
     protected $fillable = [
         'name',
@@ -78,6 +85,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->roles()->whereHas('permissions')->exists()
             || $this->permissions()->exists();
     }
+    /**
+     * Tài khoản này có BẮT BUỘC bật 2FA khi vào trang quản trị không.
+     *
+     * Bắt buộc với super_admin và admin — người giữ quyền cao nhất, lộ mật khẩu
+     * là lộ toàn bộ dữ liệu khách hàng. Nhân viên khác bật tuỳ ý trong Hồ sơ.
+     * Tên vai trò super admin lấy từ cấu hình Shield, không viết cứng.
+     */
+    public function phaiBat2fa(): bool
+    {
+        return $this->hasRole(array_filter([
+            config('filament-shield.super_admin.name'),
+            'admin',
+        ]));
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
