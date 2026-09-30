@@ -26,6 +26,9 @@ class TourDetailResource extends JsonResource
             'cover_image' => $this->cover_image
                 ? (str_starts_with($this->cover_image, 'http') ? $this->cover_image : asset('storage/'.$this->cover_image))
                 : null,
+            // Chỉ trả MÃ video (11 ký tự), không trả link thô — website tự dựng
+            // link nhúng youtube-nocookie, không bao giờ nhúng địa chỉ lạ.
+            'video_id' => \App\Services\YouTube::id($this->video_url),
             'highlights' => $this->highlights ?? [],
             // Tách lúc trả về: tour nhập từ trước có cả đoạn văn dồn vào MỘT
             // mục kèm dấu ➢, để nguyên thì ngoài web thành một dòng dài chạy

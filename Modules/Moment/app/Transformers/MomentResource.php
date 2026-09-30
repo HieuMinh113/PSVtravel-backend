@@ -9,8 +9,14 @@ class MomentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $videoId = \App\Services\YouTube::id($this->video_url);
+
         return [
-            'image' => $this->urlAnh($this->image),
+            // Không có ảnh riêng mà có video thì lấy ảnh thu nhỏ của video làm ảnh bìa
+            'image' => $this->urlAnh($this->image)
+                ?? ($videoId ? "https://i.ytimg.com/vi/{$videoId}/hqdefault.jpg" : null),
+            // Chỉ trả MÃ video — website tự dựng link nhúng youtube-nocookie
+            'video_id' => $videoId,
             'gallery' => collect($this->gallery ?? [])
                 ->map(fn ($path) => $this->urlAnh($path))
                 ->filter()

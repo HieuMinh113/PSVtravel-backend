@@ -37,7 +37,7 @@ class Tour extends Model
         'slug', 'name', 'type', 'region', 'country',
         'duration_days', 'duration_nights', 'departure_from',
         'adult_price', 'child_price', 'old_price',
-        'tag', 'cover_image',
+        'tag', 'cover_image', 'video_url',
         'highlights', 'included', 'excluded',
         'cancellation_policy', 'notes', 'description',
         'rating', 'review_count',

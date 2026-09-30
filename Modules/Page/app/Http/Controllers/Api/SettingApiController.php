@@ -26,6 +26,12 @@ class SettingApiController extends Controller
                     $value = str_starts_with($value, 'http') ? $value : asset('storage/'.$value);
                 }
 
+                // Cấu hình kiểu video YouTube: chỉ trả MÃ video, không trả link
+                // thô — website tự dựng link nhúng, không nhúng địa chỉ lạ.
+                if ($s->type === 'youtube') {
+                    $value = \App\Services\YouTube::id($value);
+                }
+
                 return [$s->key => $value];
             });
 

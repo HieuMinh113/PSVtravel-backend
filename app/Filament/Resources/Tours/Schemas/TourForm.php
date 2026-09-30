@@ -196,6 +196,15 @@ class TourForm
                     ->directory('tours')
                     ->disk('public'),
 
+                // Chỉ lưu LINK YouTube — video do YouTube phát, không tốn ổ đĩa
+                // hay băng thông máy chủ. Để trống thì trang tour ẩn khối video.
+                TextInput::make('video_url')
+                    ->label('Link video YouTube')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Dán link video quay cảnh tour. Hiện ngay dưới ảnh bìa trên trang tour. Để trống nếu chưa có.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()]),
+
                 TagsInput::make('highlights')
                     ->label('Điểm nổi bật')
                     ->helperText('Gõ từng ý rồi nhấn Enter')

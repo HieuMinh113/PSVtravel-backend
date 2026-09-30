@@ -14,7 +14,7 @@ class Moment extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'image', 'gallery', 'caption', 'customer_name', 'tour_id', 'status', 'sort_order',
+        'image', 'gallery', 'video_url', 'caption', 'customer_name', 'tour_id', 'status', 'sort_order',
     ];
 
     protected $casts = [
