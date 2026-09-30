@@ -19,7 +19,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\BatBuoc2faQuanTri;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
+use App\Filament\Auth\XacThucApp;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -45,7 +45,7 @@ class AdminPanelProvider extends PanelProvider
             // và admin bắt buộc, nhân viên khác tuỳ chọn.
             ->multiFactorAuthentication(
                 [
-                    AppAuthentication::make()
+                    XacThucApp::make()
                         ->brandName('PSV Travel')
                         ->recoverable(),
                 ],
