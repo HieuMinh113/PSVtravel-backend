@@ -12,7 +12,7 @@ limit_req_zone $binary_remote_addr zone=psv_dangnhap:10m rate=1r/s;
 # ---- Chuyển hết HTTP sang HTTPS, trừ đường xác thực chứng chỉ ----
 server {
     listen 80;
-    server_name ${PSV_DOMAIN} www.${PSV_DOMAIN} ${PSV_API_DOMAIN};
+    server_name ${PSV_DOMAIN} ${PSV_API_DOMAIN};
 
     # Let's Encrypt đặt tệp kiểm chứng vào đây khi cấp và gia hạn chứng chỉ
     location /.well-known/acme-challenge/ {
@@ -21,6 +21,23 @@ server {
 
     location / {
         return 301 https://$host$request_uri;
+    }
+}
+
+# http://www → thẳng https://tên-miền-chuẩn trong MỘT lần chuyển.
+# Trước đây đi hai chặng (http://www → https://www → https://không-www); mỗi
+# chặng là một lượt khứ hồi mạng — PageSpeed mobile tính ~0,6s "multiple page
+# redirects". Vẫn giữ đường xác thực chứng chỉ vì chứng chỉ có cả tên www.
+server {
+    listen 80;
+    server_name www.${PSV_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/certbot;
+    }
+
+    location / {
+        return 301 https://${PSV_DOMAIN}$request_uri;
     }
 }
 
