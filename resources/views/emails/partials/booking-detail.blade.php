@@ -39,7 +39,13 @@
             {!! $dong('Ngày về (dự kiến)', $ngayVe?->format('d/m/Y')) !!}
             {!! $dong('Số khách', $booking->adults.' người lớn'.($booking->children > 0 ? ', '.$booking->children.' trẻ em' : '')) !!}
             {!! $dong('Người liên hệ', $booking->customer_name.' — '.$booking->customer_phone) !!}
-            {!! $dong('Tổng tiền', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @if ($booking->choBaoGiaTreEm())
+                {{-- Tour chưa có giá trẻ em: tổng tiền CHƯA gồm trẻ em, nói rõ để khách không hiểu nhầm --}}
+                {!! $dong('Giá trẻ em', 'Nhân viên sẽ báo giá') !!}
+                {!! $dong('Tạm tính (chưa gồm trẻ em)', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @else
+                {!! $dong('Tổng tiền', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @endif
         </table>
 
         @if ($booking->note)

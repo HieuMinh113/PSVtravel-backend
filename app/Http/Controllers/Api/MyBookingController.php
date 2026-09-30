@@ -44,6 +44,7 @@ class MyBookingController extends Controller
                 'adults' => $b->adults,
                 'children' => $b->children,
                 'total_price' => $b->total_price,
+                'cho_bao_gia_tre_em' => $b->choBaoGiaTreEm(),
                 'status' => $b->status,
                 'status_label' => match ($b->status) {
                     'confirmed' => 'Đã xác nhận',

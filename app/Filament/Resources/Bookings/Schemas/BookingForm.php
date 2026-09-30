@@ -26,10 +26,13 @@ class BookingForm
                 ->searchable()
                 ->preload()
                 ->live()
-                ->afterStateUpdated(function ($state, Set $set) {
+                ->afterStateUpdated(function ($state, Get $get, Set $set) {
                     $tour = Tour::find($state);
+                    $set('tour_departure_id', null);
                     $set('unit_price_adult', $tour?->adult_price ?? 0);
-                    $set('unit_price_child', $tour?->child_price ?? 0);
+                    // Tour chưa có giá trẻ em → để trống = chờ báo giá (không phải 0đ)
+                    $set('unit_price_child', $tour?->child_price);
+                    self::tinhTong($get, $set);
                 })
                 ->required(),
 
@@ -50,7 +53,16 @@ class BookingForm
                         ])
                         ->toArray();
                 })
-                ->searchable(),
+                ->searchable()
+                // Đợt có giá riêng (phụ thu Tết, khuyến mãi…) thì đơn giá người lớn
+                // theo giá ĐỢT — khớp với con số website đã hiển thị cho khách.
+                ->live()
+                ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                    $tour = Tour::find($get('tour_id'));
+                    $dot = $state ? TourDeparture::find($state) : null;
+                    $set('unit_price_adult', $dot?->price_override ?? $tour?->adult_price ?? 0);
+                    self::tinhTong($get, $set);
+                }),
 
             TextInput::make('customer_name')
                 ->label('Tên khách')
@@ -92,15 +104,15 @@ class BookingForm
                 ->required(),
             TextInput::make('unit_price_child')
                 ->label('Đơn giá trẻ em')
+                ->helperText('Để TRỐNG = chưa báo giá trẻ em (không tính vào tổng). Nhập 0 nếu trẻ em miễn phí.')
                 ->numeric()
-                ->default(0)
                 ->minValue(0)
                 ->suffix('₫')
                 ->live(onBlur: true)
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::tinhTong($get, $set)),
             TextInput::make('total_price')
                 ->label('Tổng tiền')
-                ->helperText('Tự tính = người lớn × đơn giá + trẻ em × đơn giá')
+                ->helperText('Tự tính = người lớn × đơn giá + trẻ em × đơn giá (trẻ em chưa có giá thì chưa tính)')
                 ->numeric()
                 ->default(0)
                 ->minValue(1)

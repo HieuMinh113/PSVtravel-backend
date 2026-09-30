@@ -43,11 +43,18 @@ class BookingApiController extends Controller
             }
         }
 
-        // Server tự tính tiền, tự đặt trạng thái — khách không quyết được
-        $donGiaNguoiLon = $tour->adult_price;
-        $donGiaTreEm = $tour->child_price ?? 0;
+        // Server tự tính tiền, tự đặt trạng thái — khách không quyết được.
+        //
+        // Người lớn: đợt khởi hành có giá riêng (phụ thu Tết, giá khuyến mãi…)
+        // thì lấy giá ĐỢT — đúng con số website hiển thị cho khách. Trước đây
+        // luôn lấy giá gốc tour nên email/admin ghi khác số khách đã thấy.
+        //
+        // Trẻ em: tour chưa nhập giá → để TRỐNG (null) = chờ nhân viên báo giá,
+        // KHÔNG cộng vào tổng. (0 là trẻ em miễn phí thật, khác với chưa có giá.)
+        $donGiaNguoiLon = $departure?->price_override ?? $tour->adult_price;
+        $donGiaTreEm = $tour->child_price;
         $tongTien = $data['adults'] * $donGiaNguoiLon
-            + ($data['children'] ?? 0) * $donGiaTreEm;
+            + ($donGiaTreEm !== null ? ($data['children'] ?? 0) * $donGiaTreEm : 0);
 
         $booking = Booking::create([
             'tour_id' => $tour->id,

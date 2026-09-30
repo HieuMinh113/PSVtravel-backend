@@ -65,6 +65,7 @@ class BookingLookupController extends Controller
             'adults' => $booking->adults,
             'children' => $booking->children,
             'total_price' => $booking->total_price,
+            'cho_bao_gia_tre_em' => $booking->choBaoGiaTreEm(),
             'status' => $booking->status,
             'status_label' => match ($booking->status) {
                 'confirmed' => 'Đã xác nhận',
