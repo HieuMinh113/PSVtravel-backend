@@ -54,6 +54,14 @@ class EventForm
                     ->directory('events')
                     ->disk('public')
                     ->columnSpanFull(),
+                // Clip recap sự kiện đã tổ chức — chỉ dán link YouTube
+                TextInput::make('video_url')
+                    ->label('Video recap sự kiện (link YouTube)')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Clip tổng kết một chương trình đã tổ chức — bằng chứng năng lực cho khách doanh nghiệp. Để trống nếu chưa có.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()])
+                    ->columnSpanFull(),
                 FileUpload::make('gallery')
                     ->label('Hình ảnh thực tế')
                     ->image()

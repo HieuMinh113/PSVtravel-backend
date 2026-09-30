@@ -43,6 +43,8 @@ class PageDatabaseSeeder extends Seeder
             ['key' => 'footer_intro', 'label' => 'Giới thiệu ngắn (chân trang)', 'group' => 'contact', 'type' => 'textarea', 'value' => 'Đồng hành cùng bạn trên mọi hành trình — từ những bãi biển Việt Nam trong xanh đến những vùng đất mới lạ khắp thế giới.'],
             ['key' => 'home_video_url', 'label' => 'Video trang chủ (link YouTube)', 'group' => 'general', 'type' => 'youtube'],
             ['key' => 'home_video_title', 'label' => 'Tiêu đề khối video trang chủ', 'group' => 'general', 'type' => 'text', 'value' => 'Hành trình cùng PSV Travel'],
+            ['key' => 'about_video_url', 'label' => 'Video trang Về chúng tôi (link YouTube)', 'group' => 'general', 'type' => 'youtube'],
+            ['key' => 'about_video_title', 'label' => 'Tiêu đề khối video Về chúng tôi', 'group' => 'general', 'type' => 'text', 'value' => 'Gặp gỡ đội ngũ PSV Travel'],
             ['key' => 'seo_title', 'label' => 'Tiêu đề mặc định (SEO)', 'group' => 'seo', 'type' => 'text'],
             ['key' => 'seo_description', 'label' => 'Mô tả mặc định (SEO)', 'group' => 'seo', 'type' => 'textarea'],
 

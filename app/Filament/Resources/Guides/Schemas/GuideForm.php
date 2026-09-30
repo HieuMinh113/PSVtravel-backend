@@ -58,6 +58,16 @@ class GuideForm
                     ->disk('public')
                     ->columnSpanFull(),
 
+                // Video minh hoạ — ô riêng, KHÔNG dán iframe vào nội dung bài (bộ
+                // lọc an toàn của website sẽ loại iframe trong nội dung).
+                TextInput::make('video_url')
+                    ->label('Link video YouTube')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Video minh hoạ cho bài (VD: clip review chuyến đi). Hiện ngay dưới đoạn mở bài. Để trống nếu không có.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()])
+                    ->columnSpanFull(),
+
                 Textarea::make('excerpt')
                     ->label('Tóm tắt')
                     ->helperText('Đoạn ngắn hiện ở danh sách bài viết')

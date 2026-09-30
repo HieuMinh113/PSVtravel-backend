@@ -23,7 +23,7 @@ class Event extends Model
     ];
 
     protected $fillable = [
-        'title', 'slug', 'summary', 'audience', 'cover_image', 'gallery', 'description',
+        'title', 'slug', 'summary', 'audience', 'cover_image', 'video_url', 'gallery', 'description',
         'includes', 'itinerary', 'group_size', 'duration', 'location', 'price_note',
         'is_featured', 'status', 'sort_order',
         // rating/review_count KHÔNG nằm ở đây: chỉ EventReview tự cập nhật qua

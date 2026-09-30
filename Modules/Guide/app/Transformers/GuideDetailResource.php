@@ -15,6 +15,9 @@ class GuideDetailResource extends JsonResource
             'excerpt' => $this->excerpt,
             'content' => $this->content,
             'cover_image' => $this->anh($this->cover_image),
+            // Chỉ trả MÃ video — website tự dựng link nhúng youtube-nocookie
+            'video_id' => \App\Services\YouTube::id($this->video_url),
+            'updated_at' => $this->updated_at?->toIso8601String(),
             'category' => $this->category,
             'author_name' => $this->whenLoaded('author', fn () => $this->author?->name),
             'view_count' => $this->view_count,

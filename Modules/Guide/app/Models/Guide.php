@@ -15,7 +15,7 @@ class Guide extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'title', 'slug', 'excerpt', 'content', 'cover_image',
+        'title', 'slug', 'excerpt', 'content', 'cover_image', 'video_url',
         'author_id', 'category', 'tour_id', 'view_count', 'status', 'published_at', 'sort_order',
     ];
 

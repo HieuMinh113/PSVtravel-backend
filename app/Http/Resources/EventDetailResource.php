@@ -15,6 +15,9 @@ class EventDetailResource extends JsonResource
             'summary' => $this->summary,
             'audience' => array_values($this->audience ?? []),
             'cover_image' => $this->anh($this->cover_image),
+            // Chỉ trả MÃ video — website tự dựng link nhúng youtube-nocookie
+            'video_id' => \App\Services\YouTube::id($this->video_url),
+            'updated_at' => $this->updated_at?->toIso8601String(),
             'gallery' => collect($this->gallery ?? [])
                 ->map(fn ($p) => $this->anh($p))
                 ->filter()
