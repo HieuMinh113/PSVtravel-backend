@@ -88,6 +88,12 @@ class Tour extends Model
         return $this->hasMany(\Modules\Booking\Models\Booking::class);
     }
 
+    /** Lượt quét mã QR của tour (in trên tờ rơi, poster...) */
+    public function qrScans(): HasMany
+    {
+        return $this->hasMany(TourQrScan::class);
+    }
+
     public function departures(): HasMany
     {
         // Luôn sắp theo ngày khởi hành tăng dần: ngày gần nhất lên đầu, để danh

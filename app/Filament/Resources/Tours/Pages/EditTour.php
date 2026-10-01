@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tours\Pages;
 
+use App\Filament\Resources\Tours\Actions\MaQrAction;
 use App\Filament\Resources\Tours\TourResource;
 use Filament\Actions\DeleteAction;
 use Modules\Tour\Models\Tour;
@@ -17,6 +18,7 @@ class EditTour extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            MaQrAction::make(),
             ViewAction::make(),
             DeleteAction::make(),
 

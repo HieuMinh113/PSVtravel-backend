@@ -48,6 +48,13 @@ class ToursTable
                         'hidden' => 'warning',
                         default => 'gray',
                     }),
+                // Lượt quét mã QR (in trên tờ rơi, poster) — bấm "Mã QR" trong
+                // tour để xem chi tiết theo ngày và tải mã.
+                TextColumn::make('qr_scans_count')
+                    ->label('Lượt quét QR')
+                    ->counts('qrScans')
+                    ->numeric()
+                    ->sortable(),
                 IconColumn::make('is_featured')
                     ->label('Nổi bật')
                     ->boolean(),

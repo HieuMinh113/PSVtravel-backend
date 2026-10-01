@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tours\Pages;
 
+use App\Filament\Resources\Tours\Actions\MaQrAction;
 use App\Filament\Resources\Tours\TourResource;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
@@ -13,6 +14,7 @@ class ViewTour extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            MaQrAction::make(),
             EditAction::make(),
         ];
     }

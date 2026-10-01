@@ -18,7 +18,9 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Http\Controllers\Admin\TaiMaQrTourController;
 use App\Http\Middleware\BatBuoc2faQuanTri;
+use Illuminate\Support\Facades\Route;
 use App\Filament\Auth\XacThucApp;
 
 class AdminPanelProvider extends PanelProvider
@@ -82,6 +84,14 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            // Tải mã QR tour (PNG/SVG). Route tự viết KHÔNG được Filament gắn
+            // sẵn lớp bắt buộc 2FA như các trang, nên thêm tay.
+            ->authenticatedRoutes(function (): void {
+                Route::get('tours/{tour}/ma-qr.{dinhDang}', TaiMaQrTourController::class)
+                    ->whereIn('dinhDang', ['png', 'svg'])
+                    ->middleware(BatBuoc2faQuanTri::class)
+                    ->name('tours.ma-qr');
+            });
     }
 }
