@@ -29,7 +29,14 @@ don_dep() {
         echo
         echo "!! Triển khai DỪNG ở giữa chừng. Đang tắt thông báo bảo trì..."
         $COMPOSE exec -T app php artisan up || true
-        echo "   Website đã chạy lại bằng phiên bản CŨ. Xem lỗi phía trên."
+        # Các lệnh artisan chạy trước khi dừng (dưới quyền root) có thể đã tạo
+        # file cache/log thuộc root → PHP-FPM (www-data) không ghi được → 500.
+        # Bước 7 bình thường sẽ trả quyền, nhưng dừng sớm thì bước đó không
+        # chạy — đúng chuyện ngày 06/10/2026 (dừng ở "views" của optimize).
+        $COMPOSE exec -T app sh -c 'chgrp -R www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache' || true
+        $COMPOSE exec -T app sh -c 'kill -USR2 1' || true
+        echo "   Mã nguồn trên đĩa là bản MỚI nhưng chưa xong hết các bước. Xem lỗi phía trên,"
+        echo "   sửa xong thì chạy lại script này."
     fi
 }
 trap don_dep EXIT
@@ -66,6 +73,17 @@ if [ "${PSV_DA_LAY_MA:-0}" != "1" ]; then
     exec "$0" "$@"
 fi
 
+# Mã nguồn được gắn thẳng vào container (./:/var/www), nên từ lúc reset ở
+# bước 1 website ĐANG CHẠY mã mới với thư viện / bảng nạp lớp (autoload) cũ.
+# Bản có thêm module mới thì mọi yêu cầu đều chết "Class ... ServiceProvider
+# not found" suốt 5–8 phút build — kể cả lệnh "artisan down" ở bước 3 (đã xảy
+# ra ngày 06/10/2026 khi thêm module Alliance). Cài thư viện ngay bây giờ cho
+# mã và thư viện khớp nhau lại sau vài giây. Không được (ảnh cũ thiếu tiện ích
+# PHP mà bản mới cần chẳng hạn) thì bỏ qua — bước 4 sẽ cài lại bằng ảnh mới.
+echo "==> 1b   Cài thư viện PHP cho khớp mã mới"
+$COMPOSE exec -T -e COMPOSER_ALLOW_SUPERUSER=1 app composer install --no-dev --optimize-autoloader --no-interaction \
+    || echo "   (chưa cài được, bước 4 sẽ cài lại)"
+
 echo "==> 2/8  Đóng lại ảnh Docker"
 # CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
 #
@@ -91,12 +109,13 @@ echo "==> 3/8  Bật thông báo bảo trì"
 # Từ đây trở đi mới thật sự nguy hiểm: thay thư viện PHP, đổi cấu trúc cơ sở
 # dữ liệu, khởi động lại dịch vụ. Ảnh Docker đã đóng xong ở trên nên khoảng
 # ngừng phục vụ chỉ còn vài chục giây thay vì cả 5–8 phút build.
-$COMPOSE exec -T app php artisan down --retry=60 || true
+$COMPOSE exec -T app php artisan down --retry=60 \
+    || echo "   !! Không bật được bảo trì — vẫn chạy tiếp, nhưng khách có thể gặp lỗi trong ít phút tới."
 
 echo "==> 4/8  Cài thư viện PHP"
 # Chạy trong lúc bảo trì: thay thư viện ngay dưới chân một tiến trình đang
 # phục vụ khách có thể làm hỏng vài yêu cầu đang dở.
-$COMPOSE run --rm --no-deps app composer install --no-dev --optimize-autoloader --no-interaction
+$COMPOSE run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 app composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> 5/8  Cập nhật cấu trúc cơ sở dữ liệu"
 $COMPOSE run --rm app php artisan migrate --force
