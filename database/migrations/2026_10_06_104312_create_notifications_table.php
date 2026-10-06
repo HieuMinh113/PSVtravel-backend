@@ -15,7 +15,10 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('type');
             $table->morphs('notifiable');
-            $table->text('data');
+            // json chứ không phải text (mặc định của Laravel): chuông thông báo
+            // Filament lọc theo data->>'format', PostgreSQL không cho dùng ->>
+            // trên cột text → trang quản trị lỗi 500.
+            $table->json('data');
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
         });
