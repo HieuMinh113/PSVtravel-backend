@@ -127,6 +127,30 @@ Chỉnh trong `.env` nếu cần: `LIEN_MINH_CHU_KY_PHUT=10` (bao lâu đọc l�
 sheet), `LIEN_MINH_NGUONG_SAP_HET=3` (còn từ chừng này chỗ trở xuống thì báo
 "sắp hết").
 
+## Hồ sơ visa (dành cho bộ phận visa)
+
+Menu **Visa** trong trang quản trị:
+
+- **Hồ sơ visa** — mỗi khách một hồ sơ (cả nhà / cả đoàn ghi chung ô *Nhóm*).
+  Gồm thông tin khách, nước + mục đích + đối tượng, checklist giấy tờ (đánh dấu
+  *Chưa có / Đã nhận / Không cần*), file scan, lịch hẹn, kết quả, tiền thu / chi
+  / khách đã trả. Mỗi case một giá, không theo bảng giá cố định.
+  - Nhập nước + mục đích + đối tượng là máy tự chép checklist từ mẫu khớp nhất;
+    sửa thêm / bớt tuỳ case, không ảnh hưởng mẫu.
+  - Nút **Tin nhắn giấy thiếu** soạn sẵn đoạn tin gửi khách qua Zalo.
+  - Tab *Đang xử lý / Chờ kết quả / Đã xong*; lọc *Hồ sơ của tôi*, *lịch hẹn 7
+    ngày tới*, *khách còn nợ*. Số cạnh menu = hồ sơ có lịch hẹn trong 3 ngày.
+  - Cảnh báo hộ chiếu còn hạn dưới 6 tháng tính từ ngày đi.
+- **Mẫu checklist** — bản số hoá thư mục "thủ tục visa các nước" trên Drive. Có
+  sẵn vài mẫu (Trung Quốc, Ai Cập, Hàn Quốc) để sửa tiếp; nút *Nhân bản* để làm
+  biến thể cho đối tượng khác.
+
+File scan giấy tờ khách nằm ở `storage/app/private/ho-so-visa` (không công khai),
+chỉ mở được bằng link có chữ ký do trang quản trị tạo, qua đường dẫn
+`/tep-rieng/...`. Xoá hẳn hồ sơ thì file cũng bị xoá.
+
+Ai được xem: vai trò `visa` (cấp ở Người dùng), cùng super_admin và admin.
+
 ---
 
 ## Xem mã OTP khi chưa cấu hình mail

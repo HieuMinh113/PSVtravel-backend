@@ -45,5 +45,7 @@ class RoleSeeder extends Seeder
         // Quyền liên minh cho super_admin/admin + vai trò điều hành. Migration
         // cũng tạo, nhưng trên máy mới cài nó chạy TRƯỚC khi có super_admin.
         $this->call(\Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder::class);
+        // Tương tự cho vai trò visa (hồ sơ visa + mẫu checklist)
+        $this->call(\Modules\Visa\Database\Seeders\QuyenVisaSeeder::class);
     }
 }

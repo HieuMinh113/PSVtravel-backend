@@ -38,6 +38,22 @@ return [
             'report' => false,
         ],
 
+        // File riêng tư của hồ sơ visa (scan hộ chiếu, CCCD…). Không bao giờ
+        // nằm dưới /storage công khai; mở xem bằng link có chữ ký, hết hạn sau
+        // vài phút, chỉ trang quản trị tạo ra được.
+        //
+        // Đường dẫn phải KHÁC /storage: nginx trả thẳng /storage/ từ thư mục
+        // ảnh công khai, link của ổ này mà nằm dưới đó thì luôn ra 404.
+        'rieng' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/tep-rieng',
+            'visibility' => 'private',
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
