@@ -13,6 +13,8 @@ class TourDetailResource extends JsonResource
             'id' => $this->id,
             'slug' => $this->slug,
             'name' => $this->name,
+            // Tiêu đề Google do nhân viên tự viết (trống thì website dùng tên tour)
+            'seo_title' => $this->seo_title,
             'type' => $this->type,
             'region' => $this->region,
             'country' => $this->country,

@@ -80,6 +80,18 @@ class TourForm
                         'regex' => 'Đường dẫn chỉ được gồm chữ thường không dấu, số và dấu gạch ngang. VD: tour-da-nang-3-ngay',
                     ]),
 
+                // Tiêu đề hiện trên Google (thẻ <title>). Google cắt cụt tiêu đề
+                // dài hơn ~70 ký tự thành "…", công cụ audit SEO báo lỗi "Long
+                // title element". Để trống thì website tự dùng tên tour và tự rút
+                // gọn nếu quá dài.
+                TextInput::make('seo_title')
+                    ->label('Tiêu đề SEO (hiện trên Google)')
+                    ->maxLength(70)
+                    ->placeholder(fn (Get $get): string => (string) $get('name'))
+                    ->helperText('Không bắt buộc. Nên 50–60 ký tự, có từ khoá chính (VD: "Tour Đà Nẵng – Hội An 3N2Đ giá tốt"). Để trống = dùng tên tour.')
+                    ->live(debounce: 500)
+                    ->hint(fn (?string $state): string => mb_strlen((string) $state).'/70 ký tự'),
+
                 Select::make('type')
                     ->label('Loại tour')
                     ->options([

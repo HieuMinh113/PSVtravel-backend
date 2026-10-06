@@ -34,7 +34,7 @@ class Tour extends Model
     }
 
     protected $fillable = [
-        'slug', 'name', 'type', 'region', 'country',
+        'slug', 'name', 'seo_title', 'type', 'region', 'country',
         'duration_days', 'duration_nights', 'departure_from',
         'adult_price', 'child_price', 'old_price',
         'tag', 'cover_image', 'video_url',

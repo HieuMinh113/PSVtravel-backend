@@ -7,6 +7,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
 
@@ -26,6 +27,18 @@ class GuideForm
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
+
+                // Tiêu đề hiện trên Google (thẻ <title>). Google cắt cụt tiêu đề
+                // dài hơn ~70 ký tự thành "…", công cụ audit SEO báo lỗi "Long
+                // title element". Để trống thì website tự dùng tiêu đề bài viết và tự rút
+                // gọn nếu quá dài.
+                TextInput::make('seo_title')
+                    ->label('Tiêu đề SEO (hiện trên Google)')
+                    ->maxLength(70)
+                    ->placeholder(fn (Get $get): string => (string) $get('title'))
+                    ->helperText('Không bắt buộc. Nên 50–60 ký tự, có từ khoá chính (VD: "Tour Đà Nẵng – Hội An 3N2Đ giá tốt"). Để trống = dùng tiêu đề bài viết.')
+                    ->live(debounce: 500)
+                    ->hint(fn (?string $state): string => mb_strlen((string) $state).'/70 ký tự'),
 
                 Select::make('category')
                     ->label('Chuyên mục')

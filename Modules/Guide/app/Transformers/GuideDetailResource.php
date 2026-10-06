@@ -22,7 +22,8 @@ class GuideDetailResource extends JsonResource
             'author_name' => $this->whenLoaded('author', fn () => $this->author?->name),
             'view_count' => $this->view_count,
             'published_at' => $this->published_at?->format('Y-m-d'),
-            'meta_title' => $this->title,
+            // Ưu tiên "Tiêu đề SEO" nhân viên tự viết; trống thì dùng tiêu đề bài
+            'meta_title' => $this->seo_title ?: $this->title,
             'meta_description' => $this->excerpt,
             // Tour gắn kèm để hiện ô đặt tour bên bài viết (null nếu admin không gắn).
             'tour' => $this->whenLoaded('tour', fn () => $this->tour ? $this->duLieuTour($this->tour) : null),
