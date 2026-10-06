@@ -44,6 +44,8 @@ class ThongTinPhapLySeeder extends Seeder
 
             // --- Liên hệ ---
             'hotline' => '0907 870 707',
+            'email' => 'nguyendusit399@gmail.com',
+            'founded_year' => '2013',
             'address' => '529 Huỳnh Tấn Phát, Phường Tân Thuận, Quận 7, TP. Hồ Chí Minh',
         ];
 
