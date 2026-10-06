@@ -7,38 +7,137 @@
 # chừng còn hơn chạy tới cùng với CSDL đã đổi mà mã nguồn thì chưa.
 set -euo pipefail
 
-NHANH="${1:-main}"
+# Nhánh đang phát triển. Truyền tên nhánh khác làm tham số nếu cần:
+#   ./scripts/trien-khai.sh main
+NHANH="${1:-claude/github-repos-exploration-1izvgb}"
 THU_MUC_BE="$(cd "$(dirname "$0")/.." && pwd)"
 THU_MUC_FE="$(dirname "$THU_MUC_BE")/psvtravel-frontend"
 COMPOSE="docker compose -f docker-compose.prod.yml"
 
 cd "$THU_MUC_BE"
 
-echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
-./scripts/sao-luu-csdl.sh
+# Gặp lỗi giữa chừng thì PHẢI tắt thông báo bảo trì trước khi thoát.
+#
+# Bước 2 bật bảo trì, mà từ bản này việc đóng ảnh sẽ DỪNG LẠI nếu không gọi
+# được API (thà dừng còn hơn cho ra trang rỗng). Không có bẫy này thì lỗi build
+# đồng nghĩa với website nằm trong màn hình bảo trì cho tới khi có người phát
+# hiện ra.
+don_dep() {
+    local ma=$?
+    if [ $ma -ne 0 ]; then
+        echo
+        echo "!! Triển khai DỪNG ở giữa chừng. Đang tắt thông báo bảo trì..."
+        $COMPOSE exec -T app php artisan up || true
+        echo "   Website đã chạy lại bằng phiên bản CŨ. Xem lỗi phía trên."
+    fi
+}
+trap don_dep EXIT
 
-echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
-git -C "$THU_MUC_BE" pull origin "$NHANH"
-git -C "$THU_MUC_FE" pull origin "$NHANH"
+# Chính file script này nằm trong repo, nên bước lấy mã nguồn có thể thay đổi
+# nó ngay giữa lúc đang chạy. Bash đọc file theo vị trí byte chứ không nạp
+# toàn bộ vào bộ nhớ, nên phiên bản mới KHÔNG có tác dụng ở lần chạy này —
+# đã xảy ra thật: bản sửa thứ tự các bước nằm trên đĩa mà lần chạy đó vẫn theo
+# thứ tự cũ.
+#
+# Cách xử lý: lần gọi đầu chỉ sao lưu và lấy mã nguồn, rồi tự khởi động lại
+# bằng đúng file vừa tải về.
+if [ "${PSV_DA_LAY_MA:-0}" != "1" ]; then
+    echo "==> 0/8  Sao lưu cơ sở dữ liệu trước khi đụng vào gì"
+    ./scripts/sao-luu-csdl.sh
 
-echo "==> 2/8  Bật thông báo bảo trì"
-# --render dùng trang bảo trì đẹp thay vì dòng chữ trống trơn.
-# Bỏ qua nếu lệnh lỗi: web đang chạy vẫn hơn là dừng deploy vì cái này.
-$COMPOSE exec -T app php artisan down --retry=60 || true
+    echo "==> 1/8  Lấy mã nguồn mới (nhánh $NHANH)"
+# Dùng fetch + reset --hard chứ không phải pull.
+#
+# Máy chủ là nơi CHẠY, không phải nơi sửa code — nó phải khớp đúng nhánh trên
+# GitHub. Dùng pull thì chỉ cần một commit lỡ tay trên máy chủ là git báo
+# "divergent branches" và dừng giữa chừng.
+#
+# reset --hard chỉ động vào file git theo dõi: .env, vendor/ và thư mục ảnh
+# upload đều nằm ngoài git nên không bị mất.
+    for DIR in "$THU_MUC_BE" "$THU_MUC_FE"; do
+        git -C "$DIR" fetch origin "$NHANH"
+        git -C "$DIR" reset --hard FETCH_HEAD
+    done
 
-echo "==> 3/8  Đóng lại ảnh Docker"
+    # Bỏ bẫy trước khi nhảy sang bản mới, nếu không nó tưởng đang lỗi
+    trap - EXIT
+    export PSV_DA_LAY_MA=1
+    exec "$0" "$@"
+fi
+
+echo "==> 2/8  Đóng lại ảnh Docker"
+# CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
+#
+# Lúc build, Next gọi API để dựng sẵn nội dung các trang. Nếu website đang
+# trong chế độ bảo trì thì Laravel trả 503 cho MỌI lời gọi, nên mọi trang dựng
+# ra đều rỗng. Website chạy lên với các trang không có tour, khách phải F5 vài
+# lần chờ máy chủ dựng lại mới thấy. Trước đây script bật bảo trì ngay từ đầu
+# nên lần triển khai nào cũng tự tạo ra lỗi đó.
+#
+# Bảo trì chỉ cần bọc quanh phần thật sự nguy hiểm — đổi cấu trúc cơ sở dữ liệu
+# và khởi động lại dịch vụ — chứ không phải cả quá trình build dài 5–8 phút.
+# Nhờ vậy thời gian website ngừng phục vụ giảm từ vài phút xuống vài chục giây.
+#
+# nginx phải đang chạy: container build gọi API qua https://api.psvtravel.com
+# và được trỏ tên miền đó về chính máy này (xem docker-compose.prod.yml).
+$COMPOSE up -d nginx >/dev/null 2>&1 || true
+
 # Frontend BẮT BUỘC build lại mỗi lần: địa chỉ API được nhúng thẳng vào mã
 # JavaScript lúc build, không đọc lúc chạy.
 $COMPOSE build app queue frontend
 
+echo "==> 3/8  Bật thông báo bảo trì"
+# Từ đây trở đi mới thật sự nguy hiểm: thay thư viện PHP, đổi cấu trúc cơ sở
+# dữ liệu, khởi động lại dịch vụ. Ảnh Docker đã đóng xong ở trên nên khoảng
+# ngừng phục vụ chỉ còn vài chục giây thay vì cả 5–8 phút build.
+$COMPOSE exec -T app php artisan down --retry=60 || true
+
 echo "==> 4/8  Cài thư viện PHP"
+# Chạy trong lúc bảo trì: thay thư viện ngay dưới chân một tiến trình đang
+# phục vụ khách có thể làm hỏng vài yêu cầu đang dở.
 $COMPOSE run --rm --no-deps app composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> 5/8  Cập nhật cấu trúc cơ sở dữ liệu"
 $COMPOSE run --rm app php artisan migrate --force
 
 echo "==> 6/8  Khởi động lại các dịch vụ"
+# --force-recreate cho frontend: ảnh Docker mới chỉ có tác dụng khi container
+# được tạo lại, restart suông thì vẫn chạy ảnh cũ.
+$COMPOSE up -d --remove-orphans --force-recreate frontend
 $COMPOSE up -d --remove-orphans
+
+# Nạp lại cấu hình nginx SAU KHI các container kia đã lên.
+#
+# Bắt buộc, không phải cho chắc. Cấu hình dùng tên container:
+#   fastcgi_pass app:9000;   proxy_pass http://frontend:3000;
+# nginx phân giải những tên này ĐÚNG MỘT LẦN lúc nạp cấu hình rồi giữ nguyên
+# địa chỉ IP đó suốt đời tiến trình. Container nào được TẠO LẠI sẽ nhận IP
+# mới, nginx vẫn gửi vào IP cũ đã chết và trả 502 mãi mãi cho tới khi có người
+# tự nạp lại.
+#
+# Bình thường ảnh Docker không đổi nên container chỉ "Running", không tạo lại,
+# nên lỗi này ẩn mình. Nó chỉ lộ ra khi ảnh PHP phải dựng lại từ đầu — đã xảy
+# ra thật ngày 03/09/2026: API chết 502 trong khi website vẫn 200.
+#
+# reload chứ không restart: nginx thay tiến trình con êm, khách đang tải trang
+# không bị ngắt giữa chừng. Reload không xong (nginx chưa chạy chẳng hạn) thì
+# khởi động lại hẳn — thà chớp một nhịp còn hơn để nguyên 502.
+#
+# PHẢI dựng lại cấu hình từ template trước khi reload. Ảnh nginx chỉ biến
+# docker/nginx/prod.conf.template thành /etc/nginx/conf.d/default.conf MỘT LẦN
+# lúc container khởi động; "nginx -s reload" suông chỉ nạp lại bản đã dựng cũ,
+# nên mọi chỉnh sửa trong template (header bảo mật...) không bao giờ có hiệu
+# lực cho tới lần nginx tình cờ bị khởi động lại.
+# Dựng lại → nginx -t kiểm tra → hợp lệ mới reload. Cấu hình mới lỗi thì DỪNG
+# ở đó: nginx vẫn chạy cấu hình cũ trong bộ nhớ, website không sập.
+if $COMPOSE exec -T nginx true 2>/dev/null; then
+    if ! $COMPOSE exec -T nginx sh -c '/docker-entrypoint.d/20-envsubst-on-templates.sh >/dev/null && nginx -t -q && nginx -s reload'; then
+        echo "!! Cấu hình nginx mới KHÔNG hợp lệ (xem lỗi ở trên). nginx vẫn chạy cấu hình cũ." >&2
+        echo "!! Sửa docker/nginx/prod.conf.template rồi chạy lại script — ĐỪNG restart nginx trước khi sửa." >&2
+    fi
+else
+    $COMPOSE restart nginx
+fi
 
 echo "==> 7/8  Nạp lại bộ nhớ đệm"
 $COMPOSE exec -T app php artisan optimize
@@ -47,22 +146,98 @@ $COMPOSE exec -T app php artisan filament:optimize
 # Thiếu dòng này thì mail xác nhận đơn vẫn dùng mẫu cũ.
 $COMPOSE exec -T app php artisan queue:restart
 
+# Trả quyền ghi cho PHP-FPM — BẮT BUỘC sau mọi lệnh artisan ở trên.
+#
+# Các lệnh "exec"/"run" chạy dưới quyền root nên file chúng tạo ra (view đã
+# biên dịch, file log trong ngày, bootstrap/cache) thuộc root và chỉ root ghi
+# được. PHP-FPM chạy dưới www-data: đụng tới là "Permission denied" → toàn bộ
+# API và trang quản trị trả 500 dù code không sai. Đã xảy ra ngày 30/09/2026.
+# Bước sửa quyền trong entrypoint chỉ chạy lúc container khởi động, tức là
+# TRƯỚC các lệnh trên, nên không cứu được.
+$COMPOSE exec -T app sh -c 'chgrp -R www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache'
+
+# Nạp lại PHP-FPM để xoá OPcache. Thư viện PHP vừa được thay dưới chân tiến
+# trình đang chạy; OPcache chỉ kiểm tra file đổi mỗi 60 giây nên trong khoảng
+# đó mã cũ và mã mới trộn lẫn. USR2 = nạp lại êm, không rớt yêu cầu đang dở.
+$COMPOSE exec -T app sh -c 'kill -USR2 1' || $COMPOSE restart app
+
 echo "==> 8/8  Tắt thông báo bảo trì"
 $COMPOSE exec -T app php artisan up
 
+# Website đã chạy lại. Từ đây có lỗi cũng không phải chuyện bảo trì nữa, bỏ bẫy
+# đi để phần kiểm tra bên dưới không in ra câu "đang tắt thông báo bảo trì".
+trap - EXIT
+
+WEB="https://${PSV_DOMAIN:-psvtravel.com}"
+API="https://${PSV_API_DOMAIN:-api.psvtravel.com}"
+
+# Gọi trước vài trang chính để máy chủ dựng lại nội dung mới ngay, khách đầu
+# tiên khỏi phải chờ.
+for DUONG in "" "/tour-trong-nuoc" "/tour-nuoc-ngoai"; do
+    curl -s -o /dev/null "$WEB$DUONG" || true
+done
+
 echo
 echo "==> Kiểm tra"
-sleep 3
-MA_API=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_API_DOMAIN:-api.psvtravel.com}/api/v1/settings" || echo 000)
-MA_WEB=$(curl -s -o /dev/null -w "%{http_code}" "https://${PSV_DOMAIN:-psvtravel.com}/" || echo 000)
+
+# Thử lại vài lần thay vì đo đúng một phát.
+#
+# Container vừa được tạo lại cần vài giây mới nhận yêu cầu — PHP-FPM phải khởi
+# động, Laravel phải nạp cấu hình. Đo một phát rồi kết luận "hỏng" là báo động
+# giả, mà báo động giả vài lần thì lần thật sẽ bị bỏ qua.
+doi_ma_200() {
+    local dia_chi="$1" ma=000
+    for _ in 1 2 3 4 5 6; do
+        ma=$(curl -s -o /dev/null -w "%{http_code}" "$dia_chi" || echo 000)
+        [ "$ma" = "200" ] && break
+        sleep 5
+    done
+    echo "$ma"
+}
+
+MA_API=$(doi_ma_200 "$API/api/v1/settings")
+MA_WEB=$(doi_ma_200 "$WEB/")
 echo "    API: $MA_API    Website: $MA_WEB"
 
-if [ "$MA_API" = "200" ] && [ "$MA_WEB" = "200" ]; then
-    echo "    Xong. Website đã chạy phiên bản mới."
-else
+# Mã 200 KHÔNG đủ để nói là xong.
+#
+# Đúng cái bẫy đã cắn ba lần: trang dựng ra rỗng vẫn trả về 200 tử tế, khách mở
+# lên thấy "0 tour phù hợp" mà nhật ký không có lấy một dòng lỗi. Nên phải đếm
+# xem trang có thật sự chứa tour không.
+#
+# Danh sách tour do trình duyệt dựng nên chuỗi HTML không có thẻ tour, nhưng dữ
+# liệu tour thì luôn nằm trong đó — "categorySlugs" là dấu vết chắc chắn nhất.
+dem_tour() {
+    # || true là BẮT BUỘC: script bật set -o pipefail, mà grep không tìm thấy gì
+    # thì trả mã 1 — đúng trường hợp cần cảnh báo. Thiếu nó thì script chết ngay
+    # tại dòng này và không in ra lấy một chữ giải thích.
+    curl -s "$WEB$1" | grep -o 'categorySlugs' | wc -l || true
+}
+SO_NN=$(dem_tour /tour-nuoc-ngoai)
+SO_TN=$(dem_tour /tour-trong-nuoc)
+echo "    Tour dựng sẵn trong trang — nước ngoài: $SO_NN    trong nước: $SO_TN"
+
+if [ "$MA_API" != "200" ] || [ "$MA_WEB" != "200" ]; then
     echo
-    echo "    !! Có gì đó không ổn. Xem log:"
-    echo "       $COMPOSE logs --tail=50 app"
-    echo "       $COMPOSE logs --tail=50 frontend"
+    echo "    !! Website không phản hồi."
+    if [ "$MA_API" = "502" ] || [ "$MA_WEB" = "502" ]; then
+        echo "       502 = nginx không gọi được vào phía sau. Thử nạp lại nginx:"
+        echo "         $COMPOSE exec -T nginx nginx -s reload"
+    fi
+    echo "       Xem nhật ký:"
+    echo "         $COMPOSE logs --tail=50 nginx"
+    echo "         $COMPOSE logs --tail=50 app"
+    echo "         $COMPOSE logs --tail=50 frontend"
     exit 1
 fi
+
+if [ "$SO_NN" -eq 0 ] || [ "$SO_TN" -eq 0 ]; then
+    echo
+    echo "    !! Website trả về 200 nhưng TRANG DỰNG RA KHÔNG CÓ TOUR NÀO."
+    echo "       Khách mở lên sẽ thấy \"0 tour phù hợp\" và phải F5 vài lần."
+    echo "       Thường là do lúc đóng ảnh Docker không gọi được API."
+    echo "       Xem nhật ký:  $COMPOSE logs --tail=50 frontend"
+    exit 1
+fi
+
+echo "    Xong. Website đã chạy phiên bản mới."

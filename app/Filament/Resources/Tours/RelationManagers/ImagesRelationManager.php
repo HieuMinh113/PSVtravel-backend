@@ -24,7 +24,7 @@ class ImagesRelationManager extends RelationManager
         return $schema->components([
             FileUpload::make('path')
                 ->label('Ảnh')
-                ->image()
+                ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                 ->directory('tours/gallery')
                     ->disk('public')
                 ->required(),

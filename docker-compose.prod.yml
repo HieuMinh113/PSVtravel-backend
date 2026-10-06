@@ -70,6 +70,24 @@ services:
     build:
       context: ../psvtravel-frontend
       dockerfile: Dockerfile
+      # Lúc build, Next dựng sẵn nội dung các trang nên PHẢI gọi được API.
+      #
+      # Container build không nằm trong mạng Docker nội bộ, nên bí danh
+      # api.psvtravel.com trỏ vào nginx không áp dụng ở đây. Nó gọi ra Internet
+      # rồi phải vòng ngược về chính VPS — kiểu đi vòng mà nhà cung cấp chặn.
+      # Hậu quả: mọi trang dựng sẵn ra đời rỗng, khách bấm chuyển trang thấy
+      # trắng trơn, F5 mới có (lúc đó trang đã được dựng lại ở máy chủ).
+      #
+      # Hai dòng dưới cho container build dùng mạng của máy chủ và hiểu
+      # api.psvtravel.com chính là máy này — gói tin đi thẳng vào nginx ở cổng
+      # 443, tên miền vẫn khớp chứng chỉ nên không phải bỏ mã hoá.
+      #
+      # Cần nginx đang chạy lúc build. Script triển khai luôn build khi hệ
+      # thống đã chạy nên không sao; chỉ lần cài đặt đầu tiên là chưa có,
+      # khi đó trang tự dựng lại sau 60 giây.
+      network: host
+      extra_hosts:
+        - "${PSV_API_DOMAIN}:127.0.0.1"
       args:
         # Trình duyệt của khách gọi thẳng vào đây nên phải là tên miền công khai
         NEXT_PUBLIC_API_URL: https://${PSV_API_DOMAIN}/api/v1
@@ -95,8 +113,26 @@ services:
       - ./:/var/www:ro
       - ./docker/nginx/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
       - psv_certs:/etc/letsencrypt
-      - psv_acme:/var/www/certbot
-    networks: [psv]
+      # Thư mục xác thực Let's Encrypt phải nằm NGOÀI /var/www.
+      # /var/www được gắn chỉ-đọc, mà Docker cần tạo được thư mục con để làm
+      # điểm gắn — gắn lồng vào trong sẽ lỗi "read-only file system".
+      - psv_acme:/var/certbot
+    networks:
+      psv:
+        # Bên trong mạng Docker, ba tên miền này trỏ thẳng vào container nginx.
+        #
+        # Không có mấy dòng này, container Next.js gọi https://api.psvtravel.com
+        # sẽ đi ra Internet rồi phải vòng ngược về chính IP của VPS. Nhiều nhà
+        # cung cấp chặn kiểu đi vòng đó (hairpin NAT), kết quả là mọi lời gọi
+        # API đều treo rồi UND_ERR_CONNECT_TIMEOUT — web hiện ra nhưng trống
+        # rỗng và không đăng nhập được.
+        #
+        # Có alias thì gói tin đi thẳng sang nginx trong mạng nội bộ. Tên miền
+        # vẫn khớp chứng chỉ HTTPS nên không phải bỏ mã hoá hay sửa code.
+        aliases:
+          - ${PSV_DOMAIN}
+          - www.${PSV_DOMAIN}
+          - ${PSV_API_DOMAIN}
     depends_on: [app, frontend]
 
   certbot:
@@ -105,12 +141,12 @@ services:
     restart: unless-stopped
     volumes:
       - psv_certs:/etc/letsencrypt
-      - psv_acme:/var/www/certbot
+      - psv_acme:/var/certbot
     # Thử gia hạn mỗi 12 tiếng. Let's Encrypt cấp chứng chỉ 90 ngày và chỉ
     # thực sự gia hạn khi còn dưới 30 ngày, nên chạy thường xuyên là vô hại.
     entrypoint: >
       sh -c "trap exit TERM;
-      while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+      while :; do certbot renew --webroot -w /var/certbot --quiet;
       sleep 12h & wait $${!}; done"
 
 networks:

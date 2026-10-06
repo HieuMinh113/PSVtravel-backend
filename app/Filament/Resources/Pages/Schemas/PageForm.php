@@ -31,13 +31,16 @@ class PageForm
 
                 FileUpload::make('hero_image')
                     ->label('Ảnh đầu trang')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('pages')
                     ->disk('public')
                     ->columnSpanFull(),
 
                 RichEditor::make('body')
                     ->label('Nội dung trang')
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('pages/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 TextInput::make('meta_title')

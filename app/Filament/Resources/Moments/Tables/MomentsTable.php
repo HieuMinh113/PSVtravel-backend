@@ -21,6 +21,13 @@ class MomentsTable
         return $table
             ->columns([
                 ImageColumn::make('image')->label('Ảnh'),
+                // Đánh dấu khoảnh khắc có video cảm nhận để nhân viên dễ lọc
+                TextColumn::make('video_url')
+                    ->label('Video')
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? 'Có video' : '')
+                    ->badge()
+                    ->color('danger')
+                    ->placeholder('—'),
                 TextColumn::make('caption')
                     ->label('Chú thích')
                     ->placeholder('—')

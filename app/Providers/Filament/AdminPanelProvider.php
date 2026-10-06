@@ -18,6 +18,10 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Http\Controllers\Admin\TaiMaQrTourController;
+use App\Http\Middleware\BatBuoc2faQuanTri;
+use Illuminate\Support\Facades\Route;
+use App\Filament\Auth\XacThucApp;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -32,6 +36,24 @@ class AdminPanelProvider extends PanelProvider
             // thi trang quan tri van hien dung "PSV Travel".
             ->brandName('PSV Travel')
             ->login()
+            // Trang Hồ sơ (menu người dùng góc phải): nơi bật / tắt 2FA, xem lại
+            // mã khôi phục, đổi mật khẩu.
+            ->profile()
+            // Xác thực 2 lớp bằng app Google Authenticator (mã 6 số đổi mỗi 30s).
+            // recoverable(): cấp mã khôi phục dùng khi mất điện thoại.
+            //
+            // isRequired: true chỉ để Filament dựng sẵn bước "bắt buộc thiết lập
+            // 2FA"; AI bị bắt buộc do BatBuoc2faQuanTri quyết định — super_admin
+            // và admin bắt buộc, nhân viên khác tuỳ chọn.
+            ->multiFactorAuthentication(
+                [
+                    XacThucApp::make()
+                        ->brandName('PSV Travel')
+                        ->recoverable(),
+                ],
+                isRequired: true,
+            )
+            ->multiFactorAuthenticationRequiredMiddlewareName(BatBuoc2faQuanTri::class)
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -62,6 +84,14 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            // Tải mã QR tour (PNG/SVG). Route tự viết KHÔNG được Filament gắn
+            // sẵn lớp bắt buộc 2FA như các trang, nên thêm tay.
+            ->authenticatedRoutes(function (): void {
+                Route::get('tours/{tour}/ma-qr.{dinhDang}', TaiMaQrTourController::class)
+                    ->whereIn('dinhDang', ['png', 'svg'])
+                    ->middleware(BatBuoc2faQuanTri::class)
+                    ->name('tours.ma-qr');
+            });
     }
 }

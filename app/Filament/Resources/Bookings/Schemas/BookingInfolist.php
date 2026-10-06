@@ -45,7 +45,10 @@ class BookingInfolist
                     ->money('VND'),
                 TextEntry::make('unit_price_child')
                     ->label('Đơn giá trẻ em')
-                    ->money('VND'),
+                    ->money('VND')
+                    // Trống = tour chưa có giá trẻ em → nhân viên cần báo giá cho khách
+                    ->placeholder(fn ($record): string => $record?->choBaoGiaTreEm() ? 'Chờ báo giá — tổng tiền chưa gồm trẻ em' : '—')
+                    ->color(fn ($record): ?string => $record?->choBaoGiaTreEm() ? 'danger' : null),
                 TextEntry::make('total_price')
                     ->label('Tổng tiền')
                     ->money('VND')

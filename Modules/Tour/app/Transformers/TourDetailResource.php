@@ -13,6 +13,8 @@ class TourDetailResource extends JsonResource
             'id' => $this->id,
             'slug' => $this->slug,
             'name' => $this->name,
+            // Tiêu đề Google do nhân viên tự viết (trống thì website dùng tên tour)
+            'seo_title' => $this->seo_title,
             'type' => $this->type,
             'region' => $this->region,
             'country' => $this->country,
@@ -26,10 +28,27 @@ class TourDetailResource extends JsonResource
             'cover_image' => $this->cover_image
                 ? (str_starts_with($this->cover_image, 'http') ? $this->cover_image : asset('storage/'.$this->cover_image))
                 : null,
+            // Chỉ trả MÃ video (11 ký tự), không trả link thô — website tự dựng
+            // link nhúng youtube-nocookie, không bao giờ nhúng địa chỉ lạ.
+            'video_id' => \App\Services\YouTube::id($this->video_url),
             'highlights' => $this->highlights ?? [],
-            'included' => $this->included ?? [],
-            'excluded' => $this->excluded ?? [],
+            // Tách lúc trả về: tour nhập từ trước có cả đoạn văn dồn vào MỘT
+            // mục kèm dấu ➢, để nguyên thì ngoài web thành một dòng dài chạy
+            // tràn khỏi khung.
+            'included' => \Modules\Tour\Models\Tour::tachTungMuc($this->included ?? []),
+            'excluded' => \Modules\Tour\Models\Tour::tachTungMuc($this->excluded ?? []),
             'cancellation_policy' => $this->cancellation_policy,
+
+            // Khối "Những thông tin cần lưu ý" ở cuối trang tour.
+            // Mục để trống nội dung thì không gửi ra — khách bấm vào một dòng
+            // rỗng sẽ tưởng trang bị lỗi.
+            'notes' => collect($this->notes ?? [])
+                ->filter(fn ($muc) => filled($muc['title'] ?? null) && filled($muc['content'] ?? null))
+                ->map(fn ($muc) => [
+                    'title' => $muc['title'],
+                    'content' => $muc['content'],
+                ])
+                ->values(),
             'description' => $this->description,
             'rating' => $this->rating,
             'review_count' => $this->review_count,
@@ -43,6 +62,10 @@ class TourDetailResource extends JsonResource
                 'day_number' => $it->day_number,
                 'title' => $it->title,
                 'description' => $it->description,
+                // Ảnh của riêng ngày này, đúng thứ tự nhân viên đã sắp trong admin
+                'images' => collect($it->images ?? [])
+                    ->map(fn ($path) => str_starts_with($path, 'http') ? $path : asset('storage/'.$path))
+                    ->values(),
             ]),
 
             // Chỉ đợt còn hiệu lực, còn chỗ

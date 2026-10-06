@@ -58,7 +58,7 @@ class UserForm
                     ->maxLength(255),
                 FileUpload::make('avatar')
                     ->label('Ảnh đại diện')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('avatars')
                     ->disk('public'),
 

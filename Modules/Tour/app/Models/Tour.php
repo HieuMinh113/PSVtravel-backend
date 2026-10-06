@@ -10,17 +10,36 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Category\Models\Category;
+use App\Jobs\PingIndexNow;
 class Tour extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
+    // Khi một tour ĐANG BÁN được lưu, báo IndexNow để Bing/Yandex lập chỉ mục
+    // ngay trang đó (Bing nuôi ChatGPT/Copilot). Chạy trong hàng đợi nên không
+    // làm chậm thao tác lưu; chỉ ping ở môi trường thật để khỏi nhiễu khi seed.
+    protected static function booted(): void
+    {
+        static::saved(function (self $tour) {
+            if ($tour->status !== 'published' || ! app()->isProduction()) {
+                return;
+            }
+            $goc = rtrim((string) config('app.frontend_url'), '/');
+            $muc = $tour->type === 'abroad' ? 'tour-nuoc-ngoai' : 'tour-trong-nuoc';
+            PingIndexNow::dispatch([
+                "{$goc}/{$muc}/{$tour->slug}",
+                "{$goc}/{$muc}",
+            ]);
+        });
+    }
+
     protected $fillable = [
-        'slug', 'name', 'type', 'region', 'country',
+        'slug', 'name', 'seo_title', 'type', 'region', 'country',
         'duration_days', 'duration_nights', 'departure_from',
         'adult_price', 'child_price', 'old_price',
-        'tag', 'cover_image',
+        'tag', 'cover_image', 'video_url',
         'highlights', 'included', 'excluded',
-        'cancellation_policy', 'description',
+        'cancellation_policy', 'notes', 'description',
         'rating', 'review_count',
         'status', 'is_featured', 'sort_order',
     ];
@@ -29,6 +48,7 @@ class Tour extends Model
         'highlights'   => 'array',
         'included'     => 'array',
         'excluded'     => 'array',
+        'notes'        => 'array',
         'adult_price'  => 'integer',
         'child_price'  => 'integer',
         'old_price'    => 'integer',
@@ -38,15 +58,47 @@ class Tour extends Model
         'sort_order'   => 'integer',
     ];
 
+    /**
+     * Tách một danh sách (bao gồm / không bao gồm) thành từng mục riêng.
+     *
+     * Dùng ở CẢ HAI đầu:
+     *  - lúc lưu trong admin, để dán nguyên đoạn từ file chương trình tour vào
+     *    là ra đúng từng mục;
+     *  - lúc trả về cho website, để những tour đã nhập từ trước — cả đoạn văn
+     *    dồn thành MỘT mục có dấu ➢ ở giữa — hiện ra đúng, khỏi phải mở từng
+     *    tour ra lưu lại.
+     */
+    public static function tachTungMuc($gia): array
+    {
+        if (is_array($gia)) {
+            $gia = implode("\n", $gia);
+        }
+
+        return collect(preg_split('/[\r\n➢▪•]+/u', (string) $gia))
+            // Cắt khoảng trắng và dấu gạch đầu dòng, GIỮ dấu chấm cuối câu.
+            ->map(fn ($dong) => trim($dong, " \t\u{00A0}-"))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     // Đơn đặt của tour — dùng để chặn xoá vĩnh viễn khi tour đã phát sinh giao dịch
     public function bookings(): HasMany
     {
         return $this->hasMany(\Modules\Booking\Models\Booking::class);
     }
 
+    /** Lượt quét mã QR của tour (in trên tờ rơi, poster...) */
+    public function qrScans(): HasMany
+    {
+        return $this->hasMany(TourQrScan::class);
+    }
+
     public function departures(): HasMany
     {
-        return $this->hasMany(TourDeparture::class);
+        // Luôn sắp theo ngày khởi hành tăng dần: ngày gần nhất lên đầu, để danh
+        // sách chọn ngày trên web đúng thứ tự thời gian (không theo thứ tự nhập).
+        return $this->hasMany(TourDeparture::class)->orderBy('start_date');
     }
 
     public function itineraries(): HasMany
@@ -56,7 +108,9 @@ class Tour extends Model
 
     public function images(): HasMany
     {
-        return $this->hasMany(TourImage::class)->orderBy('sort_order');
+        // Thêm id làm tiêu chí phụ: nhiều ảnh cùng "Thứ tự = 0" thì Postgres trả
+        // về theo thứ tự ngẫu nhiên, mỗi lần tải trang một khác.
+        return $this->hasMany(TourImage::class)->orderBy('sort_order')->orderBy('id');
     }
 
     // Chỉ lấy tour đang hiển thị công khai

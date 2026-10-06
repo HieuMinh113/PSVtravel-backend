@@ -40,7 +40,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
         Gate::policy(\App\Models\ContactMessage::class, \App\Policies\ContactMessagePolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
+            // API đọc (GET) đã cache: 600 lần/phút/IP đủ chặn lạm dụng mà không cản
+            // lúc build (Next.js dựng ~80 trang bắn nhiều request). Nhờ TrustProxies,
+            // $request->ip() là IP THẬT của khách nên giới hạn tính đúng theo từng người.
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($request->ip());
         });
 
         \Illuminate\Support\Facades\RateLimiter::for('booking', function (\Illuminate\Http\Request $request) {

@@ -47,6 +47,16 @@ class SettingForm
                     ->columnSpanFull()
                     ->visible(fn (?Setting $record): bool => $record?->type === 'url'),
 
+                // Link video YouTube — kiểm tra đúng là link YouTube trước khi lưu
+                TextInput::make('value')
+                    ->label('Link video YouTube')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Dán link video YouTube. Để trống thì khối video trên web tự ẩn.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()])
+                    ->columnSpanFull()
+                    ->visible(fn (?Setting $record): bool => $record?->type === 'youtube'),
+
                 Textarea::make('value')
                     ->label('Giá trị')
                     ->rows(4)
@@ -55,7 +65,7 @@ class SettingForm
 
                 FileUpload::make('value')
                     ->label('Ảnh')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('settings')
                     ->disk('public')
                     ->columnSpanFull()

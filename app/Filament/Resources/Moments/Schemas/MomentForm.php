@@ -13,12 +13,34 @@ class MomentForm
     {
         return $schema
             ->components([
+                // Video cảm nhận của khách — dán link YouTube. Có video thì ảnh
+                // chính không bắt buộc (web dùng ảnh thu nhỏ của video).
+                TextInput::make('video_url')
+                    ->label('Video cảm nhận (link YouTube)')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Khách gửi clip → đăng lên YouTube → dán link vào đây. Chọn "Đang hiển thị" là lên web.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()])
+                    ->live(onBlur: true)
+                    ->columnSpanFull(),
                 FileUpload::make('image')
-                    ->label('Ảnh')
-                    ->image()
+                    ->label('Ảnh chính')
+                    ->helperText('Ảnh đại diện hiển thị ngoài trang. Không bắt buộc nếu đã có video.')
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
+                    ->imageEditor()
                     ->directory('moments')
                     ->disk('public')
-                    ->required()
+                    ->required(fn ($get): bool => blank($get('video_url')))
+                    ->columnSpanFull(),
+                FileUpload::make('gallery')
+                    ->label('Ảnh phụ (bộ sưu tập)')
+                    ->helperText('Có thể thêm nhiều ảnh — kéo thả để sắp thứ tự. Khách bấm vào khoảnh khắc sẽ xem được tất cả.')
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
+                    ->multiple()
+                    ->reorderable()
+                    ->appendFiles()
+                    ->directory('moments')
+                    ->disk('public')
                     ->columnSpanFull(),
                 TextInput::make('caption')
                     ->label('Chú thích')

@@ -12,9 +12,12 @@
         $co = $dam ? '16px' : '13.5px';
         $canNang = $dam ? '700' : '600';
 
+        // e(): nội dung như tên khách là do khách TỰ NHẬP — không escape thì ai đó
+        // đặt tour với tên chứa thẻ HTML (vd. một nút "Xác nhận thanh toán" dẫn
+        // tới trang giả) sẽ chèn được nó vào email hệ thống gửi cho nhân viên.
         return '<tr>
-            <td style="padding:9px 0; font-size:13px; color:rgba(15,42,66,.6); white-space:nowrap;">'.$nhan.'</td>
-            <td align="right" style="padding:9px 0 9px 14px; font-size:'.$co.'; font-weight:'.$canNang.'; color:'.$mau.';">'.$giaTri.'</td>
+            <td style="padding:9px 0; font-size:13px; color:rgba(15,42,66,.6); white-space:nowrap;">'.e($nhan).'</td>
+            <td align="right" style="padding:9px 0 9px 14px; font-size:'.$co.'; font-weight:'.$canNang.'; color:'.$mau.';">'.e($giaTri).'</td>
         </tr>';
     };
 @endphp
@@ -36,7 +39,13 @@
             {!! $dong('Ngày về (dự kiến)', $ngayVe?->format('d/m/Y')) !!}
             {!! $dong('Số khách', $booking->adults.' người lớn'.($booking->children > 0 ? ', '.$booking->children.' trẻ em' : '')) !!}
             {!! $dong('Người liên hệ', $booking->customer_name.' — '.$booking->customer_phone) !!}
-            {!! $dong('Tổng tiền', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @if ($booking->choBaoGiaTreEm())
+                {{-- Tour chưa có giá trẻ em: tổng tiền CHƯA gồm trẻ em, nói rõ để khách không hiểu nhầm --}}
+                {!! $dong('Giá trẻ em', 'Nhân viên sẽ báo giá') !!}
+                {!! $dong('Tạm tính (chưa gồm trẻ em)', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @else
+                {!! $dong('Tổng tiền', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
+            @endif
         </table>
 
         @if ($booking->note)

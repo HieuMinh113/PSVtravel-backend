@@ -3,7 +3,10 @@
 namespace App\Filament\Resources\Users\Tables;
 
 
+use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -58,6 +61,24 @@ class UsersTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
+                // Nhân viên mất điện thoại (và mất mã khôi phục) → super admin tắt
+                // 2FA giúp để họ đăng nhập rồi thiết lập lại. Chỉ super admin thấy.
+                Action::make('tat2fa')
+                    ->label('Tắt 2FA')
+                    ->icon('heroicon-o-shield-exclamation')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Tắt xác thực 2 lớp?')
+                    ->modalDescription('Dùng khi người này mất điện thoại. Nếu là quản trị viên, họ sẽ phải thiết lập lại 2FA ngay lần đăng nhập tới.')
+                    ->visible(fn (User $record): bool => filled($record->getAppAuthenticationSecret())
+                        && (bool) auth()->user()?->hasRole(config('filament-shield.super_admin.name')))
+                    ->action(function (User $record): void {
+                        $record->saveAppAuthenticationSecret(null);
+                        $record->saveAppAuthenticationRecoveryCodes(null);
+                        $record->save();
+                        activity('user')->performedOn($record)->log('Tắt 2FA từ trang quản trị');
+                        Notification::make()->title('Đã tắt 2FA cho '.$record->email)->success()->send();
+                    }),
             ]);
     }
 }

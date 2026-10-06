@@ -7,6 +7,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
 
@@ -27,6 +28,18 @@ class GuideForm
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
 
+                // Tiêu đề hiện trên Google (thẻ <title>). Google cắt cụt tiêu đề
+                // dài hơn ~70 ký tự thành "…", công cụ audit SEO báo lỗi "Long
+                // title element". Để trống thì website tự dùng tiêu đề bài viết và tự rút
+                // gọn nếu quá dài.
+                TextInput::make('seo_title')
+                    ->label('Tiêu đề SEO (hiện trên Google)')
+                    ->maxLength(70)
+                    ->placeholder(fn (Get $get): string => (string) $get('title'))
+                    ->helperText('Không bắt buộc. Nên 50–60 ký tự, có từ khoá chính (VD: "Tour Đà Nẵng – Hội An 3N2Đ giá tốt"). Để trống = dùng tiêu đề bài viết.')
+                    ->live(debounce: 500)
+                    ->hint(fn (?string $state): string => mb_strlen((string) $state).'/70 ký tự'),
+
                 Select::make('category')
                     ->label('Chuyên mục')
                     ->options([
@@ -43,11 +56,29 @@ class GuideForm
                     ->searchable()
                     ->preload(),
 
+                Select::make('tour_id')
+                    ->label('Gắn tour để đặt')
+                    ->helperText('Chọn tour liên quan — bài viết sẽ hiện ô đặt tour bên phải. Để trống nếu không gắn.')
+                    ->relationship('tour', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->columnSpanFull(),
+
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('guides')
                     ->disk('public')
+                    ->columnSpanFull(),
+
+                // Video minh hoạ — ô riêng, KHÔNG dán iframe vào nội dung bài (bộ
+                // lọc an toàn của website sẽ loại iframe trong nội dung).
+                TextInput::make('video_url')
+                    ->label('Link video YouTube')
+                    ->placeholder('https://www.youtube.com/watch?v=...')
+                    ->helperText('Video minh hoạ cho bài (VD: clip review chuyến đi). Hiện ngay dưới đoạn mở bài. Để trống nếu không có.')
+                    ->maxLength(255)
+                    ->rules([\App\Services\YouTube::quyTac()])
                     ->columnSpanFull(),
 
                 Textarea::make('excerpt')
@@ -58,6 +89,11 @@ class GuideForm
                     ->columnSpanFull(),
                 RichEditor::make('content')
                     ->label('Nội dung bài viết')
+                    // Bật tải ảnh: nút ảnh trên thanh công cụ lưu vào disk public
+                    // (storage/app/public) để ảnh hiện được ra ngoài website.
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('guides/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 Select::make('status')

@@ -26,6 +26,15 @@ class Booking extends Model
         'cancelled_by', 'cancel_reason', 'cancelled_at',
     ];
 
+    /**
+     * Đơn có trẻ em nhưng tour chưa có giá trẻ em → tổng tiền CHƯA gồm trẻ em,
+     * nhân viên cần báo giá thêm cho khách.
+     */
+    public function choBaoGiaTreEm(): bool
+    {
+        return (int) $this->children > 0 && $this->unit_price_child === null;
+    }
+
     protected $casts = [
         'adults' => 'integer',
         'children' => 'integer',

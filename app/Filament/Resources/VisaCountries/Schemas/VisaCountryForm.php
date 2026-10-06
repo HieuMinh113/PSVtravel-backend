@@ -28,7 +28,7 @@ class VisaCountryForm
 
                 FileUpload::make('flag_image')
                     ->label('Ảnh cờ / ảnh đại diện')
-                    ->image()
+                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('visa')
                     ->disk('public'),
                 Select::make('visa_type')
@@ -75,6 +75,9 @@ class VisaCountryForm
 
                 RichEditor::make('description')
                     ->label('Mô tả chi tiết')
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('visa/noi-dung')
+                    ->fileAttachmentsVisibility('public')
                     ->columnSpanFull(),
 
                 TextInput::make('sort_order')
