@@ -97,6 +97,25 @@ Menu **Điều hành** trong trang quản trị:
 
 Ai được xem: vai trò `dieu_hanh` (cấp ở Người dùng), cùng super_admin và admin.
 
+**Máy tự hiểu được** (đã thử với 10 sheet đối tác thật — V1, VNA, AZ, M Tour,
+J Travel HCM/HN, Hanvina, VGI, VVT, Triều Hảo):
+
+- Cột nằm ở đâu cũng được — nhận ra theo chữ tiêu đề (NGÀY KHỞI HÀNH, LỊCH KH,
+  KH, GIÁ, GIÁ KHUYẾN MÃI, COM / HH / COM AG, NHẬN, CÒN NHẬN, SIZE, SURE, HOLD,
+  TUYẾN DU LỊCH, HÀNH TRÌNH, CHƯƠNG TRÌNH, THỊ TRƯỜNG, HK, HÀNG KHÔNG...).
+- Ngày: `08/04`, `11.01`, `Tháng 10: 15, 22, 29`, cột tháng + cột ngày riêng
+  (`Tháng 1` | `21`, `12; 27`, `8.15.22`), `06 - 10/02/2027`, `THỨ 5` (hằng tuần).
+  Năm suy theo tựa tab, mục "THÁNG 10/2026", mốc Tết ("MÙNG 1 TẾT") và thứ tự
+  các dòng — không sinh ngày đi giả từ lịch cũ.
+- Tiền: `21.990` (nghìn), `16.990K`, `800k`, `2tr5`; giá KM làm giá chính,
+  giá gốc gạch ngang.
+- Hết chỗ: `FULL`, `-`, `ĐÓNG`, `ĐÓNG ĐOÀN`, `HỦY`; ngày tô đỏ nếu bật tuỳ chọn.
+
+**Trang sửa sheet** có thêm: "Ngày tô ĐỎ có nghĩa là hết chỗ?", bỏ qua tab
+(phí visa, vé máy bay...), khai cột bằng tay cho tab không có dòng tiêu đề, và
+**báo cáo từng tab** của lần đọc gần nhất (đọc được bao nhiêu ngày đi, ô ngày
+nào chưa hiểu kèm số dòng). Sheet Hanvina được khai sẵn các tuỳ chọn này.
+
 Đọc tay để kiểm tra:
 
 ```bash

@@ -45,7 +45,9 @@ class DongBoLienMinh
         $file = null;
         try {
             $file = $this->tai->tai($nguon->sheet_url);
-            $kq = $this->doc->doc($file);
+            // Sheet đối tác lớn (Triều Hảo 1,4MB, 25 tab) cần nhiều bộ nhớ hơn mức mặc định
+            @ini_set('memory_limit', '1024M');
+            $kq = $this->doc->doc($file, null, $nguon->tuyChonDoc());
         } catch (\Throwable $e) {
             $nguon->last_error = mb_substr($e->getMessage(), 0, 1000);
             $nguon->save();
@@ -75,6 +77,7 @@ class DongBoLienMinh
             'last_success_at' => now(),
             'last_error' => null,
             'warnings' => $kq['canh_bao'] ?: null,
+            'bao_cao' => $kq['bao_cao'] ?? null,
             'sheet_updated_on' => $kq['ngay_cap_nhat'],
             'departures_count' => count($kq['dong']),
         ])->save();
@@ -111,12 +114,12 @@ class DongBoLienMinh
     {
         $nguong = (int) config('alliance.nguong_sap_het', 3);
 
-        // Trạng thái cũ theo "khoá tour|ngày" để so sánh
+        // Trạng thái cũ theo "khoá tour|ngày" (hoặc "khoá tour|tuần:Thứ 5...") để so sánh
         $cu = AllianceDeparture::query()
             ->where('alliance_departures.alliance_source_id', $nguon->id)
             ->join('alliance_tours', 'alliance_tours.id', '=', 'alliance_departures.alliance_tour_id')
-            ->get(['alliance_departures.id', 'alliance_tours.key', 'departure_date', 'seats_left', 'status'])
-            ->keyBy(fn ($d) => $d->key.'|'.$d->departure_date->toDateString());
+            ->get(['alliance_departures.id', 'alliance_tours.key', 'departure_date', 'weekly', 'seats_left', 'status'])
+            ->keyBy(fn ($d) => $d->key.'|'.($d->departure_date?->toDateString() ?? 'tuan:'.$d->weekly));
 
         // Tour liên minh đang có tour PSV nối vào — báo kỹ hơn cho các tour này
         $dangBan = Tour::query()->whereNotNull('alliance_tour_id')
@@ -153,14 +156,17 @@ class DongBoLienMinh
             // Tìm theo id đã nạp ở trên chứ không updateOrCreate theo ngày: cột
             // ngày so chuỗi trên SQLite ("2026-10-14" ≠ "2026-10-14 00:00:00")
             // sẽ không khớp và tạo bản ghi trùng.
-            $truoc = $cu[$d['khoa_tour'].'|'.$d['ngay_di']] ?? null;
+            $truoc = $cu[$d['khoa_tour'].'|'.($d['ngay_di'] ?? 'tuan:'.$d['lich_tuan'])] ?? null;
             $ngayDi = $truoc ? AllianceDeparture::findOrFail($truoc->id) : new AllianceDeparture([
                 'alliance_tour_id' => $tour->id,
                 'departure_date' => $d['ngay_di'],
+                'weekly' => $d['ngay_di'] ? null : mb_substr((string) $d['lich_tuan'], 0, 80),
             ]);
             $ngayDi->fill([
                 'alliance_source_id' => $nguon->id,
+                'tour_code' => $d['ma_tour'] ?? null,
                 'price' => $d['gia'],
+                'price_original' => $d['gia_niem_yet'] ?? null,
                 'price_text' => $d['gia_goc'],
                 'price_child' => $d['gia_tre_em'],
                 'price_infant' => $d['gia_em_be'],
@@ -198,7 +204,7 @@ class DongBoLienMinh
 
     private function soSanh(AllianceDeparture $truoc, AllianceDeparture $sau, AllianceTour $tour, bool $dangBan, int $nguong): ?string
     {
-        $ten = e(mb_strimwidth($tour->name, 0, 60, '…')).' '.$sau->departure_date->format('d/m');
+        $ten = e(mb_strimwidth($tour->name, 0, 60, '…')).' '.e($sau->nhanNgay());
         $conTruoc = $truoc->status === 'con_cho' ? (int) $truoc->seats_left : 0;
         $conSau = $sau->status === 'con_cho' ? (int) $sau->seats_left : 0;
         $ghiChuBan = $dangBan ? ' <em>(tour PSV đang bán)</em>' : '';
@@ -242,6 +248,7 @@ class DongBoLienMinh
 
         foreach ($tourPsv as $tour) {
             $lm = AllianceDeparture::where('alliance_tour_id', $tour->alliance_tour_id)
+                ->whereNotNull('departure_date') // lịch "Thứ 5 hằng tuần" không khớp ngày cụ thể
                 ->get()->keyBy(fn ($d) => $d->departure_date->toDateString());
 
             foreach ($tour->departures as $dot) {

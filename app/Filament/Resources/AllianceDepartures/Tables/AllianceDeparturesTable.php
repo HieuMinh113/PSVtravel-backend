@@ -29,9 +29,13 @@ class AllianceDeparturesTable
                 TextColumn::make('departure_date')
                     ->label('Ngày đi')
                     ->date('d/m/Y')
-                    ->description(fn (AllianceDeparture $record) => self::THU[$record->departure_date->dayOfWeek]
-                        .' · '.self::conBaoLau($record->departure_date))
-                    ->sortable(),
+                    // Tour không có ngày cụ thể: "Thứ 5 hằng tuần" (VVT nội địa)
+                    ->placeholder(fn (AllianceDeparture $record) => $record->weekly ?: '—')
+                    ->description(fn (AllianceDeparture $record) => $record->departure_date
+                        ? self::THU[$record->departure_date->dayOfWeek].' · '.self::conBaoLau($record->departure_date)
+                        : 'khởi hành hằng tuần')
+                    ->sortable(query: fn (Builder $query, string $direction) => $query
+                        ->orderByRaw('departure_date is null')->orderBy('departure_date', $direction)),
                 TextColumn::make('tour.name')
                     ->label('Tour')
                     ->wrap()
@@ -69,7 +73,11 @@ class AllianceDeparturesTable
                     ->formatStateUsing(fn ($state) => self::tien($state))
                     ->placeholder(fn (AllianceDeparture $record) => $record->price_text ?: '—')
                     ->tooltip(fn (AllianceDeparture $record) => $record->price_text ? 'Trong sheet ghi: '.$record->price_text : null)
-                    ->description(fn (AllianceDeparture $record) => $record->price_child ? 'Trẻ em '.self::tien($record->price_child) : null)
+                    // Có giá khuyến mãi: giá chính là giá KM, giá gốc gạch ngang bên dưới
+                    ->description(fn (AllianceDeparture $record) => $record->price_original
+                        ? new \Illuminate\Support\HtmlString('<span style="text-decoration:line-through">'.e(self::tien($record->price_original)).'</span> · giá KM')
+                        : ($record->price_child ? 'Trẻ em '.self::tien($record->price_child) : null))
+                    ->color(fn (AllianceDeparture $record) => $record->price_original ? 'danger' : null)
                     ->sortable(),
                 TextColumn::make('commission')
                     ->label('COM')
@@ -99,12 +107,17 @@ class AllianceDeparturesTable
                     ->state(fn (AllianceDeparture $record) => (bool) $record->tour?->program_url)
                     ->icon(fn (bool $state) => $state ? Heroicon::OutlinedDocumentText : null)
                     ->url(fn (AllianceDeparture $record) => $record->tour?->program_url, shouldOpenInNewTab: true),
+                TextColumn::make('tour_code')
+                    ->label('Mã tour')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('sheet_tab')
                     ->label('Tab / dòng')
                     ->formatStateUsing(fn ($state, AllianceDeparture $record) => $state.($record->sheet_row ? " · dòng {$record->sheet_row}" : ''))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort(fn (Builder $query) => $query->orderBy('departure_date')->orderBy('alliance_tour_id'))
+            ->defaultSort(fn (Builder $query) => $query->orderByRaw('departure_date is null')->orderBy('departure_date')->orderBy('alliance_tour_id'))
             ->filters([
                 Filter::make('ngay')
                     ->label('Khoảng ngày đi')
@@ -112,9 +125,17 @@ class AllianceDeparturesTable
                         DatePicker::make('tu')->label('Đi từ ngày')->native(false)->displayFormat('d/m/Y'),
                         DatePicker::make('den')->label('Đến ngày')->native(false)->displayFormat('d/m/Y'),
                     ])
-                    ->query(fn (Builder $query, array $data) => $query
-                        ->when($data['tu'] ?? null, fn ($w, $v) => $w->whereDate('departure_date', '>=', $v))
-                        ->when($data['den'] ?? null, fn ($w, $v) => $w->whereDate('departure_date', '<=', $v)))
+                    // Tour hằng tuần (không có ngày) chạy mọi tuần nên luôn khớp khoảng ngày
+                    // (chỉ lọc khi có nhập ngày — nhóm điều kiện rỗng bị Laravel bỏ đi,
+                    // còn lại mỗi "hoặc không có ngày" sẽ giấu hết các ngày đi)
+                    ->query(fn (Builder $query, array $data) => $query->when(
+                        ($data['tu'] ?? null) || ($data['den'] ?? null),
+                        fn ($q) => $q->where(fn ($w) => $w
+                            ->where(fn ($n) => $n
+                                ->when($data['tu'] ?? null, fn ($x, $v) => $x->whereDate('departure_date', '>=', $v))
+                                ->when($data['den'] ?? null, fn ($x, $v) => $x->whereDate('departure_date', '<=', $v)))
+                            ->orWhereNull('departure_date')),
+                    ))
                     ->indicateUsing(fn (array $data) => array_filter([
                         ($data['tu'] ?? null) ? 'Từ '.Carbon::parse($data['tu'])->format('d/m/Y') : null,
                         ($data['den'] ?? null) ? 'Đến '.Carbon::parse($data['den'])->format('d/m/Y') : null,

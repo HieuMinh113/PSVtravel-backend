@@ -126,6 +126,103 @@ class LienMinhTest extends TestCase
         $this->assertSame(['2027-02-06'], $tet->pluck('ngay_di')->values()->all());
     }
 
+    public function test_doc_kieu_vgi_thang_kem_danh_sach_ngay(): void
+    {
+        $d = $this->doc(MauSheetLienMinh::vgi());
+
+        // "Tháng 10: 15, 22, 29" + "Tháng 11: 5, 12⏎Tháng 12: 03, 10" + "Tháng 12: 31 (TẾT DƯƠNG)"
+        foreach (['2026-10-15', '2026-10-22', '2026-10-29', '2026-11-05', '2026-11-12', '2026-12-03', '2026-12-10', '2026-12-31'] as $ngay) {
+            $this->assertArrayHasKey('HÀ NỘI - TRƯ|'.$ngay, $d, $ngay);
+        }
+        $this->assertSame(10490000, $d['HÀ NỘI - TRƯ|2026-10-15']['gia']);
+        $this->assertSame(800000, $d['HÀ NỘI - TRƯ|2026-10-15']['hoa_hong'], 'COM "800k"');
+        $this->assertSame('https://docs.google.com/document/d/phct-6n5d', $d['HÀ NỘI - TRƯ|2026-10-15']['link_chuong_trinh']);
+        // Biến thể liệt kê lại từ tháng 10 → vẫn năm nay, không đẩy sang 2027
+        $this->assertSame(1000000, $d['HÀ NỘI - TRƯ|2026-10-17']['hoa_hong'], 'COM "1000K"');
+        $this->assertArrayNotHasKey('HÀ NỘI - TRƯ|2027-10-17', $d);
+        // Tab giữ cả lịch 2026 đã qua (có mốc "Tức 1 Tết" = Tết 2026) → không sinh ngày giả
+        $this->assertFalse(collect($d)->contains(fn ($x) => $x['tab'] === 'ĐÔNG NAM Á'));
+    }
+
+    public function test_doc_kieu_vvt_cot_thang_cot_ngay_va_hang_tuan(): void
+    {
+        $tatCa = app(DocBangLienMinh::class)->doc(MauSheetLienMinh::vvt())['dong'];
+        $ngay = collect($tatCa)->whereNotNull('ngay_di')->pluck('ngay_di')->sort()->values()->all();
+
+        // "Tháng 1|21" (tựa NĂM 2026 → đã qua), "Lễ 2/9|28" = 28/08 (đã qua) → không có
+        $this->assertSame(['2026-12-10', '2026-12-24', '2027-01-08', '2027-01-15', '2027-01-22', '2027-02-02', '2027-02-06'], $ngay);
+        $this->assertSame('HÀN QUỐC – SEOUL MONO', collect($tatCa)->firstWhere('ngay_di', '2026-12-10')['ten_tour']);
+        $this->assertSame('SINGAPORE - MALAYSIA 5N4Đ', collect($tatCa)->firstWhere('ngay_di', '2027-02-06')['ten_tour'], '"06 - 10/02/2027" → 06/02');
+
+        $tuan = collect($tatCa)->whereNull('ngay_di');
+        $this->assertSame(['Thứ 5 hằng tuần', 'Thứ 5 hằng tuần', 'Thứ 3, 6, Chủ nhật hằng tuần'], $tuan->pluck('lich_tuan')->values()->all());
+        // Cùng tên khác số ngày (3N2Đ / 4N3Đ) là 2 tour
+        $this->assertSame([3450000, 3750000], $tuan->take(2)->pluck('gia')->values()->all());
+    }
+
+    public function test_doc_kieu_trieu_hao_cot_ngay_khong_tieu_de_com_ag_dong(): void
+    {
+        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::trieuHao())['dong'])->keyBy('ngay_di');
+
+        $this->assertSame(['2026-10-24', '2026-10-31', '2026-11-03', '2026-11-10'], $d->keys()->sort()->values()->all());
+        $this->assertSame([17990000, 1000000, 25, 29, 'con_cho'], [$d['2026-10-24']['gia'], $d['2026-10-24']['hoa_hong'], $d['2026-10-24']['con_cho'], $d['2026-10-24']['tong_cho'], $d['2026-10-24']['trang_thai']], 'Lấy COM AG, không lấy TỔNG COM / LN');
+        $this->assertSame([16990000, 'het_cho'], [$d['2026-10-31']['gia'], $d['2026-10-31']['trang_thai']], '"16.990K", NHẬN "ĐÓNG"');
+        $this->assertSame('het_cho', $d['2026-11-10']['trang_thai'], 'Cột không tiêu đề ghi "ĐÓNG ĐOÀN"');
+    }
+
+    public function test_doc_kieu_hanvina_ngay_to_do_va_cot_khai_tay(): void
+    {
+        $tuyChon = ['mau_do' => 'theo_chu_thich', 'cot_tay' => ['BẮC KINH - THƯỢNG HẢI HCM' => ['ten' => 'B', 'thoi_gian' => 'D', 'hang_bay' => 'E', 'ngay_di' => 'F', 'gia' => 'H', 'hoa_hong' => 'I', 'ghi_chu' => 'J']]];
+        $kq = app(DocBangLienMinh::class)->doc(MauSheetLienMinh::hanvina(), null, $tuyChon);
+        $d = collect($kq['dong'])->keyBy(fn ($x) => mb_substr($x['ten_tour'], 0, 8).'|'.$x['ngay_di']);
+
+        // Tab HCM có chú thích "Đỏ hết chỗ": chỉ ngày 24 (tô đỏ) là hết chỗ
+        $this->assertSame('lien_he', $d['SUN_6N5D|2026-10-10']['trang_thai']);
+        $this->assertSame('het_cho', $d['SUN_6N5D|2026-10-24']['trang_thai']);
+        $this->assertSame('lien_he', $d['SUN_6N5D|2026-10-31']['trang_thai']);
+        $this->assertSame('het_cho', $d['LỆ GIANG|2026-11-03']['trang_thai'], 'Cột không tiêu đề ghi FULL');
+
+        // Tab HN tô đỏ ngày lễ (không có chú thích) → không phải hết chỗ;
+        // "16/01 Đóng đoàn" là hạn chót, không phải hết chỗ; "Full" ở cột SL thì hết
+        $this->assertSame('lien_he', $d['HÀ NỘI -|2026-12-29']['trang_thai']);
+        $this->assertSame('lien_he', $d['HÀ NỘI -|2026-10-17']['trang_thai']);
+        $this->assertSame('het_cho', $d['HÀ NỘI -|2026-11-03']['trang_thai']);
+
+        // Tab không có dòng tiêu đề, đọc theo cột khai tay
+        $this->assertSame([23590000, 1000000, 'lien_he'], [$d['NAM KINH|2026-10-31']['gia'], $d['NAM KINH|2026-10-31']['hoa_hong'], $d['NAM KINH|2026-10-31']['trang_thai']]);
+        $this->assertSame('het_cho', $d['NAM KINH|2026-11-14']['trang_thai']);
+
+        $baoCao = collect($kq['bao_cao'])->keyBy('tab');
+        $this->assertTrue($baoCao['TOUR TRUNG QUỐC HCM']['mau_do']);
+        $this->assertFalse($baoCao['TOUR TRUNG QUỐC HÀ NỘI']['mau_do']);
+        $this->assertTrue($baoCao['BẮC KINH - THƯỢNG HẢI HCM']['cot_tay']);
+
+        // Không bật tuỳ chọn màu đỏ → ngày đỏ vẫn là "liên hệ"
+        $khong = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::hanvina())['dong']);
+        $this->assertSame('lien_he', $khong->first(fn ($x) => $x['ngay_di'] === '2026-10-24' && str_starts_with($x['ten_tour'], 'SUN'))['trang_thai']);
+    }
+
+    public function test_doc_kieu_vna_phong_chu_dac_biet_va_com_trieu(): void
+    {
+        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::vna())['dong'])->keyBy('ngay_di');
+
+        $this->assertSame('SEOUL - BUSAN', $d['2026-11-13']['ten_tour'], 'Chữ 𝐒𝐄𝐎𝐔𝐋 đổi về chữ thường');
+        $this->assertSame([20990000, 2500000, 4, 20, 'con_cho'], [$d['2026-11-13']['gia'], $d['2026-11-13']['hoa_hong'], $d['2026-11-13']['con_cho'], $d['2026-11-13']['tong_cho'], $d['2026-11-13']['trang_thai']]);
+        $this->assertSame('OSBUS130526/06/TGH', $d['2026-11-13']['ma_tour']);
+        $this->assertSame('30/10', $d['2026-11-13']['han_visa'], '"DEALINE VISA"');
+        $this->assertSame([2000000, 'het_cho'], [$d['2026-11-20']['hoa_hong'], $d['2026-11-20']['trang_thai']], '"20.11", "2tr", "FULL"');
+    }
+
+    public function test_doc_kieu_j_travel_gia_khuyen_mai(): void
+    {
+        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::jTravel())['dong'])->keyBy('ngay_di');
+
+        $this->assertSame([23990000, 25990000], [$d['2026-10-12']['gia'], $d['2026-10-12']['gia_niem_yet']], 'Giá KM làm giá chính, giá gốc gạch ngang');
+        $this->assertSame([27990000, null], [$d['2026-12-30']['gia'], $d['2026-12-30']['gia_niem_yet']]);
+        $this->assertSame('CỬU TRẠI CÂU', $d['2026-10-12']['muc'], 'Cột THỊ TRƯỜNG là nhóm, không phải tên tour');
+        $this->assertSame('THÀNH ĐÔ – TRÙNG KHÁNH – CỬU TRẠI CÂU', $d['2026-10-12']['ten_tour']);
+    }
+
     public function test_nhan_dien_link_google(): void
     {
         $this->assertSame('1q_Q1nTPiXerS8aoK5I8zl8dIPh9U7YdzYZ20SXoZCbg', TaiSheetLienMinh::maFile('https://docs.google.com/spreadsheets/d/1q_Q1nTPiXerS8aoK5I8zl8dIPh9U7YdzYZ20SXoZCbg/edit?gid=244595541#gid=244595541'));
@@ -368,6 +465,69 @@ class LienMinhTest extends TestCase
         // Seoul trong sheet có 5 ngày sắp tới, web đã có 04/11 → thêm 4
         $this->assertSame(5, $tour->departures()->count());
         $this->assertSame(0, $tour->departures()->whereDate('start_date', '2026-10-28')->value('seats_left'));
+    }
+
+    public function test_dong_bo_luu_lich_tuan_gia_km_bao_cao_va_bo_qua_tab(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $nguon = AllianceSource::create(['name' => 'VVT', 'sheet_url' => self::LINK]);
+        $this->traVe(MauSheetLienMinh::vvt());
+        app(DongBoLienMinh::class)->dongBo($nguon);
+
+        $tuan = AllianceDeparture::whereNull('departure_date')->get();
+        $this->assertSame(['Thứ 5 hằng tuần', 'Thứ 5 hằng tuần', 'Thứ 3, 6, Chủ nhật hằng tuần'], $tuan->pluck('weekly')->all());
+        $this->assertSame(['VL01', 'VL02', 'VL08'], $tuan->pluck('tour_code')->all());
+        $baoCao = collect($nguon->fresh()->bao_cao)->keyBy('tab');
+        $this->assertSame(3, $baoCao['TOUR NỘI ĐỊA']['so_ngay']);
+
+        // Bảng tra chỗ hiện cả tour hằng tuần (kể cả khi lọc theo khoảng ngày)
+        $this->actingAs($this->dieuHanh());
+        Livewire::test(ListAllianceDepartures::class)
+            ->assertSee('Thứ 3, 6, Chủ nhật hằng tuần')
+            ->filterTable('ngay', ['tu' => '2026-12-01', 'den' => '2026-12-31'])
+            ->assertCanSeeTableRecords($tuan)
+            ->assertCanSeeTableRecords(AllianceDeparture::whereDate('departure_date', '2026-12-10')->get())
+            ->assertCanNotSeeTableRecords(AllianceDeparture::whereDate('departure_date', '2027-01-08')->get());
+
+        // Điều hành tắt tab nội địa → đọc lại thì các tour hằng tuần biến mất
+        $nguon->update(['tab_bo_qua' => ['TOUR NỘI ĐỊA']]);
+        app(DongBoLienMinh::class)->dongBo($nguon->fresh());
+        $this->assertSame(0, AllianceDeparture::whereNull('departure_date')->count());
+        $this->assertSame('bo_qua', collect($nguon->fresh()->bao_cao)->firstWhere('tab', 'TOUR NỘI ĐỊA')['tinh_trang']);
+    }
+
+    public function test_gia_khuyen_mai_luu_gia_goc(): void
+    {
+        $nguon = AllianceSource::create(['name' => 'J Travel', 'sheet_url' => self::LINK]);
+        $this->traVe(MauSheetLienMinh::jTravel());
+        app(DongBoLienMinh::class)->dongBo($nguon);
+
+        $d = AllianceDeparture::whereDate('departure_date', '2026-10-12')->firstOrFail();
+        $this->assertSame([23990000, 25990000], [$d->price, $d->price_original]);
+    }
+
+    public function test_them_link_hanvina_tu_dien_cau_hinh_san_va_trang_sua_hien_bao_cao(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $nguon = AllianceSource::create(['name' => 'Hanvina', 'sheet_url' => 'https://docs.google.com/spreadsheets/d/1iS3G9tbkfpE95csaYadKk4PZjY3dYJato1uKXSLLNGw/htmlview?gid=376037578']);
+        $this->assertSame('theo_chu_thich', $nguon->mau_do);
+        $this->assertSame('F', $nguon->cot_tay[0]['ngay_di']);
+        $this->assertSame('BẮC KINH - THƯỢNG HẢI HCM', $nguon->cot_tay[0]['tab']);
+
+        $this->traVe(MauSheetLienMinh::hanvina());
+        app(DongBoLienMinh::class)->dongBo($nguon);
+        $this->assertTrue(AllianceDeparture::whereDate('departure_date', '2026-10-24')->where('status', 'het_cho')->exists(), 'Ngày tô đỏ = hết chỗ');
+
+        $this->actingAs($this->dieuHanh());
+        Livewire::test(\App\Filament\Resources\AllianceSources\Pages\EditAllianceSource::class, ['record' => $nguon->getRouteKey()])
+            ->assertOk()
+            ->assertFormFieldExists('mau_do')
+            ->assertFormFieldExists('tab_bo_qua')
+            ->assertSee('ngày tô đỏ = hết chỗ')
+            ->assertSee('đọc theo cột khai tay');
+
+        // Sheet không có trong cấu hình khai sẵn → mặc định không coi màu đỏ là hết chỗ
+        $this->assertSame('tat', AllianceSource::create(['name' => 'Khác', 'sheet_url' => self::LINK])->fresh()->mau_do);
     }
 
     public function test_nhan_vien_khong_co_quyen_khong_vao_duoc(): void

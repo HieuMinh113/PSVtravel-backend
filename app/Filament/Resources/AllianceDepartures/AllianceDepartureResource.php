@@ -41,8 +41,9 @@ class AllianceDepartureResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        // Ngày đi từ hôm nay, cộng các tour khởi hành "Thứ 5 hằng tuần" (không có ngày)
         return parent::getEloquentQuery()
-            ->whereDate('departure_date', '>=', today())
+            ->where(fn (Builder $q) => $q->whereDate('departure_date', '>=', today())->orWhereNull('departure_date'))
             ->with(['tour.source', 'tour.psvTours:id,name,alliance_tour_id']);
     }
 

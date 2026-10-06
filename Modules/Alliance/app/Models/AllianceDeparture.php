@@ -21,6 +21,7 @@ class AllianceDeparture extends Model
     protected $casts = [
         'departure_date' => 'date',
         'price' => 'integer',
+        'price_original' => 'integer',
         'price_child' => 'integer',
         'price_infant' => 'integer',
         'commission' => 'integer',
@@ -30,6 +31,12 @@ class AllianceDeparture extends Model
         'seats_left' => 'integer',
         'sheet_row' => 'integer',
     ];
+
+    /** "14/10/2026" hoặc "Thứ 5 hằng tuần". */
+    public function nhanNgay(string $dinhDang = 'd/m'): string
+    {
+        return $this->departure_date ? $this->departure_date->format($dinhDang) : (string) $this->weekly;
+    }
 
     public function tour(): BelongsTo
     {

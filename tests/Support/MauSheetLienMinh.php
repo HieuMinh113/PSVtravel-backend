@@ -132,6 +132,175 @@ class MauSheetLienMinh
         return self::luu($s, 'mtour');
     }
 
+    /**
+     * Kiểu VGI: "Tháng 10: 15, 22, 29" (nhiều tháng / ô), COM "800k", cột
+     * "CHƯƠNG TRÌNH" là tên tour, nhiều biến thể cùng tour xếp liền nhau, và
+     * một tab giữ cả lịch năm nay đã qua (có mốc Tết).
+     */
+    public static function vgi(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('TOUR ĐƯỜNG BAY');
+        $t->fromArray(['TUYẾN', 'CHƯƠNG TRÌNH ', 'THỜI GIAN', 'LỊCH KHỞI HÀNH', 'GIÁ ', 'LINK CHƯƠNG TRÌNH', 'PHƯƠNG TIỆN ', 'COM'], null, 'A2');
+        $t->setCellValue('A3', 'PHCT')->setCellValue('B3', "HÀ NỘI - TRƯỜNG SA - PHƯỢNG HOÀNG\n(CẬP NHẬT GIÁ)")->mergeCells('A3:A8')->mergeCells('B3:B8');
+        $t->fromArray(['6N5D', "\nTháng 10: 15, 22, 29", '10,490,000', 'TRƯỜNG SA 6N5D', 'CZ', '800k'], null, 'C3');
+        $t->getCell('F3')->getHyperlink()->setUrl('https://docs.google.com/document/d/phct-6n5d');
+        $t->fromArray(['6N5D', "Tháng 11: 5, 12\nTháng 12: 03, 10", '10,490,000', null, 'CZ', '800k'], null, 'C4');
+        $t->fromArray(['6N5D', 'Tháng 12: 31 (TẾT DƯƠNG)', '12,090,000', null, 'CZ', '800k'], null, 'C5');
+        // Biến thể khác của cùng tour, liệt kê lại từ tháng 10 (không phải năm sau)
+        $t->fromArray(['6N5D', 'Tháng 10: 17, 20', '9,990,000', null, 'CZ', '1000K'], null, 'C6');
+
+        // Tab giữ cả lịch năm 2026 đã qua: không được đẩy sang 2027/2028
+        $c = $s->createSheet()->setTitle('ĐÔNG NAM Á');
+        $c->fromArray(['TUYẾN', 'CHƯƠNG TRÌNH ', 'THỜI GIAN', 'LỊCH KHỞI HÀNH', 'GIÁ ', 'LINK CHƯƠNG TRÌNH', 'PHƯƠNG TIỆN ', 'COM'], null, 'A2');
+        $c->setCellValue('B3', 'HÀ NỘI – SINGAPORE – MALAYSIA')->mergeCells('B3:B6');
+        $c->fromArray(['5N4D', "Tháng 01: 21\nTháng 03: 18\nTháng 04: 15", '13,990,000', null, 'VN', '1000K'], null, 'C3');
+        $c->fromArray(['5N4D', 'Tháng 08: 31( Quốc Khánh)', '14,990,000', null, 'VN', '1000K'], null, 'C4');
+        $c->fromArray(['5N4D', 'Tháng 02: 17 (Tức 1 Tết Âm Lịch)', '17,990,000', null, 'VN', '1000K'], null, 'C5');
+        $c->fromArray(['5N4D', 'Tháng 06: 25, 29', '14,990,000', null, 'VN', '1000K'], null, 'C6');
+
+        return self::luu($s, 'vgi');
+    }
+
+    /**
+     * Kiểu VVT: tựa "Năm 2026", "LỊCH KHỞI HÀNH" gộp 2 cột (tháng | ngày),
+     * ngày "21", "12; 27", "8.15.22", "02(26AL)", "Lễ 2/9 | 28", "06 - 10/02/2027",
+     * tour nội địa "THỨ 5" hằng tuần.
+     */
+    public static function vvt(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('CHÂU Á');
+        $t->setCellValue('B3', "LỊCH KHỞI HÀNH CHÂU Á - NĂM 2026\nKÍNH GỞI QUÝ ĐỐI TÁC")->mergeCells('B3:H3');
+        $t->setCellValue('B4', 'TUYẾN DU LỊCH')->mergeCells('B4:B5');
+        $t->setCellValue('C4', 'THỜI GIAN')->mergeCells('C4:C5');
+        $t->setCellValue('D4', 'LỊCH KHỞI HÀNH')->mergeCells('D4:E5');
+        $t->setCellValue('F4', 'GIÁ')->setCellValue('F5', 'VNĐ');
+        $t->setCellValue('G4', 'HK')->mergeCells('G4:G5');
+        $t->setCellValue('H4', 'HH')->mergeCells('H4:H5');
+        $t->setCellValue('B6', "HÀN QUỐC\nSEOUL MONO\n(LÀNG CỔ - NAMI)")->mergeCells('B6:B11');
+        $t->setCellValue('C6', '5N4Đ')->mergeCells('C6:C11');
+        $dong = [['Tháng 1', '21'], ['Tháng 8', '14'], ['Lễ 2/9', '28'], ['Tháng 12', '10; 24'], ['Tháng 1', '8.15.22'], ['Tháng 2', '02(26AL)']];
+        foreach ($dong as $i => [$thang, $ngay]) {
+            $r = 6 + $i;
+            $t->setCellValueExplicit("D$r", $thang, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING)
+                ->setCellValueExplicit("E$r", $ngay, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING)
+                ->setCellValue("F$r", '15.990.000')->setCellValue("G$r", 'VJ')->setCellValue("H$r", '1.000.000');
+        }
+
+        $tet = $s->createSheet()->setTitle('TẾT 2027');
+        $tet->setCellValue('B3', 'LỊCH KHỞI HÀNH TẾT ĐINH MÙI - NĂM 2027')->mergeCells('B3:H3');
+        $tet->fromArray(['TUYẾN DU LỊCH', 'THỜI GIAN', 'LỊCH KHỞI HÀNH', null, 'GIÁ', 'HK', 'HH'], null, 'B4');
+        $tet->mergeCells('D4:E4');
+        $tet->fromArray(['SINGAPORE - MALAYSIA 5N4Đ', '5N4Đ', 'MÙNG 1', '06 - 10/02/2027', '14,990,000', 'AK', '900,000'], null, 'B6');
+
+        $nd = $s->createSheet()->setTitle('TOUR NỘI ĐỊA');
+        $nd->setCellValue('A3', 'CÁC TUYẾN MIỀN BẮC 2026')->mergeCells('A3:I3');
+        $nd->fromArray(['CODE', 'TUYẾN DU LỊCH', 'TG', 'KHỞI HÀNH ', 'GIÁ NET ', 'PHÒNG ĐƠN', 'PHỤ THU NN', 'C,TRÌNH', 'GHI CHÚ '], null, 'A4');
+        $nd->fromArray(['VL01', 'HÀ NỘI - TRÀNG AN - HẠ LONG', '3N2Đ', 'THỨ 5 ', '3,450,000', '600,000', '400,000', 'CHƯƠNG TRÌNH', "TOUR GHÉP\nChưa bao gồm VMB"], null, 'A5');
+        $nd->fromArray(['VL02', 'HÀ NỘI - TRÀNG AN - HẠ LONG', '4N3Đ', null, '3,750,000', '900,000', null, 'CHƯƠNG TRÌNH'], null, 'A6');
+        $nd->mergeCells('D5:D6');
+        $nd->fromArray(['VL08', 'ĐÀ NẴNG - HỘI AN', '2N1Đ', 'T3.T6. CN', '2,050,000'], null, 'A7');
+
+        return self::luu($s, 'vvt');
+    }
+
+    /**
+     * Kiểu Triều Hảo: "LỊCH KH", tháng ở cột tiêu đề còn số ngày ở cột bên
+     * cạnh KHÔNG có tiêu đề, 3 cột COM (lấy COM AG), giá "16.990K", NHẬN ghi
+     * "ĐÓNG", cột không tiêu đề ghi "ĐÓNG ĐOÀN", dòng dữ liệu có chữ giống
+     * tiêu đề ("LINK", "Huỷ code").
+     */
+    public static function trieuHao(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('TQ tuyến khác');
+        $t->setCellValue('A2', "TRUNG QUỐC TUYẾN KHÁC  2026\n")->mergeCells('A2:N2');
+        $t->fromArray(['STT', 'HÀNH TRÌNH', 'THỜI GIAN', 'PHƯƠNG TIỆN', 'LỊCH KHỞI HÀNH', null, 'GIÁ TOUR', 'TỔNG COM', 'LN', 'COM AG', 'TỔNG CHỖ', 'CHỐT', 'GIỮ', 'NHẬN', 'AG', 'THT'], null, 'A3');
+        $t->setCellValue('A4', '2')->setCellValue('B4', "HÀ NỘI – THÀNH ĐÔ – CỬU TRẠI CÂU")->setCellValue('C4', '6N5Đ')->setCellValue('D4', 'Sichuan airline (3U)');
+        foreach (['A', 'B', 'C', 'D'] as $c) {
+            $t->mergeCells("{$c}4:{$c}7");
+        }
+        $dong = [
+            ['Tháng 10', '24', '17,990', '2,000', '1,000', '1,000', 29, 4, 0, 25, 'LINK', 'LINK', 'Huỷ code'],
+            [null, '31', '16.990K', '2,000', '1,000', '1,200', 29, 29, 0, 'ĐÓNG', null, null, null],
+            ['Tháng 11', '3', '18,990', '2,000', '1,000', '1,000', 29, 5, 2, 22, null, null, null],
+            [null, '10', '18,990', '2,000', '1,000', '1,000', 29, 0, 0, 29, null, null, 'ĐÓNG ĐOÀN'],
+        ];
+        foreach ($dong as $i => $x) {
+            $r = 4 + $i;
+            if ($x[0]) {
+                $t->setCellValue("E$r", $x[0]);
+            }
+            $t->setCellValueExplicit("F$r", $x[1], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $t->fromArray(array_slice($x, 2), null, "G$r");
+        }
+
+        return self::luu($s, 'trieuhao');
+    }
+
+    /**
+     * Kiểu Hanvina: "Tháng 10: 10, 24, 31" mà ngày 24 tô đỏ + chú thích "Đỏ hết
+     * chỗ"; tab khác tô đỏ ngày lễ (không có chú thích); cột SL ghi "Full" /
+     * "16/01 Đóng đoàn"; tab không có dòng tiêu đề.
+     */
+    public static function hanvina(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('TOUR TRUNG QUỐC HCM');
+        $t->fromArray([null, 'CHƯƠNG TRÌNH', 'LỊCH TRÌNH ', 'THỜI GIAN ', 'HÀNG KHÔNG', 'NGÀY KHỞI HÀNH', 'GIÁ TOUR ', 'Com'], null, 'A1');
+        $t->setCellValue('I1', 'Đỏ hết chỗ');
+        $t->setCellValue('A2', 'TUYẾN CỬU TRẠI CÂU')->mergeCells('A2:I2');
+        $t->fromArray([null, 'SUN_6N5D_ THÀNH ĐÔ - CỬU TRẠI CÂU', 'CTC 6N5D', '6N5D', 'SICHUAN'], null, 'A3');
+        $chu = new \PhpOffice\PhpSpreadsheet\RichText\RichText;
+        $chu->createTextRun('THÁNG 10: 10, ');
+        $chu->createTextRun('24')->getFont()->getColor()->setRGB('FF0000');
+        $chu->createTextRun(', 31');
+        $t->getCell('F3')->setValue($chu);
+        $t->setCellValue('G3', '16,990,000')->setCellValue('H3', '1,000,000');
+        $t->fromArray([null, 'LỆ GIANG - SHANGRILA', 'LỆ GIANG 5N4D', '5N4D', 'RUILI', 'Tháng 11: 03, 17', '18,990,000', '1,000,000', 'FULL'], null, 'A4');
+
+        $hn = $s->createSheet()->setTitle('TOUR TRUNG QUỐC HÀ NỘI');
+        $hn->fromArray(['CHƯƠNG TRÌNH', 'THỜI GIAN ', 'PHƯƠNG TIỆN DI CHUYỂN ', 'NGÀY KHỞI HÀNH ', 'GIÁ TOUR', 'COM', null, 'SL'], null, 'A2');
+        $hn->fromArray(['HÀ NỘI - THÀNH ĐÔ - CTC', '6N5D', '3U', 'Tháng 10: 17, 24', '19,590,000', '1,000,000', null, '16/01 Đóng đoàn'], null, 'A3');
+        $hn->fromArray(['HÀ NỘI - THÀNH ĐÔ - CTC', '6N5D', '3U', 'Tháng 11: 03', '19,590,000', '1,000,000', null, 'Full'], null, 'A4');
+        $hn->fromArray(['HÀ NỘI - THÀNH ĐÔ - CTC', '6N5D', '3U', 'Tháng 12: 29 (Tết Dương Lịch)', '18,990,000', '1,000,000'], null, 'A5');
+        $hn->getStyle('D5')->getFont()->getColor()->setRGB('FF0000'); // đỏ = ngày lễ ở tab này
+
+        $kt = $s->createSheet()->setTitle('BẮC KINH - THƯỢNG HẢI HCM');
+        $kt->setCellValue('A1', 'THƯỢNG HẢI - HÀNG CHÂU - Ô TRẤN (ĐẦU HCM) NOSHOP')->mergeCells('A1:J1');
+        $kt->fromArray([null, 'NAM KINH - THƯỢNG HẢI - Ô TRẤN', 'NK T10 NKGPVG', '6N5Đ', 'MU', '[ĐÊM] 31/10/2026', null, '23,590,000', '1,000,000'], null, 'A2');
+        $kt->fromArray([null, 'NAM KINH - THƯỢNG HẢI - Ô TRẤN', 'NK T11', '6N5Đ', 'MU', '14/11/2026', null, '23,590,000', '1,000,000', 'full'], null, 'A3');
+
+        return self::luu($s, 'hanvina');
+    }
+
+    /** Kiểu VNA: chữ phông đặc biệt (𝐒𝐄𝐎𝐔𝐋), "KH", "2tr5", "DEALINE VISA", "FULL". */
+    public static function vna(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('Hàn Quốc - HCM');
+        $t->setCellValue('A1', 'VNA TRAVEL KÍNH GỬI QUÝ ĐỐI TÁC');
+        $t->fromArray(['MÃ TOUR', 'TUYẾN', "THỜI\n GIAN", 'LINK CT', "HÀNG \nKHÔNG", 'KH', 'GIÁ', 'SỐ CHỖ', 'GIỮ', 'ĐÃ CHỐT ', 'CÒN NHẬN', 'DEALINE VISA', "COM \ntừ"], null, 'A3');
+        $t->fromArray(['OSBUS130526/06/TGH', "𝐒𝐄𝐎𝐔𝐋 - 𝐁𝐔𝐒𝐀𝐍\n(ĐI TỐI)", '6N5Đ', 'LINK CT', 'Vietnam Airlines', '13/11', '𝟮𝟬.𝟵𝟵𝟬.𝟬𝟬𝟬', 20, 2, 14, 4, '30/10', '2tr5'], null, 'A4');
+        $t->fromArray(['OSBUS050626/06/TGH', "𝐒𝐄𝐎𝐔𝐋 - 𝐁𝐔𝐒𝐀𝐍\n(ĐI TỐI)", '6N5Đ', 'LINK CT', 'Vietnam Airlines', '20.11', '20.990.000', 20, 0, 20, 'FULL', null, '2tr'], null, 'A5');
+
+        return self::luu($s, 'vna');
+    }
+
+    /** Kiểu J Travel: THỊ TRƯỜNG + HÀNH TRÌNH, GIÁ BÁN + GIÁ KHUYẾN MÃI. */
+    public static function jTravel(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('CỬU TRẠI CÂU');
+        $t->setCellValue('B1', 'LỊCH KHỞI HÀNH TOUR 2026 ');
+        $t->fromArray(['THỊ TRƯỜNG', 'HÀNH TRÌNH', 'HÃNG BAY ', 'THÁNG', 'NGÀY KHỞI HÀNH', 'GIÁ BÁN', 'COM', 'GIÁ KHUYẾN MÃI ', 'CHƯƠNG TRÌNH CHI TIẾT '], null, 'A2');
+        $t->fromArray(['CỬU TRẠI CÂU', "THÀNH ĐÔ – TRÙNG KHÁNH – CỬU TRẠI CÂU\n6N5Đ", 'VJ', 'Tháng 10', '12/10', '25,990,000', '1.000.000', '23,990,000', 'CHƯƠNG TRÌNH CHI TIẾT'], null, 'A3');
+        $t->fromArray(['CỬU TRẠI CÂU', "THÀNH ĐÔ – TRÙNG KHÁNH – CỬU TRẠI CÂU\n6N5Đ", 'VJ', 'Tháng 11', '30/12 - 03/01/2027', '27,990,000', '1.000.000', null], null, 'A4');
+
+        return self::luu($s, 'jtravel');
+    }
+
     private static function v1TieuDe(Worksheet $t, int $dong, string $tieuDe): void
     {
         $t->setCellValue('A1', $tieuDe)->mergeCells('A1:P1');

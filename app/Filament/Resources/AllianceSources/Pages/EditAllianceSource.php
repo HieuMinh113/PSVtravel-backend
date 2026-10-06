@@ -19,10 +19,10 @@ class EditAllianceSource extends EditRecord
         ];
     }
 
-    /** Đổi link thì đọc lại ngay theo link mới. */
+    /** Đổi link hoặc đổi cách đọc (màu đỏ, bỏ tab, khai cột) thì đọc lại ngay. */
     protected function afterSave(): void
     {
-        if ($this->record->wasChanged('sheet_url') && $this->record->is_active) {
+        if ($this->record->wasChanged(['sheet_url', 'mau_do', 'tab_bo_qua', 'cot_tay']) && $this->record->is_active) {
             DocNgayAction::chay($this->record);
         }
     }

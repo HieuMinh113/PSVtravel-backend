@@ -102,6 +102,7 @@ class DeparturesRelationManager extends RelationManager
     {
         return $this->ngayLienMinh ??= \Modules\Alliance\Models\AllianceDeparture::query()
             ->where('alliance_tour_id', $this->getOwnerRecord()->alliance_tour_id)
+            ->whereNotNull('departure_date')
             ->get()
             ->mapWithKeys(fn ($d) => [$d->departure_date->toDateString() => 'Theo sheet: '.($d->status === 'con_cho'
                 ? "còn {$d->seats_left}"
