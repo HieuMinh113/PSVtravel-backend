@@ -95,6 +95,20 @@ class DeparturesRelationManager extends RelationManager
         ]);
     }
 
+    /** @var array<string,string>|null ngày => "Theo sheet: ..." (nạp 1 lần cho cả bảng) */
+    private ?array $ngayLienMinh = null;
+
+    private function ngayLienMinh(): array
+    {
+        return $this->ngayLienMinh ??= \Modules\Alliance\Models\AllianceDeparture::query()
+            ->where('alliance_tour_id', $this->getOwnerRecord()->alliance_tour_id)
+            ->get()
+            ->mapWithKeys(fn ($d) => [$d->departure_date->toDateString() => 'Theo sheet: '.($d->status === 'con_cho'
+                ? "còn {$d->seats_left}"
+                : mb_strtolower(\Modules\Alliance\Models\AllianceDeparture::TRANG_THAI[$d->status] ?? $d->status))])
+            ->all();
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -108,7 +122,10 @@ class DeparturesRelationManager extends RelationManager
                     ->money('VND')
                     ->placeholder('—'),
                 TextColumn::make('seats_total')->label('Tổng chỗ'),
-                TextColumn::make('seats_left')->label('Còn'),
+                TextColumn::make('seats_left')->label('Còn')
+                    ->description(fn (TourDeparture $record): ?string => $this->getOwnerRecord()->alliance_tour_id
+                        ? ($this->ngayLienMinh()[$record->start_date->toDateString()] ?? 'Sheet không có ngày này')
+                        : null),
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
@@ -126,6 +143,24 @@ class DeparturesRelationManager extends RelationManager
             ->defaultSort('start_date')
             ->headerActions([
                 CreateAction::make()->label('Thêm đợt khởi hành'),
+                // Tour đã nối với tour liên minh: thêm một lần mọi ngày đi trong
+                // sheet đối tác mà web chưa có, kèm số chỗ theo sheet.
+                \Filament\Actions\Action::make('layTuLienMinh')
+                    ->label('Lấy ngày đi từ liên minh')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedArrowDownTray)
+                    ->color('gray')
+                    ->visible(fn (): bool => (bool) $this->getOwnerRecord()->alliance_tour_id
+                        && auth()->user()?->can('create', TourDeparture::class))
+                    ->requiresConfirmation()
+                    ->modalDescription('Thêm các ngày khởi hành có trong sheet đối tác mà tour này chưa có. Ngày đã có thì giữ nguyên; ngày sheet không ghi số chỗ thì bỏ qua.')
+                    ->action(function (): void {
+                        $kq = app(\Modules\Alliance\Services\DongBoLienMinh::class)->themNgayDi($this->getOwnerRecord());
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title($kq['them'] ? "Đã thêm {$kq['them']} ngày khởi hành" : 'Không có ngày mới để thêm')
+                            ->body($kq['bo_qua'] ? "Bỏ qua {$kq['bo_qua']} ngày vì sheet không ghi số chỗ." : null)
+                            ->send();
+                    }),
             ])
             ->recordActions([
                 EditAction::make(),

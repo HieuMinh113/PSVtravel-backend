@@ -57,6 +57,10 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            // Chuông thông báo góc phải: báo động liên minh (có chỗ trở lại,
+            // sắp hết chỗ, sheet lỗi...). Hỏi lại mỗi 30 giây.
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

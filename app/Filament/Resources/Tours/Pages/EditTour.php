@@ -33,6 +33,20 @@ class EditTour extends EditRecord
             RestoreAction::make(),
         ];
     }
+    /** Vừa nối (hoặc đổi) tour liên minh → cập nhật số chỗ ngay, không chờ lần đọc sheet sau. */
+    protected function afterSave(): void
+    {
+        if ($this->record->wasChanged('alliance_tour_id') && $this->record->alliance_tour_id) {
+            $doi = app(\Modules\Alliance\Services\DongBoLienMinh::class)
+                ->capNhatTourPsv([$this->record->alliance_tour_id]);
+            if ($doi) {
+                \Filament\Notifications\Notification::make()->success()
+                    ->title("Đã cập nhật số chỗ {$doi} ngày đi theo sheet liên minh")
+                    ->send();
+            }
+        }
+    }
+
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');

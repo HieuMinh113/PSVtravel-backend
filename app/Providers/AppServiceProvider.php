@@ -39,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Spatie\Activitylog\Models\Activity::class, \App\Policies\ActivityPolicy::class);
         Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
         Gate::policy(\App\Models\ContactMessage::class, \App\Policies\ContactMessagePolicy::class);
+        Gate::policy(\Modules\Alliance\Models\AllianceSource::class, \Modules\Alliance\Policies\AllianceSourcePolicy::class);
+        Gate::policy(\Modules\Alliance\Models\AllianceDeparture::class, \Modules\Alliance\Policies\AllianceDeparturePolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
             // API đọc (GET) đã cache: 600 lần/phút/IP đủ chặn lạm dụng mà không cản
             // lúc build (Next.js dựng ~80 trang bắn nhiều request). Nhờ TrustProxies,

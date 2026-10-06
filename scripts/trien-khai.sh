@@ -7,9 +7,10 @@
 # chừng còn hơn chạy tới cùng với CSDL đã đổi mà mã nguồn thì chưa.
 set -euo pipefail
 
-# Nhánh đang phát triển. Truyền tên nhánh khác làm tham số nếu cần:
-#   ./scripts/trien-khai.sh main
-NHANH="${1:-claude/github-repos-exploration-1izvgb}"
+# Nhánh chạy thật là main: code mới được đẩy lên main, chạy thử ở máy local,
+# ổn rồi mới chạy script này. Truyền tên nhánh khác làm tham số nếu cần:
+#   ./scripts/trien-khai.sh ten-nhanh-khac
+NHANH="${1:-main}"
 THU_MUC_BE="$(cd "$(dirname "$0")/.." && pwd)"
 THU_MUC_FE="$(dirname "$THU_MUC_BE")/psvtravel-frontend"
 COMPOSE="docker compose -f docker-compose.prod.yml"
@@ -84,7 +85,7 @@ $COMPOSE up -d nginx >/dev/null 2>&1 || true
 
 # Frontend BẮT BUỘC build lại mỗi lần: địa chỉ API được nhúng thẳng vào mã
 # JavaScript lúc build, không đọc lúc chạy.
-$COMPOSE build app queue frontend
+$COMPOSE build app queue scheduler frontend
 
 echo "==> 3/8  Bật thông báo bảo trì"
 # Từ đây trở đi mới thật sự nguy hiểm: thay thư viện PHP, đổi cấu trúc cơ sở
@@ -145,6 +146,9 @@ $COMPOSE exec -T app php artisan filament:optimize
 # Worker chạy nền giữ mã cũ trong bộ nhớ mãi mãi nếu không bảo nó thoát.
 # Thiếu dòng này thì mail xác nhận đơn vẫn dùng mẫu cũ.
 $COMPOSE exec -T app php artisan queue:restart
+# Lịch chạy: mỗi phút nó gọi một tiến trình PHP mới nên tự dùng mã mới, nhưng
+# khởi động lại cho chắc (và để container được tạo nếu đây là lần đầu có nó).
+$COMPOSE up -d scheduler >/dev/null 2>&1 && $COMPOSE restart scheduler >/dev/null 2>&1 || true
 
 # Trả quyền ghi cho PHP-FPM — BẮT BUỘC sau mọi lệnh artisan ở trên.
 #

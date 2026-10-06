@@ -41,5 +41,9 @@ class RoleSeeder extends Seeder
         );
 
         $staff->syncRoles(['staff']);
+
+        // Quyền liên minh cho super_admin/admin + vai trò điều hành. Migration
+        // cũng tạo, nhưng trên máy mới cài nó chạy TRƯỚC khi có super_admin.
+        $this->call(\Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder::class);
     }
 }

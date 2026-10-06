@@ -8,5 +8,6 @@
     "Review": true,
     "Flight": true,
     "Visa": true,
-    "Page": true
+    "Page": true,
+    "Alliance": true
 }

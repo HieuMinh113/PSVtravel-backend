@@ -68,6 +68,25 @@ services:
       - postgres
       - redis
 
+  # Việc hẹn giờ (đọc sheet liên minh 5 phút/lần...). Chạy dưới www-data để
+  # file cache/log nó tạo ra không bị khoá quyền với PHP-FPM.
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: psvtravel_scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    user: www-data
+    command: php artisan schedule:work
+    volumes:
+      - ./:/var/www
+    networks:
+      - psvtravel
+    depends_on:
+      - postgres
+      - redis
+
 networks:
   psvtravel:
     driver: bridge

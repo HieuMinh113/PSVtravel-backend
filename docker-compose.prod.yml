@@ -38,6 +38,27 @@ services:
     networks: [psv]
     depends_on: [postgres, redis]
 
+  # Chạy các việc hẹn giờ của Laravel mỗi phút (routes/console.php + lịch của
+  # từng module): đọc sheet liên minh 5 phút/lần, dọn nhật ký hoạt động...
+  #
+  # user www-data: BẮT BUỘC. Chạy dưới root thì file cache / log do lịch chạy
+  # tạo ra thuộc root, PHP-FPM (www-data) không ghi đè được → API và trang
+  # quản trị trả 500 (đúng lỗi ngày 30/09/2026).
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: psv_scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    env_file: .env
+    user: www-data
+    command: php artisan schedule:work
+    volumes:
+      - ./:/var/www
+    networks: [psv]
+    depends_on: [postgres, redis]
+
   postgres:
     image: postgres:16-alpine
     container_name: psv_postgres

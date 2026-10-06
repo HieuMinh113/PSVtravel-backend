@@ -30,6 +30,23 @@ class TourForm
         'Liên hệ',
     ];
 
+    /** Tìm tour liên minh theo tên tour / tên đối tác cho ô chọn. */
+    private static function timTourLienMinh(string $tim): array
+    {
+        $like = \App\Filament\Resources\AllianceDepartures\Tables\AllianceDeparturesTable::like();
+
+        return \Modules\Alliance\Models\AllianceTour::query()
+            ->with('source')
+            ->withCount(['departures' => fn ($q) => $q->whereDate('departure_date', '>=', today())])
+            ->where(fn ($q) => $q->where('name', $like, "%{$tim}%")
+                ->orWhereHas('source', fn ($s) => $s->where('name', $like, "%{$tim}%")))
+            ->orderByDesc('last_seen_at')
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn ($t) => [$t->id => $t->nhan()." · {$t->departures_count} ngày đi"])
+            ->all();
+    }
+
     /** Mảng trong CSDL -> ô nhập nhiều dòng. */
     private static function ghepDong($state): string
     {
@@ -310,6 +327,18 @@ class TourForm
                     ->numeric()
                     ->default(0)
                     ->required(),
+
+                // Nối với tour trong sheet đối tác liên minh: số chỗ các ngày đi
+                // trên website tự lấy theo sheet (đọc lại mỗi 10–15 phút).
+                Select::make('alliance_tour_id')
+                    ->label('Lấy số chỗ theo tour liên minh')
+                    ->placeholder('Không nối — tự nhập số chỗ')
+                    ->helperText('Chọn tour tương ứng trong sheet đối tác. Ngày đi nào trùng ngày trong sheet sẽ tự cập nhật “Còn N chỗ” trên website; ngày sheet ghi FULL / huỷ / tạm ngưng thì web tự hết chỗ. Gõ tên tour hoặc đối tác để tìm.')
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search): array => self::timTourLienMinh($search))
+                    ->getOptionLabelUsing(fn ($value): ?string => \Modules\Alliance\Models\AllianceTour::with('source')->find($value)?->nhan())
+                    ->visible(fn (): bool => (bool) auth()->user()?->can('ViewAny:AllianceDeparture'))
+                    ->columnSpanFull(),
             ]);
     }
 }

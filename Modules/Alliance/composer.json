@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/alliance",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Alliance\\": "app/",
+            "Modules\\Alliance\\Database\\Factories\\": "database/factories/",
+            "Modules\\Alliance\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Alliance\\Tests\\": "tests/"
+        }
+    }
+}

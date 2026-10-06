@@ -1,0 +1,11 @@
+{
+    "name": "Alliance",
+    "alias": "alliance",
+    "description": "Liên minh: đọc sheet chỗ trống của đối tác, báo động, đồng bộ chỗ cho tour PSV",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Alliance\\Providers\\AllianceServiceProvider"
+    ],
+    "files": []
+}

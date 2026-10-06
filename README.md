@@ -38,9 +38,15 @@ docker compose exec app php artisan db:seed --class="Modules\Page\Database\Seede
 
 # 8. Cho phép website đọc ảnh đã upload
 docker compose exec app php artisan storage:link
+
+# 9. Cấp đủ quyền cho tài khoản Toàn quyền (máy mới cài chưa có quyền nào)
+docker compose exec app php artisan shield:generate --all --panel=admin --option=permissions
 ```
 
 Xong: trang quản trị ở **http://localhost:8000/admin**
+
+Lệnh `docker compose up` bật luôn container `scheduler` — nó chạy các việc hẹn
+giờ (đọc sheet liên minh 5 phút/lần...). Xem nó chạy: `docker compose logs -f scheduler`.
 
 ### Tài khoản có sẵn sau bước 6
 
@@ -71,6 +77,36 @@ docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --force   # x
 ```
 
 Lệnh này giữ nguyên tài khoản, phân quyền, Cài đặt và trang tĩnh.
+
+---
+
+## Liên minh (dành cho điều hành)
+
+Menu **Điều hành** trong trang quản trị:
+
+- **Sheet liên minh** — dán link Google Sheet chỗ trống của từng đối tác. Sheet
+  phải để chế độ *Bất kỳ ai có đường liên kết đều xem được*. Lưu xong máy đọc
+  thử ngay; sau đó tự đọc lại mỗi 10–15 phút.
+- **Tra chỗ liên minh** — mọi ngày khởi hành của mọi đối tác trong một bảng: lọc
+  theo ngày, số chỗ còn, đối tác, tình trạng; tìm theo tên tour.
+- **Chuông thông báo** (góc phải) — có chỗ trở lại, sắp hết chỗ, tour PSV đang
+  bán vừa hết chỗ, đối tác thêm ngày mới, sheet bị khoá / lỗi.
+- **Nối với tour trên web** — trong trang sửa tour, ô *Lấy số chỗ theo tour liên
+  minh*. Nối xong, các ngày đi trùng ngày trong sheet tự cập nhật “Còn N chỗ”
+  trên website; tab *Lịch khởi hành* có nút *Lấy ngày đi từ liên minh*.
+
+Ai được xem: vai trò `dieu_hanh` (cấp ở Người dùng), cùng super_admin và admin.
+
+Đọc tay để kiểm tra:
+
+```bash
+docker compose exec app php artisan lien-minh:dong-bo --tat-ca   # đọc lại mọi sheet ngay
+docker compose exec app php artisan lien-minh:dong-bo --nguon=1  # chỉ sheet số 1
+```
+
+Chỉnh trong `.env` nếu cần: `LIEN_MINH_CHU_KY_PHUT=10` (bao lâu đọc lại một
+sheet), `LIEN_MINH_NGUONG_SAP_HET=3` (còn từ chừng này chỗ trở xuống thì báo
+"sắp hết").
 
 ---
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Category\Models\Category;
 use App\Jobs\PingIndexNow;
@@ -42,6 +43,7 @@ class Tour extends Model
         'cancellation_policy', 'notes', 'description',
         'rating', 'review_count',
         'status', 'is_featured', 'sort_order',
+        'alliance_tour_id',
     ];
 
     protected $casts = [
@@ -86,6 +88,15 @@ class Tour extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(\Modules\Booking\Models\Booking::class);
+    }
+
+    /**
+     * Tour liên minh (sheet đối tác) mà tour này lấy số chỗ theo. Có nối thì
+     * số chỗ các ngày đi trên website tự cập nhật mỗi lần máy đọc sheet.
+     */
+    public function allianceTour(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Alliance\Models\AllianceTour::class);
     }
 
     /** Lượt quét mã QR của tour (in trên tờ rơi, poster...) */
