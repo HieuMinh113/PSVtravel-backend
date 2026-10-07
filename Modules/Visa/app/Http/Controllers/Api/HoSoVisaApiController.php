@@ -14,6 +14,7 @@ use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
 use Modules\Visa\Models\VisaCountry;
 use Modules\Visa\Services\BaoHoSoVisaMoi;
+use Modules\Visa\Support\PhieuThongTin;
 use Modules\Visa\Transformers\HoSoVisaKhachResource;
 
 /**
@@ -34,6 +35,43 @@ class HoSoVisaApiController extends Controller
 
     public const LOAI_FILE = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 
+    // GET /api/v1/visa-applications/checklist?visa_country=&purpose=&profile=
+    // Danh sách giấy tờ để form web hiện ô tải file cho từng giấy tờ. Đúng mẫu
+    // này sẽ được chép vào hồ sơ khi khách bấm nộp (cùng thứ tự → "muc" khớp).
+    public function checklist(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'visa_country' => ['required', 'string', 'max:255'],
+            'purpose' => ['nullable', Rule::in(array_keys(VisaCase::MUC_DICH))],
+            'profile' => ['nullable', Rule::in(array_keys(VisaCase::DOI_TUONG))],
+        ]);
+
+        $nuoc = VisaCountry::where('slug', $data['visa_country'])->where('status', 'published')->first();
+        $mau = $nuoc ? VisaChecklist::timMau($nuoc->name, $data['purpose'] ?? 'du_lich', $data['profile'] ?? null) : null;
+
+        return response()->json(['data' => [
+            'note' => $mau?->note,
+            'items' => collect(VisaCase::chepMau($mau))
+                ->map(fn ($g, $i) => ['muc' => $i, 'ten' => $g['ten'], 'ghi_chu' => $g['ghi_chu'], 'nhom' => $g['nhom']])
+                ->values(),
+        ]]);
+    }
+
+    // GET /api/v1/visa-applications/phieu — câu hỏi phiếu thông tin cho form web
+    // (một nguồn duy nhất: sửa câu hỏi ở PhieuThongTin là web đổi theo)
+    public function phieu(): JsonResponse
+    {
+        return response()->json(['data' => collect(PhieuThongTin::NHOM)->map(fn ($cauHoi, $tieuDe) => [
+            'tieu_de' => $tieuDe,
+            'cau_hoi' => collect($cauHoi)->map(fn ($dn, $khoa) => [
+                'khoa' => $khoa,
+                'nhan' => $dn[0],
+                'kieu' => $dn[1],
+                'lua_chon' => $dn[1] === 'co_khong' ? PhieuThongTin::CO_KHONG : ($dn[2] ?? null),
+            ])->values(),
+        ])->values()]);
+    }
+
     // POST /api/v1/visa-applications
     public function store(Request $request, BaoHoSoVisaMoi $bao): JsonResponse
     {
@@ -48,6 +86,7 @@ class HoSoVisaApiController extends Controller
             'profile' => ['nullable', Rule::in(array_keys(VisaCase::DOI_TUONG))],
             'travel_date' => ['nullable', 'date', 'after_or_equal:today'],
             'note' => ['nullable', 'string', 'max:2000'],
+            'thong_tin' => ['nullable', 'array'],
             'dong_y' => ['accepted'],
             // Ô bẫy: người thật không thấy nên luôn để trống
             'website' => ['nullable', 'size:0'],
@@ -101,6 +140,7 @@ class HoSoVisaApiController extends Controller
             'visa_checklist_id' => $mau?->id,
             'checklist' => VisaCase::chepMau($mau),
             'customer_note' => $data['note'] ?? null,
+            'thong_tin' => PhieuThongTin::loc($data['thong_tin'] ?? []) ?: null,
             'status' => 'moi',
             'upload_token_hash' => hash('sha256', $maTai),
             'upload_token_expires_at' => now()->addHours(2),
@@ -117,6 +157,7 @@ class HoSoVisaApiController extends Controller
     {
         $request->validate([
             'token' => ['required', 'string', 'max:100'],
+            'muc' => ['nullable', 'integer', 'min:0', 'max:200'],
             'file' => ['required', File::types(self::LOAI_FILE)->max(10 * 1024)],
         ], [
             'file.required' => 'Chưa chọn file.',
@@ -137,18 +178,31 @@ class HoSoVisaApiController extends Controller
         $tep = $request->file('file');
         $duong = $tep->store('ho-so-visa', 'rieng');
 
+        // "muc" = số thứ tự giấy tờ trong checklist (ô khách chọn trên web);
+        // không có / không khớp thì vào "Giấy tờ khác".
+        $muc = $request->filled('muc') ? (int) $request->input('muc') : null;
+        $ten = self::tenGoc($tep->getClientOriginalName());
+
         // Khoá dòng hồ sơ khi đếm: khách gửi song song nhiều file cùng lúc vẫn
         // không vượt quá 10.
-        $duoc = DB::transaction(function () use ($hs, $duong, $tep) {
+        $duoc = DB::transaction(function () use ($hs, $duong, $ten, $muc) {
             $hs = VisaCase::whereKey($hs->id)->lockForUpdate()->first();
             if ($hs->web_files_count >= self::TOI_DA_FILE) {
                 return false;
             }
-            $hs->forceFill([
-                'files' => [...($hs->files ?? []), $duong],
-                'file_names' => [...($hs->file_names ?? []), $duong => self::tenGoc($tep->getClientOriginalName())],
-                'web_files_count' => $hs->web_files_count + 1,
-            ])->save();
+
+            $ds = $hs->checklist ?? [];
+            if ($muc !== null && isset($ds[$muc])) {
+                // Đúng ô giấy tờ khách chọn → gắn vào dòng đó (tự thành "Đã nhận")
+                $ds[$muc]['tep'] = [...(array) ($ds[$muc]['tep'] ?? []), $duong];
+                $ds[$muc]['ten_tep'] = [...(array) ($ds[$muc]['ten_tep'] ?? []), $duong => $ten];
+                $hs->checklist = $ds;
+            } else {
+                $hs->files = [...($hs->files ?? []), $duong];
+                $hs->file_names = [...($hs->file_names ?? []), $duong => $ten];
+            }
+            $hs->web_files_count++;
+            $hs->save();
 
             return true;
         });
@@ -183,6 +237,7 @@ class HoSoVisaApiController extends Controller
                 'upload_token' => $maTai,
                 'max_files' => max(0, self::TOI_DA_FILE - $hs->web_files_count),
                 'documents' => collect($hs->checklist ?? [])->pluck('ten')->values(),
+                'items' => collect($hs->checklist ?? [])->map(fn ($g, $i) => ['muc' => $i, 'ten' => $g['ten'] ?? ''])->values(),
             ],
         ], $ma);
     }

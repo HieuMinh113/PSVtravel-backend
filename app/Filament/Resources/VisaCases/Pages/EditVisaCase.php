@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VisaCases\Pages;
 
 use App\Filament\Resources\VisaCases\Actions\TinNhanGiayThieuAction;
+use App\Filament\Resources\VisaCases\Actions\XuatZipAction;
 use App\Filament\Resources\VisaCases\VisaCaseResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -30,6 +31,7 @@ class EditVisaCase extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            XuatZipAction::make(),
             TinNhanGiayThieuAction::make(),
             DeleteAction::make(),
         ];

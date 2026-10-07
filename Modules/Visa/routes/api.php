@@ -9,6 +9,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('visa-countries/{slug}', [VisaApiController::class, 'show']);
 });
 // Khách tự nộp hồ sơ visa trên website (không bắt buộc đăng nhập)
+Route::get('v1/visa-applications/checklist', [HoSoVisaApiController::class, 'checklist'])
+    ->middleware('throttle:api');
+Route::get('v1/visa-applications/phieu', [HoSoVisaApiController::class, 'phieu'])
+    ->middleware('throttle:api');
 Route::post('v1/visa-applications', [HoSoVisaApiController::class, 'store'])
     ->middleware('throttle:visa-nop');
 Route::post('v1/visa-applications/{code}/files', [HoSoVisaApiController::class, 'storeFile'])

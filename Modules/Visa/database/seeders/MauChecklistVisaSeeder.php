@@ -18,9 +18,61 @@ class MauChecklistVisaSeeder extends Seeder
             return;
         }
 
-        foreach (self::mau() as $i => $m) {
+        foreach ([...self::mau(), ...self::mauDoanHan()] as $i => $m) {
             VisaChecklist::create($m + ['sort_order' => $i]);
         }
+    }
+
+    /** Thêm các mẫu chưa có (so theo tên) — dùng cho migration bổ sung mẫu về sau. */
+    public static function themMauNeuChuaCo(array $dsMau): void
+    {
+        $thuTu = (int) VisaChecklist::withTrashed()->max('sort_order');
+        foreach ($dsMau as $m) {
+            if (! VisaChecklist::withTrashed()->where('name', $m['name'])->exists()) {
+                VisaChecklist::create($m + ['sort_order' => ++$thuTu]);
+            }
+        }
+    }
+
+    /**
+     * Đoàn Hàn Quốc — theo checklist "VISA ĐOÀN HÀN": nhân thân + tài chính +
+     * nghề nghiệp (khác nhau theo đối tượng) + tờ khai theo mẫu.
+     */
+    public static function mauDoanHan(): array
+    {
+        $nhanThan = [
+            self::g('Hồ sơ nhân thân', 'Hộ chiếu', 'hộ chiếu gốc — scan trang thông tin + các trang có visa / dấu xuất nhập cảnh'),
+            self::g('Hồ sơ nhân thân', 'Ảnh thẻ 3.5x4.5', 'nền trắng, gửi file'),
+            self::g('Hồ sơ nhân thân', 'Căn cước', 'chụp ảnh'),
+            self::g('Hồ sơ nhân thân', 'Đăng ký kết hôn - quyết định ly hôn', 'chụp ảnh — nếu đi cùng gia đình, để chứng minh quan hệ'),
+            self::g('Hồ sơ nhân thân', 'Giấy khai sinh', 'chụp ảnh / scan — nếu đi cùng gia đình, để chứng minh quan hệ'),
+        ];
+        $taiChinh = [
+            self::g('Hồ sơ tài chính', 'Sao kê ngân hàng', '3–6 tháng gần nhất, tài khoản nhận lương; miễn nếu đã đi Mỹ, Canada, châu Âu, Úc'),
+            self::g('Hồ sơ tài chính', 'Sổ tiết kiệm', 'sổ gốc chụp ảnh; miễn nếu đã đi Mỹ, Canada, châu Âu, Úc'),
+        ];
+        $toKhai = [self::g('Tờ khai', 'Tờ khai', 'theo mẫu')];
+        $luuY = 'Hồ sơ đã đi Mỹ, Canada, châu Âu, Úc… được miễn phần tài chính.';
+        $mau = fn (string $doiTuong, string $ten, array $ngheNghiep) => [
+            'name' => 'Hàn Quốc — Đoàn du lịch — '.$ten,
+            'country' => 'Hàn Quốc', 'purpose' => 'du_lich', 'profile' => $doiTuong,
+            'items' => [...$nhanThan, ...$taiChinh, ...$ngheNghiep, ...$toKhai],
+            'note' => $luuY,
+        ];
+
+        return [
+            $mau('nhan_vien', 'Nhân viên', [
+                self::g('Hồ sơ nghề nghiệp', 'Hợp đồng lao động - quyết định bổ nhiệm', 'chụp ảnh / scan'),
+                self::g('Hồ sơ nghề nghiệp', 'VssID', 'chụp màn hình bảo hiểm xã hội'),
+            ]),
+            $mau('chu_doanh_nghiep', 'Chủ doanh nghiệp', [
+                self::g('Hồ sơ nghề nghiệp', 'Đăng ký kinh doanh', 'chụp ảnh / scan'),
+                self::g('Hồ sơ nghề nghiệp', 'Giấy tờ thuế 3 tháng gần nhất', 'chụp ảnh / scan'),
+            ]),
+            $mau('huu_tri', 'Hưu trí', [
+                self::g('Hồ sơ nghề nghiệp', 'Quyết định hưu trí', 'chụp ảnh / scan'),
+            ]),
+        ];
     }
 
     private static function g(string $nhom, string $ten, ?string $ghiChu = null): array

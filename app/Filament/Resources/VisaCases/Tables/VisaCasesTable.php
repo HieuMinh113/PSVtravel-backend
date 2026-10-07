@@ -4,6 +4,9 @@ namespace App\Filament\Resources\VisaCases\Tables;
 
 use App\Filament\Resources\VisaCases\Actions\NhanHoSoAction;
 use App\Filament\Resources\VisaCases\Actions\TinNhanGiayThieuAction;
+use App\Filament\Resources\VisaCases\Actions\XuatZipAction;
+use App\Filament\Resources\VisaCases\VisaCaseResource;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
@@ -106,6 +109,11 @@ class VisaCasesTable
                     ->label('Nước')
                     ->options(fn () => VisaCase::query()->distinct()->orderBy('country')->pluck('country', 'country')->all())
                     ->searchable(),
+                SelectFilter::make('group_name')
+                    ->label('Nhóm / đoàn')
+                    ->options(fn () => VisaCaseResource::getEloquentQuery()->whereNotNull('group_name')
+                        ->distinct()->orderBy('group_name')->pluck('group_name', 'group_name')->all())
+                    ->searchable(),
                 SelectFilter::make('source')
                     ->label('Nguồn')
                     ->options(VisaCase::NGUON),
@@ -132,9 +140,16 @@ class VisaCasesTable
             ])
             ->recordActions([
                 NhanHoSoAction::make(),
-                TinNhanGiayThieuAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                ActionGroup::make([
+                    XuatZipAction::make(),
+                    TinNhanGiayThieuAction::make(),
+                    EditAction::make(),
+                    DeleteAction::make(),
+                ]),
+            ])
+            // Chọn cả nhà / cả đoàn (lọc theo ô Nhóm) rồi xuất một file ZIP
+            ->toolbarActions([
+                XuatZipAction::caDoan(),
             ]);
     }
 }

@@ -156,6 +156,25 @@ khoản → Hồ sơ visa*. Gửi kèm tối đa 10 file ảnh/PDF, mỗi file 1
 file một vì nginx nhận tối đa 20MB mỗi lần). Có hồ sơ mới: chuông báo cho nhân
 viên visa + admin, email xác nhận cho khách (nếu có email).
 
+**Giấy tờ theo từng dòng + xuất ZIP**: mỗi dòng checklist có ô tải file riêng
+(gắn file là tự "Đã nhận"); khách trên web cũng tải vào đúng ô từng giấy. Nút
+**Xuất hồ sơ (ZIP)** (trang sửa hồ sơ, hoặc chọn nhiều hồ sơ cùng nhóm trong
+bảng → *Xuất ZIP đoàn*) cho ra:
+
+```
+gđ anh tuấn.zip
+  DANH SÁCH gđ anh tuấn.xlsx
+  NGUYỄN TÔ THỤY BẢO CHÂU/
+    Hộ chiếu.pdf, Căn cước.jpg, Hợp đồng lao động (1).pdf, (2).pdf…
+    Giấy tờ khác/…            (file chưa xếp vào dòng nào)
+    Phiếu thông tin.docx      (theo phiếu thông tin xin visa Nhật)
+    GIẤY TỜ CÒN THIẾU.txt     (chỉ khi còn thiếu)
+```
+
+Xuất lúc nào cũng được; còn thiếu thì báo trước. File ZIP tải qua link có chữ ký
+10 phút, chỉ người bấm xuất tải được, tải xong tự xoá (chưa tải thì lịch chạy
+dọn sau 1 ngày). Mỗi lần xuất được ghi nhật ký hoạt động.
+
 Ai thấy gì:
 
 - Vai trò `visa` (cấp ở Người dùng): chỉ thấy hồ sơ mình phụ trách + hồ sơ

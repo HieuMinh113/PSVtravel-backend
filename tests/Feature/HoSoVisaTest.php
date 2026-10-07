@@ -19,9 +19,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use Modules\Visa\Database\Seeders\MauChecklistVisaSeeder;
 use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
 use Modules\Visa\Models\VisaCountry;
+use Modules\Visa\Services\XuatHoSoVisa;
+use Modules\Visa\Services\XuatTam;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -61,7 +65,7 @@ class HoSoVisaTest extends TestCase
         $this->assertTrue($vaiTro->hasPermissionTo('Create:VisaChecklist'));
         $this->assertFalse($vaiTro->hasPermissionTo(Permission::findOrCreate('ViewAny:Tour', 'web')));
 
-        $this->assertSame(8, VisaChecklist::count());
+        $this->assertSame(11, VisaChecklist::count());
         $tq = $this->mau('Trung Quốc — Du lịch — Nhân viên');
         $this->assertSame('Hộ chiếu bản gốc', $tq->items[0]['ten']);
         $this->assertSame('Xác nhận việc làm', collect($tq->items)->last()['ten']);
@@ -73,7 +77,7 @@ class HoSoVisaTest extends TestCase
         // Mẫu công tác ghi "chung" đối tượng → dùng cho mọi đối tượng
         $this->assertSame('Trung Quốc — Công tác', VisaChecklist::timMau('Trung Quốc', 'cong_tac', 'nhan_vien')?->name);
         // Mẫu Hàn ghi rõ học sinh → không đưa cho người đi làm
-        $this->assertNull(VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'nhan_vien'));
+        $this->assertNull(VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'tu_do'));
         $this->assertSame('Ai Cập — Du lịch', VisaChecklist::timMau('Ai Cập', 'du_lich', 'huu_tri')?->name);
         $this->assertNull(VisaChecklist::timMau(null, 'du_lich', null));
 
@@ -460,5 +464,234 @@ class HoSoVisaTest extends TestCase
         // Chưa đăng nhập thì không xem được
         $this->app['auth']->forgetGuards();
         $this->getJson('/api/v1/auth/visa-cases')->assertUnauthorized();
+    }
+
+    // ------------------------------------------------------------------
+    // File theo từng giấy tờ + phiếu thông tin + xuất ZIP
+    // ------------------------------------------------------------------
+
+    /** Hồ sơ có sẵn file trên ổ riêng (đã Storage::fake). */
+    private function hoSoCoFile(array $them = []): VisaCase
+    {
+        $dia = Storage::disk('rieng');
+        $dia->put('ho-so-visa/hc1.pdf', '%PDF hộ chiếu trang 1');
+        $dia->put('ho-so-visa/hc2.pdf', '%PDF hộ chiếu trang visa');
+        $dia->put('ho-so-visa/anh.jpg', 'JPG');
+        $dia->put('ho-so-visa/khac.png', 'PNG');
+
+        return VisaCase::create([
+            'full_name' => 'NGUYỄN TÔ THỤY BẢO CHÂU', 'country' => 'Hàn Quốc', 'purpose' => 'du_lich',
+            'birth_date' => '1990-05-01', 'passport_no' => '012345678', 'phone' => '0909000111',
+            'group_name' => 'gđ anh tuấn',
+            'checklist' => [
+                ['nhom' => 'Hồ sơ nhân thân', 'ten' => 'Hộ chiếu', 'trang_thai' => 'da_nhan', 'tep' => ['ho-so-visa/hc1.pdf', 'ho-so-visa/hc2.pdf']],
+                ['nhom' => 'Hồ sơ nhân thân', 'ten' => 'Ảnh thẻ 3.5x4.5', 'trang_thai' => 'thieu', 'tep' => ['ho-so-visa/anh.jpg']],
+                ['nhom' => 'Hồ sơ tài chính', 'ten' => 'Sao kê ngân hàng', 'trang_thai' => 'thieu'],
+                ['nhom' => 'Hồ sơ tài chính', 'ten' => 'Sổ tiết kiệm', 'trang_thai' => 'khong_can'],
+            ],
+            'files' => ['ho-so-visa/khac.png'],
+            'file_names' => ['ho-so-visa/khac.png' => 'zalo 123.png'],
+            'thong_tin' => ['noi_sinh' => 'Hà Nội', 'hon_nhan' => 'da_ket_hon', 'so_cccd' => '001090000111', 'nghe_nghiep' => 'Kế toán'],
+            ...$them,
+        ]);
+    }
+
+    private function mucTrongZip(string $duong): array
+    {
+        $zip = new \ZipArchive;
+        $zip->open($duong);
+        $ds = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $ds[$zip->getNameIndex($i)] = $zip->getFromIndex($i);
+        }
+        $zip->close();
+
+        return $ds;
+    }
+
+    public function test_giay_co_file_tu_thanh_da_nhan(): void
+    {
+        Storage::fake('rieng');
+        $hs = $this->hoSoCoFile();
+
+        // Dòng "Ảnh thẻ" ghi Chưa có nhưng đã có file → tự thành Đã nhận
+        $this->assertSame('da_nhan', $hs->fresh()->checklist[1]['trang_thai']);
+        $this->assertSame(['Sao kê ngân hàng'], $hs->fresh()->giayConThieu());
+        $this->assertCount(4, $hs->tatCaFile());
+
+        $this->actingAs($this->quanTri());
+        Livewire::test(EditVisaCase::class, ['record' => $hs->getRouteKey()])->assertOk()->assertSee('Đã nhận 2/3 giấy tờ');
+
+        $hs->forceDelete();
+        Storage::disk('rieng')->assertMissing(['ho-so-visa/hc1.pdf', 'ho-so-visa/anh.jpg', 'ho-so-visa/khac.png']);
+    }
+
+    public function test_xuat_zip_mot_nguoi_dat_ten_theo_giay_to(): void
+    {
+        Storage::fake('rieng');
+        $hs = $this->hoSoCoFile();
+
+        [$duong, $ten] = app(XuatHoSoVisa::class)->motNguoi($hs->fresh());
+        $this->assertSame('NGUYỄN TÔ THỤY BẢO CHÂU.zip', $ten);
+
+        $muc = $this->mucTrongZip($duong);
+        $thuMuc = 'NGUYỄN TÔ THỤY BẢO CHÂU/';
+        $this->assertSame('%PDF hộ chiếu trang 1', $muc[$thuMuc.'Hộ chiếu (1).pdf']);
+        $this->assertSame('%PDF hộ chiếu trang visa', $muc[$thuMuc.'Hộ chiếu (2).pdf']);
+        $this->assertSame('JPG', $muc[$thuMuc.'Ảnh thẻ 3.5x4.5.jpg']);
+        $this->assertSame('PNG', $muc[$thuMuc.'Giấy tờ khác/zalo 123.png']);
+        $this->assertStringContainsString('1. Sao kê ngân hàng', $muc[$thuMuc.'GIẤY TỜ CÒN THIẾU.txt']);
+        $this->assertStringNotContainsString('Sổ tiết kiệm', $muc[$thuMuc.'GIẤY TỜ CÒN THIẾU.txt']);
+
+        // Phiếu thông tin: file Word có câu trả lời của khách
+        $tamDocx = tempnam(sys_get_temp_dir(), 'docx');
+        file_put_contents($tamDocx, $muc[$thuMuc.'Phiếu thông tin.docx']);
+        $docx = new \ZipArchive;
+        $docx->open($tamDocx);
+        $xml = $docx->getFromName('word/document.xml');
+        $this->assertStringContainsString('PHIẾU THÔNG TIN XIN VISA HÀN QUỐC', $xml);
+        $this->assertStringContainsString('Hà Nội', $xml);
+        $this->assertStringContainsString('Đã kết hôn', $xml);
+        $this->assertStringContainsString('012345678', $xml);
+        @unlink($tamDocx);
+        @unlink($duong);
+
+        // Đủ giấy → không có file GIẤY TỜ CÒN THIẾU
+        $hs->update(['checklist' => [['ten' => 'Hộ chiếu', 'trang_thai' => 'da_nhan', 'tep' => ['ho-so-visa/hc1.pdf']]]]);
+        [$duong] = app(XuatHoSoVisa::class)->motNguoi($hs->fresh());
+        $this->assertArrayNotHasKey($thuMuc.'GIẤY TỜ CÒN THIẾU.txt', $this->mucTrongZip($duong));
+        @unlink($duong);
+    }
+
+    public function test_xuat_zip_ca_doan_co_danh_sach_excel(): void
+    {
+        Storage::fake('rieng');
+        $chau = $this->hoSoCoFile();
+        $tuan = $this->hoSoCoFile(['full_name' => 'NGUYỄN DUY TUẤN', 'passport_no' => '0011', 'thong_tin' => ['gioi_tinh' => 'nam']]);
+        $trungTen = $this->hoSoCoFile(['full_name' => 'NGUYỄN DUY TUẤN', 'passport_no' => '0022']);
+
+        [$duong, $ten] = app(XuatHoSoVisa::class)->caDoan(collect([$chau, $tuan, $trungTen])->map->fresh());
+        $this->assertSame('gđ anh tuấn.zip', $ten);
+        $muc = $this->mucTrongZip($duong);
+
+        $this->assertArrayHasKey('NGUYỄN TÔ THỤY BẢO CHÂU/Hộ chiếu (1).pdf', $muc);
+        $this->assertArrayHasKey('NGUYỄN DUY TUẤN/Phiếu thông tin.docx', $muc);
+        $this->assertArrayHasKey("NGUYỄN DUY TUẤN - {$trungTen->code}/Phiếu thông tin.docx", $muc);
+
+        $tam = tempnam(sys_get_temp_dir(), 'xlsx');
+        file_put_contents($tam, $muc['DANH SÁCH gđ anh tuấn.xlsx']);
+        $bang = IOFactory::load($tam)->getActiveSheet();
+        $this->assertSame('Họ và tên', $bang->getCell('B1')->getValue());
+        $this->assertSame('NGUYỄN DUY TUẤN', $bang->getCell('B3')->getValue());
+        $this->assertSame('Nam', $bang->getCell('C3')->getValue());
+        $this->assertSame('0011', $bang->getCell('F3')->getValue()); // giữ số 0 đầu
+        $this->assertSame('Hà Nội', $bang->getCell('E2')->getValue());
+        $this->assertSame('Sao kê ngân hàng', $bang->getCell('U2')->getValue());
+        @unlink($tam);
+        @unlink($duong);
+    }
+
+    public function test_nut_xuat_zip_tai_bang_link_chi_nguoi_xuat_dung_duoc(): void
+    {
+        Storage::fake('rieng');
+        $nv = $this->nhanVienVisa();
+        $hs = $this->hoSoCoFile(['assigned_to' => $nv->id]);
+        $this->actingAs($nv);
+
+        $tl = Livewire::test(EditVisaCase::class, ['record' => $hs->getRouteKey()])
+            ->assertActionVisible('xuatZip')
+            ->callAction('xuatZip');
+        $link = $tl->effects['redirect'] ?? null;
+        $this->assertStringContainsString('/quan-tri/ho-so-visa/tai-zip/', (string) $link);
+        $this->assertDatabaseHas('activity_log', ['description' => 'Xuất hồ sơ ZIP', 'subject_id' => $hs->id]);
+
+        // Người khác cầm link → không tải được
+        $this->actingAs($this->nhanVienVisa());
+        $this->get($link)->assertForbidden();
+
+        // Đúng người → tải được, tải xong file tạm bị xoá
+        $this->actingAs($nv);
+        $tai = $this->get($link)->assertOk()->assertDownload();
+        $this->assertStringContainsString(rawurlencode('NGUYỄN TÔ THỤY BẢO CHÂU.zip'), $tai->headers->get('content-disposition'));
+        ob_start();
+        $tai->baseResponse->sendContent(); // gửi xong mới xoá (như máy chủ thật)
+        ob_end_clean();
+        $this->assertSame([], Storage::disk('rieng')->files('xuat-tam'));
+        $this->get($link)->assertNotFound();
+
+        // Link bị sửa → chữ ký sai
+        $this->get($link.'x')->assertForbidden();
+    }
+
+    public function test_xuat_zip_doan_bo_qua_ho_so_khong_thuoc_quyen(): void
+    {
+        Storage::fake('rieng');
+        $nv = $this->nhanVienVisa();
+        $cuaToi = $this->hoSoCoFile(['assigned_to' => $nv->id]);
+        $trong = tap((new VisaCase)->forceFill(['full_name' => 'KHACH WEB', 'country' => 'Hàn Quốc', 'source' => 'website', 'group_name' => 'gđ anh tuấn']))->save();
+        $this->actingAs($nv);
+
+        Livewire::test(ListVisaCases::class)
+            ->set('activeTab', 'tat_ca')
+            ->callTableBulkAction('xuatZipDoan', [$cuaToi, $trong])
+            ->assertNotified('Bỏ qua 1 hồ sơ không thuộc quyền của bạn.');
+
+        $tep = Storage::disk('rieng')->files('xuat-tam');
+        $this->assertCount(1, $tep);
+        $muc = $this->mucTrongZip(Storage::disk('rieng')->path($tep[0]));
+        $this->assertArrayHasKey('NGUYỄN TÔ THỤY BẢO CHÂU/Hộ chiếu (1).pdf', $muc);
+        $this->assertArrayNotHasKey('KHACH WEB/Phiếu thông tin.docx', $muc);
+
+        // Dọn file tạm cũ hơn 1 ngày (chưa ai tải)
+        $this->assertSame(0, XuatTam::donDep());
+        touch(Storage::disk('rieng')->path($tep[0]), now()->subDays(2)->getTimestamp());
+        $this->assertSame(1, XuatTam::donDep());
+    }
+
+    public function test_web_lay_danh_sach_giay_va_tai_file_vao_dung_giay(): void
+    {
+        Storage::fake('rieng');
+        $this->nuocTrungQuoc();
+
+        $this->getJson('/api/v1/visa-applications/checklist?visa_country=trung-quoc&purpose=du_lich&profile=nhan_vien')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.ten', 'Hộ chiếu bản gốc')
+            ->assertJsonPath('data.items.5.ten', 'Xác nhận việc làm')
+            ->assertJsonPath('data.items.5.muc', 5);
+        $this->getJson('/api/v1/visa-applications/checklist?visa_country=khong-co')->assertOk()->assertJsonCount(0, 'data.items');
+        $this->getJson('/api/v1/visa-applications/phieu')->assertOk()
+            ->assertJsonPath('data.0.tieu_de', 'Nhân thân')
+            ->assertJsonPath('data.0.cau_hoi.3.lua_chon.da_ket_hon', 'Đã kết hôn');
+
+        $tl = $this->nopWeb(['thong_tin' => [
+            'noi_sinh' => 'Cần Thơ', 'hon_nhan' => 'doc_than', 'gioi_tinh' => 'khong-hop-le',
+            'khoa_la' => 'x', 'da_den_nuoc_nay' => 'co',
+        ]])->assertCreated();
+        $hs = VisaCase::firstOrFail();
+        $this->assertSame(['noi_sinh' => 'Cần Thơ', 'hon_nhan' => 'doc_than', 'da_den_nuoc_nay' => 'co'], $hs->thong_tin);
+
+        $gui = fn (array $them) => $this->post('/api/v1/visa-applications/'.$hs->code.'/files',
+            ['token' => $tl->json('data.upload_token'), ...$them], ['Accept' => 'application/json']);
+        $gui(['muc' => 0, 'file' => UploadedFile::fake()->create('scan hc.pdf', 100, 'application/pdf')])->assertCreated();
+        $gui(['muc' => 99, 'file' => UploadedFile::fake()->image('la.png')])->assertCreated();
+        $gui(['file' => UploadedFile::fake()->image('khac.png')])->assertCreated();
+
+        $hs->refresh();
+        $this->assertSame('da_nhan', $hs->checklist[0]['trang_thai']);
+        $this->assertCount(1, $hs->checklist[0]['tep']);
+        $this->assertSame('scan hc.pdf', $hs->checklist[0]['ten_tep'][$hs->checklist[0]['tep'][0]]);
+        $this->assertCount(2, $hs->files); // muc sai + không chọn mục → Giấy tờ khác
+        $this->assertSame(3, $hs->web_files_count);
+    }
+
+    public function test_migration_them_mau_doan_han(): void
+    {
+        $mau = VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'nhan_vien');
+        $this->assertSame('Hàn Quốc — Đoàn du lịch — Nhân viên', $mau->name);
+        $this->assertSame('VssID', collect($mau->items)->firstWhere('nhom', 'Hồ sơ nghề nghiệp') ? collect($mau->items)->where('nhom', 'Hồ sơ nghề nghiệp')->last()['ten'] : null);
+
+        // Chạy lại không thêm trùng
+        MauChecklistVisaSeeder::themMauNeuChuaCo(MauChecklistVisaSeeder::mauDoanHan());
+        $this->assertSame(11, VisaChecklist::count());
     }
 }

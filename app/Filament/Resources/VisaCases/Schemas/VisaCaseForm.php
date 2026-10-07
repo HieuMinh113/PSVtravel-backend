@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
@@ -22,6 +23,7 @@ use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
 use Modules\Visa\Models\VisaCountry;
 use Modules\Visa\Models\VisaProvider;
+use Modules\Visa\Support\PhieuThongTin;
 
 class VisaCaseForm
 {
@@ -137,12 +139,35 @@ class VisaCaseForm
                             ->table([
                                 TableColumn::make('Giấy tờ')->markAsRequired(),
                                 TableColumn::make('Ghi chú'),
+                                TableColumn::make('File')->width('16rem'),
                                 TableColumn::make('Tình trạng')->width('17rem'),
                             ])
                             ->schema([
                                 TextInput::make('ten')
                                     ->required(),
                                 TextInput::make('ghi_chu'),
+                                // File của đúng giấy tờ này — xuất ZIP sẽ đặt tên theo
+                                // tên giấy tờ (Hộ chiếu.pdf…). Gắn file là tự "Đã nhận".
+                                FileUpload::make('tep')
+                                    ->hiddenLabel()
+                                    ->multiple()
+                                    ->disk('rieng')
+                                    ->directory('ho-so-visa')
+                                    ->visibility('private')
+                                    ->acceptedFileTypes(self::LOAI_FILE)
+                                    ->maxSize(10240)
+                                    ->maxFiles(10)
+                                    ->storeFileNamesIn('ten_tep')
+                                    ->downloadable()
+                                    ->openable()
+                                    ->panelLayout('compact')
+                                    ->imagePreviewHeight('64')
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        if (filled($state) && $get('trang_thai') === 'thieu') {
+                                            $set('trang_thai', 'da_nhan');
+                                        }
+                                    }),
                                 ToggleButtons::make('trang_thai')
                                     ->options(VisaCase::GIAY)
                                     ->colors(['thieu' => 'danger', 'da_nhan' => 'success', 'khong_can' => 'gray'])
@@ -150,13 +175,14 @@ class VisaCaseForm
                                     ->grouped()
                                     ->live(),
                                 Hidden::make('nhom'),
+                                Hidden::make('ten_tep'),
                             ])
                             ->defaultItems(0)
                             ->addActionLabel('Thêm giấy tờ')
                             ->reorderable(),
                         FileUpload::make('files')
-                            ->label('File scan / ảnh giấy tờ khách gửi')
-                            ->helperText('Chỉ người có quyền hồ sơ visa mới mở được. Ảnh, PDF, Word, Excel — tối đa 10MB mỗi file.')
+                            ->label('Giấy tờ khác (chưa xếp vào dòng nào)')
+                            ->helperText('File không thuộc giấy tờ nào ở trên. Xuất ZIP sẽ để trong thư mục "Giấy tờ khác". Chỉ người có quyền hồ sơ visa mới mở được; ảnh, PDF, Word, Excel — tối đa 10MB mỗi file.')
                             ->multiple()
                             ->disk('rieng')
                             ->directory('ho-so-visa')
@@ -170,6 +196,13 @@ class VisaCaseForm
                             ->reorderable()
                             ->panelLayout('grid'),
                     ])
+                    ->columnSpanFull(),
+
+                Section::make('Phiếu thông tin xin visa')
+                    ->description('Theo phiếu thông tin của đại sứ quán (bản Nhật đầy đủ nhất). Khách có thể tự điền khi nộp trên web. Xuất ZIP sẽ có file "Phiếu thông tin.docx".')
+                    ->collapsible()
+                    ->collapsed(fn (?VisaCase $record) => blank($record?->thong_tin))
+                    ->schema(self::oPhieuThongTin())
                     ->columnSpanFull(),
 
                 Section::make('Tiến độ')
@@ -236,6 +269,28 @@ class VisaCaseForm
                     ->rows(3)
                     ->columnSpanFull(),
             ]);
+    }
+
+    /** Các ô của phiếu thông tin, chia nhóm như phiếu giấy. */
+    private static function oPhieuThongTin(): array
+    {
+        $nhom = [];
+        foreach (PhieuThongTin::NHOM as $tieuDe => $cauHoi) {
+            $o = [];
+            foreach ($cauHoi as $khoa => [$nhan, $kieu]) {
+                $luaChon = $cauHoi[$khoa][2] ?? null;
+                $o[] = match ($kieu) {
+                    'textarea' => Textarea::make("thong_tin.{$khoa}")->label($nhan)->rows(2)->maxLength(2000),
+                    'date' => DatePicker::make("thong_tin.{$khoa}")->label($nhan)->native(false)->displayFormat('d/m/Y'),
+                    'chon' => Select::make("thong_tin.{$khoa}")->label($nhan)->options($luaChon),
+                    'co_khong' => ToggleButtons::make("thong_tin.{$khoa}")->label($nhan)->options(PhieuThongTin::CO_KHONG)->inline(),
+                    default => TextInput::make("thong_tin.{$khoa}")->label($nhan)->maxLength(300),
+                };
+            }
+            $nhom[] = Fieldset::make($tieuDe)->schema($o)->columns(2)->columnSpanFull();
+        }
+
+        return $nhom;
     }
 
     /** Nước gợi ý: nước đã có mẫu, đã có hồ sơ, hoặc đang bán visa trên web. */

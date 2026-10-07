@@ -2,8 +2,9 @@
 
 namespace Modules\Visa\Providers;
 
-use Nwidart\Modules\Support\ModuleServiceProvider;
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\Visa\Services\XuatTam;
+use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class VisaServiceProvider extends ModuleServiceProvider
 {
@@ -36,11 +37,12 @@ class VisaServiceProvider extends ModuleServiceProvider
 
     /**
      * Define module schedules.
-     * 
-     * @param $schedule
      */
-    // protected function configureSchedules(Schedule $schedule): void
-    // {
-    //     $schedule->command('inspire')->hourly();
-    // }
+    protected function configureSchedules(Schedule $schedule): void
+    {
+        // Dọn file ZIP hồ sơ đã xuất mà không ai tải (chứa giấy tờ khách)
+        $schedule->call(fn () => XuatTam::donDep())
+            ->name('visa:don-zip-tam')
+            ->daily();
+    }
 }

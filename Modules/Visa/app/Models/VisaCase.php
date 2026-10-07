@@ -75,7 +75,7 @@ class VisaCase extends Model
     protected $fillable = [
         'code', 'full_name', 'phone', 'email', 'birth_date', 'passport_no', 'passport_expiry', 'group_name',
         'country', 'purpose', 'profile', 'travel_date', 'visa_provider_id', 'visa_checklist_id',
-        'checklist', 'files', 'file_names',
+        'checklist', 'thong_tin', 'files', 'file_names',
         'status', 'submitted_on', 'appointment_at', 'result_expected_on', 'result_on', 'visa_expiry',
         'fee', 'cost', 'paid', 'assigned_to', 'created_by', 'note',
     ];
@@ -89,6 +89,7 @@ class VisaCase extends Model
         'passport_expiry' => 'date',
         'travel_date' => 'date',
         'checklist' => 'array',
+        'thong_tin' => 'array',
         'files' => 'array',
         'file_names' => 'array',
         'submitted_on' => 'date',
@@ -122,7 +123,21 @@ class VisaCase extends Model
 
         // Xoá hẳn hồ sơ (không phải xoá tạm) thì xoá luôn file scan giấy tờ
         // khách — không giữ hộ chiếu, CCCD của người ta khi không còn cần.
-        static::forceDeleted(fn (VisaCase $hs) => Storage::disk('rieng')->delete($hs->files ?? []));
+        static::forceDeleted(fn (VisaCase $hs) => Storage::disk('rieng')->delete($hs->tatCaFile()));
+
+        // Dòng giấy tờ đã có file mà vẫn ghi "Chưa có" → tự chuyển "Đã nhận"
+        static::saving(function (VisaCase $hs) {
+            if (! is_array($hs->checklist)) {
+                return;
+            }
+            $hs->checklist = array_values(array_map(function ($g) {
+                if (! empty($g['tep']) && ($g['trang_thai'] ?? 'thieu') === 'thieu') {
+                    $g['trang_thai'] = 'da_nhan';
+                }
+
+                return $g;
+            }, $hs->checklist));
+        });
     }
 
     /**
@@ -183,6 +198,14 @@ class VisaCase extends Model
     public function nguoiTao(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Mọi file của hồ sơ: file gắn theo từng giấy tờ + file "giấy tờ khác". */
+    public function tatCaFile(): array
+    {
+        $theoGiay = collect($this->checklist ?? [])->flatMap(fn ($g) => (array) ($g['tep'] ?? []));
+
+        return $theoGiay->merge($this->files ?? [])->filter()->unique()->values()->all();
     }
 
     /** @return array{0:int,1:int} [đã nhận, cần có] — bỏ qua giấy "không cần". */
