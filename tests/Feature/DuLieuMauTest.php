@@ -8,6 +8,8 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Modules\Booking\Models\Booking;
+use Modules\Tour\Models\Tour;
+use Modules\Tour\Models\TourDeparture;
 use Modules\Visa\Models\VisaCase;
 use Tests\TestCase;
 
@@ -28,6 +30,12 @@ class DuLieuMauTest extends TestCase
         $visa1 = User::where('email', 'visa1@psvtravel.com')->firstOrFail();
         $this->assertTrue($visa1->hasRole('visa'));
         $this->assertTrue(User::where('email', 'khach@example.com')->firstOrFail()->hasRole('customer'));
+
+        $this->assertSame(14, Tour::published()->count());
+        $this->assertSame(7, Tour::where('type', 'domestic')->count());
+        $this->assertTrue(TourDeparture::where('status', 'full')->exists());
+        $this->get('/api/v1/tours?category=dong-bac-a')->assertOk()->assertJsonCount(2, 'data');
+        $this->get('/api/v1/destinations/seoul')->assertOk();
 
         $this->assertSame(8, VisaCase::count());
         $web = VisaCase::where('source', 'website')->sole();

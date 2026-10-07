@@ -34,6 +34,7 @@ class DonDuLieuMau extends Command
         'airlines',
         'visa_providers',
         'visa_countries',
+        'destinations',
         'tours',
         'categories',
     ];

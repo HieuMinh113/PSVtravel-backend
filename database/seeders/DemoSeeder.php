@@ -16,8 +16,8 @@ use Modules\Moment\Models\Moment;
 use Modules\Review\Models\Review;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
-use Modules\Tour\Models\TourItinerary;
 use Modules\Tour\Models\TourImage;
+use Modules\Tour\Models\TourItinerary;
 use Modules\Visa\Models\VisaCountry;
 use Modules\Visa\Models\VisaProvider;
 
@@ -38,15 +38,15 @@ class DemoSeeder extends Seeder
         $dmTrongNuoc = Category::updateOrCreate(
             ['slug' => 'mien-trung'],
             ['type' => 'domestic', 'name' => 'Miền Trung', 'status' => 'published', 'sort_order' => 1,
-             'image' => $this->anh('cat-mientrung', 600, 400),
-             'description' => 'Các tour khám phá dải đất miền Trung.'],
+                'image' => $this->anh('cat-mientrung', 600, 400),
+                'description' => 'Các tour khám phá dải đất miền Trung.'],
         );
 
         $dmNuocNgoai = Category::updateOrCreate(
             ['slug' => 'dong-nam-a'],
             ['type' => 'abroad', 'name' => 'Đông Nam Á', 'status' => 'published', 'sort_order' => 1,
-             'image' => $this->anh('cat-dongnama', 600, 400),
-             'description' => 'Tour các nước Đông Nam Á giá tốt.'],
+                'image' => $this->anh('cat-dongnama', 600, 400),
+                'description' => 'Tour các nước Đông Nam Á giá tốt.'],
         );
 
         // ---------- TOUR 1: Đà Nẵng (trong nước) ----------
@@ -224,12 +224,12 @@ class DemoSeeder extends Seeder
         Banner::updateOrCreate(
             ['title' => 'Ưu đãi hè - Giảm đến 30%'],
             ['subtitle' => 'Đặt tour ngay hôm nay', 'image' => $this->anh('banner-he', 1920, 700),
-             'link' => '/tour-trong-nuoc', 'status' => 'published', 'sort_order' => 1],
+                'link' => '/tour-trong-nuoc', 'status' => 'published', 'sort_order' => 1],
         );
         Banner::updateOrCreate(
             ['title' => 'Khám phá Đông Nam Á'],
             ['subtitle' => 'Tour nước ngoài giá tốt', 'image' => $this->anh('banner-dna', 1920, 700),
-             'link' => '/tour-nuoc-ngoai', 'status' => 'published', 'sort_order' => 2],
+                'link' => '/tour-nuoc-ngoai', 'status' => 'published', 'sort_order' => 2],
         );
 
         // ---------- CẨM NANG ----------
@@ -252,30 +252,30 @@ class DemoSeeder extends Seeder
         Moment::updateOrCreate(
             ['caption' => 'Check-in Cầu Vàng'],
             ['image' => $this->anh('moment-1', 800, 800), 'customer_name' => 'Anh Tuấn',
-             'tour_id' => $tour1->id, 'status' => 'published', 'sort_order' => 1],
+                'tour_id' => $tour1->id, 'status' => 'published', 'sort_order' => 1],
         );
         Moment::updateOrCreate(
             ['caption' => 'Biển Pattaya'],
             ['image' => $this->anh('moment-2', 800, 800), 'customer_name' => 'Chị Lan',
-             'tour_id' => $tour2->id, 'status' => 'published', 'sort_order' => 2],
+                'tour_id' => $tour2->id, 'status' => 'published', 'sort_order' => 2],
         );
 
         // ---------- HÃNG BAY + CHẶNG ----------
         $vna = Airline::updateOrCreate(
             ['code' => 'VN'],
             ['name' => 'Vietnam Airlines', 'country' => 'Việt Nam',
-             'logo' => $this->anh('airline-vna', 200, 100), 'status' => 'published', 'sort_order' => 1],
+                'logo' => $this->anh('airline-vna', 200, 100), 'status' => 'published', 'sort_order' => 1],
         );
         FlightDeal::updateOrCreate(
             ['airline_id' => $vna->id, 'from_city' => 'Hồ Chí Minh', 'to_city' => 'Hà Nội'],
             ['trip_type' => 'round_trip', 'price' => 1590000, 'old_price' => 2100000,
-             'valid_to' => Carbon::now()->addMonths(2)->toDateString(),
-             'status' => 'published', 'sort_order' => 1],
+                'valid_to' => Carbon::now()->addMonths(2)->toDateString(),
+                'status' => 'published', 'sort_order' => 1],
         );
         FlightDeal::updateOrCreate(
             ['airline_id' => $vna->id, 'from_city' => 'Hồ Chí Minh', 'to_city' => 'Đà Nẵng'],
             ['trip_type' => 'one_way', 'price' => 890000,
-             'status' => 'published', 'sort_order' => 2],
+                'status' => 'published', 'sort_order' => 2],
         );
 
         // ---------- VISA ----------
@@ -293,8 +293,8 @@ class DemoSeeder extends Seeder
         VisaProvider::updateOrCreate(
             ['name' => 'Đối tác Visa Toàn Cầu'],
             ['contact_person' => 'Nguyễn Văn Đối Tác', 'phone' => '0288888888',
-             'email' => 'doitac@visa.vn', 'address' => '123 Nguyễn Huệ, Q1, HCM',
-             'status' => 'active', 'note' => 'Đối tác chính, chiết khấu 10%.'],
+                'email' => 'doitac@visa.vn', 'address' => '123 Nguyễn Huệ, Q1, HCM',
+                'status' => 'active', 'note' => 'Đối tác chính, chiết khấu 10%.'],
         );
 
         foreach ([
@@ -314,9 +314,11 @@ class DemoSeeder extends Seeder
             );
         }
 
+        // Thêm 12 tour đủ các miền / châu lục + điểm đến
+        $this->call(DuLieuMauTourSeeder::class);
         // Tài khoản theo vai trò, đơn tour có cọc + hạn nhắn khách, hồ sơ visa
         $this->call(DuLieuMauNghiepVuSeeder::class);
 
-        $this->command->info('Đã tạo xong dữ liệu mẫu: 2 tour + đơn/đánh giá/banner/cẩm nang/khoảnh khắc/vé/visa + hồ sơ visa.');
+        $this->command->info('Đã tạo xong dữ liệu mẫu: 14 tour + đơn/đánh giá/banner/cẩm nang/khoảnh khắc/vé/visa + hồ sơ visa.');
     }
 }

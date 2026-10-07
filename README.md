@@ -79,6 +79,10 @@ Có sẵn để thử các việc nghiệp vụ:
 | `dieuhanh@psvtravel.com` | `NhanVien@123456` | Điều hành: tra chỗ liên minh |
 | `khach@example.com` | `Khach@123456` | Khách đăng nhập website: tab Hồ sơ visa, đơn đặt tour |
 
+- **Tour** (14 tour): trong nước Miền Bắc / Trung / Nam / Tây Nguyên, nước ngoài
+  Đông Nam Á / Đông Bắc Á / Trung Quốc / Châu Âu; mỗi tour 2–3 đợt khởi hành
+  (có đợt **hết chỗ**), lịch trình từng ngày, ảnh, đánh giá; kèm 8 điểm đến nối
+  vào danh mục. Giá là số mẫu.
 - **Hồ sơ visa** (8 hồ sơ, tên giả): 1 hồ sơ khách nộp web chưa ai nhận; 1 hồ sơ
   Trung Quốc hẹn nộp sau 2 ngày, còn nợ phí, hộ chiếu sắp hết hạn; đoàn Hàn
   Quốc 3 người (thử xuất ZIP cả đoàn); đã nộp / đậu / trượt. File đính kèm là
