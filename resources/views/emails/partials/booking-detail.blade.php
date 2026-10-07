@@ -46,6 +46,12 @@
             @else
                 {!! $dong('Tổng tiền', number_format((int) $booking->total_price, 0, ',', '.').'đ', true) !!}
             @endif
+            @if ($booking->deposit_amount)
+                {!! $dong('Tiền cọc ('.\Modules\Booking\Models\Booking::phanTram($booking->deposit_percent).')', number_format((int) $booking->deposit_amount, 0, ',', '.').'đ', true) !!}
+            @endif
+            @if ($booking->remind_on)
+                {!! $dong('Hạn thanh toán phần còn lại', 'Trước ngày '.$booking->remind_on->format('d/m/Y')) !!}
+            @endif
         </table>
 
         @if ($booking->note)

@@ -22,7 +22,9 @@ class BookingServiceProvider extends ModuleServiceProvider
      *
      * @var string[]
      */
-    // protected array $commands = [];
+    protected array $commands = [
+        \Modules\Booking\Console\NhacNhanKhachCommand::class,
+    ];
 
     /**
      * Provider classes to register.
@@ -39,8 +41,11 @@ class BookingServiceProvider extends ModuleServiceProvider
      * 
      * @param $schedule
      */
-    // protected function configureSchedules(Schedule $schedule): void
-    // {
-    //     $schedule->command('inspire')->hourly();
-    // }
+    protected function configureSchedules(Schedule $schedule): void
+    {
+        // 8 giờ sáng: báo chuông đơn tới hạn nhắn khách đóng tiền. Chạy thêm
+        // 13 giờ để đơn tạo trong buổi sáng với hạn hôm nay cũng được báo.
+        $schedule->command('don-tour:nhac-nhan-khach')->dailyAt('08:00')->withoutOverlapping();
+        $schedule->command('don-tour:nhac-nhan-khach')->dailyAt('13:00')->withoutOverlapping();
+    }
 }

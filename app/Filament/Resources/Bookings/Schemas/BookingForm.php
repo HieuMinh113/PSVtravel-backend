@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Bookings\Schemas;
 
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Modules\Booking\Models\Booking;
 use Modules\Tour\Models\TourDeparture;
 use Filament\Schemas\Components\Utilities\Set;
 use Modules\Tour\Models\Tour;
@@ -61,6 +63,8 @@ class BookingForm
                     $tour = Tour::find($get('tour_id'));
                     $dot = $state ? TourDeparture::find($state) : null;
                     $set('unit_price_adult', $dot?->price_override ?? $tour?->adult_price ?? 0);
+                    // Hạn nhắn khách đóng phần còn lại = ngày đi − 7 ngày
+                    $set('remind_on', $dot?->start_date?->copy()->subDays(Booking::NHAC_TRUOC_NGAY)->toDateString());
                     self::tinhTong($get, $set);
                 }),
 
@@ -151,6 +155,21 @@ class BookingForm
                 ->disabledOn('edit')
                 ->helperText('Tự tính từ các khoản đã thu ở tab Thanh toán'),
 
+            TextInput::make('deposit_percent')
+                ->label('Tỷ lệ cọc')
+                ->numeric()
+                ->minValue(10)
+                ->maxValue(100)
+                ->suffix('%')
+                ->placeholder('VD: 30')
+                ->live(onBlur: true)
+                ->helperText(fn (Get $get) => self::moTaCoc($get)),
+            DatePicker::make('remind_on')
+                ->label('Hạn nhắn khách đóng tiền')
+                ->native(false)
+                ->displayFormat('d/m/Y')
+                ->helperText(fn (?Booking $record) => self::moTaNhac($record)),
+
             Textarea::make('note')
                 ->label('Ghi chú của khách')
                 ->rows(3)
@@ -161,6 +180,28 @@ class BookingForm
                 ->columnSpanFull(),
         ]);
     }
+    /** "Tiền cọc: 3.000.000đ" — tính theo tổng tiền đang có trên form. */
+    protected static function moTaCoc(Get $get): string
+    {
+        $tyLe = (float) ($get('deposit_percent') ?: 0);
+        if ($tyLe <= 0) {
+            return 'Gõ từ 10 đến 100. Để trống nếu đơn không thu cọc.';
+        }
+        $coc = (int) (round((int) $get('total_price') * $tyLe / 100 / 1000) * 1000);
+
+        return 'Tiền cọc: '.number_format($coc, 0, ',', '.').'đ (làm tròn nghìn đồng)';
+    }
+
+    protected static function moTaNhac(?Booking $record): string
+    {
+        if ($record?->reminded_at) {
+            return 'Đã nhắn khách lúc '.$record->reminded_at->format('H:i d/m/Y')
+                .($record->nguoiNhan ? ' — '.$record->nguoiNhan->name : '').'.';
+        }
+
+        return 'Tự điền = ngày khởi hành − '.Booking::NHAC_TRUOC_NGAY.' ngày, sửa được. Đến hạn sẽ báo chuông cho người tạo đơn.';
+    }
+
     protected static function tinhTong(Get $get, Set $set): void
     {
         $nguoiLon = (int) ($get('adults') ?: 0);

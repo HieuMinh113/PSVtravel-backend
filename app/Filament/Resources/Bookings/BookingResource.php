@@ -73,4 +73,22 @@ class BookingResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
+
+    /** Số đơn đã tới hạn nhắn khách đóng tiền mà chưa nhắn — của người đang xem. */
+    public static function getNavigationBadge(): ?string
+    {
+        $so = Booking::toiHanNhac()->where('created_by', auth()->id())->count();
+
+        return $so ? (string) $so : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Đơn tới hạn nhắn khách đóng tiền';
+    }
 }

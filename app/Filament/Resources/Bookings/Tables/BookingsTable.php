@@ -12,10 +12,14 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
+use App\Filament\Resources\Bookings\Actions\NhacDongTienAction;
+use App\Filament\Resources\Bookings\Actions\PhieuXacNhanAction;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Booking\Models\Booking;
 use Modules\Tour\Models\TourDeparture;
 
@@ -24,6 +28,9 @@ class BookingsTable
     public static function configure(Table $table): Table
     {
         return $table
+            // Tổng đã thu tính sẵn một lần cho cả trang (cột cọc dùng), khỏi mỗi
+            // dòng một truy vấn
+            ->modifyQueryUsing(fn (Builder $query) => $query->withSum(['payments as da_thu' => fn ($q) => $q->where('status', 'success')], 'amount'))
             ->columns([
                 TextColumn::make('booking_code')
                     ->label('Mã đơn')
@@ -74,7 +81,24 @@ class BookingsTable
                         'paid' => 'success',
                         'partial' => 'warning',
                         default => 'gray',
+                    })
+                    ->description(fn (Booking $record): ?string => self::moTaCoc($record)),
+                TextColumn::make('remind_on')
+                    ->label('Hạn nhắn khách')
+                    ->date('d/m/Y')
+                    ->sortable()
+                    ->placeholder('—')
+                    ->color(fn (Booking $record) => $record->canNhacKhach() ? 'danger' : null)
+                    ->weight(fn (Booking $record) => $record->canNhacKhach() ? 'bold' : null)
+                    ->description(fn (Booking $record): ?string => match (true) {
+                        $record->reminded_at !== null => 'Đã nhắn '.$record->reminded_at->format('d/m'),
+                        $record->canNhacKhach() => 'Cần nhắn khách',
+                        default => null,
                     }),
+                TextColumn::make('nguoiTao.name')
+                    ->label('Người tạo')
+                    ->placeholder('Khách đặt web')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cancelledBy.name')
                     ->label('Người huỷ')
                     ->placeholder('—')
@@ -102,6 +126,14 @@ class BookingsTable
                         'partial' => 'Trả một phần',
                         'paid' => 'Đã trả',
                     ]),
+                Filter::make('can_nhac')
+                    ->label('Cần nhắn khách đóng tiền')
+                    ->toggle()
+                    ->query(fn (Builder $query) => $query->toiHanNhac()),
+                Filter::make('cua_toi')
+                    ->label('Đơn tôi tạo / phụ trách')
+                    ->toggle()
+                    ->query(fn (Builder $query) => $query->where('created_by', auth()->id())),
                 TrashedFilter::make()->label('Đã xoá'),
             ])
             ->recordActions([
@@ -137,6 +169,9 @@ class BookingsTable
                                     }
                                 }
 
+                                // Đơn khách tự đặt trên web chưa có người phụ trách →
+                                // người xác nhận nhận luôn (nhận chuông nhắc khách)
+                                $record->forceFill(['created_by' => $record->created_by ?? Auth::id()]);
                                 $record->update(['status' => 'confirmed']);
                             });
                         } catch (\RuntimeException $e) {
@@ -266,7 +301,24 @@ class BookingsTable
                             ->success()
                             ->send();
                     }),
+                // Trong bảng chỉ hiện nút nhắc khi đã tới hạn; muốn nhắc sớm thì
+                // mở đơn ra (trang xem / sửa luôn có nút)
+                NhacDongTienAction::make()
+                    ->hidden(fn (Booking $record) => ! $record->canNhacKhach()),
+                PhieuXacNhanAction::make()->iconButton()->tooltip('Phiếu xác nhận (PDF)'),
                 EditAction::make(),
             ]);
+    }
+
+    /** "Đủ cọc" / "Chưa đủ cọc 30% · 3.000.000đ" dưới trạng thái thanh toán. */
+    private static function moTaCoc(Booking $record): ?string
+    {
+        if (! $record->deposit_amount) {
+            return null;
+        }
+        $daThu = (int) ($record->da_thu ?? $record->daThu());
+        $coc = 'cọc '.Booking::phanTram($record->deposit_percent).' · '.number_format($record->deposit_amount, 0, ',', '.').'đ';
+
+        return $daThu >= $record->deposit_amount ? 'Đủ '.$coc : 'Chưa đủ '.$coc;
     }
 }
