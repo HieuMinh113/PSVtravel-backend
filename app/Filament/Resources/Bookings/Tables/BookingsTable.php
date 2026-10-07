@@ -2,24 +2,24 @@
 
 namespace App\Filament\Resources\Bookings\Tables;
 
-use Filament\Forms\Components\Textarea;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use App\Filament\Resources\Bookings\Actions\NhacDongTienAction;
+use App\Filament\Resources\Bookings\Actions\PhieuXacNhanAction;
 use App\Mail\BookingMail;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
-use App\Filament\Resources\Bookings\Actions\NhacDongTienAction;
-use App\Filament\Resources\Bookings\Actions\PhieuXacNhanAction;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Modules\Booking\Models\Booking;
 use Modules\Tour\Models\TourDeparture;
 
@@ -95,9 +95,19 @@ class BookingsTable
                         $record->canNhacKhach() => 'Cần nhắn khách',
                         default => null,
                     }),
+                TextColumn::make('nguoiPhuTrach.name')
+                    ->label('Phụ trách')
+                    ->placeholder('Chưa ai nhận')
+                    ->description(fn (Booking $record): ?string => $record->source === 'web' ? 'Khách đặt web' : null)
+                    ->toggleable(),
                 TextColumn::make('nguoiTao.name')
                     ->label('Người tạo')
                     ->placeholder('Khách đặt web')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('nguoiXacNhan.name')
+                    ->label('Người xác nhận')
+                    ->placeholder('—')
+                    ->description(fn (Booking $record): ?string => $record->confirmed_at?->format('d/m/Y'))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cancelledBy.name')
                     ->label('Người huỷ')
@@ -131,9 +141,14 @@ class BookingsTable
                     ->toggle()
                     ->query(fn (Builder $query) => $query->toiHanNhac()),
                 Filter::make('cua_toi')
-                    ->label('Đơn tôi tạo / phụ trách')
+                    ->label('Đơn tôi phụ trách')
                     ->toggle()
-                    ->query(fn (Builder $query) => $query->where('created_by', auth()->id())),
+                    ->query(fn (Builder $query) => $query->where('assigned_to', auth()->id())),
+                SelectFilter::make('assigned_to')
+                    ->label('Người phụ trách')
+                    ->relationship('nguoiPhuTrach', 'name')
+                    ->searchable()
+                    ->preload(),
                 TrashedFilter::make()->label('Đã xoá'),
             ])
             ->recordActions([
@@ -169,9 +184,8 @@ class BookingsTable
                                     }
                                 }
 
-                                // Đơn khách tự đặt trên web chưa có người phụ trách →
-                                // người xác nhận nhận luôn (nhận chuông nhắc khách)
-                                $record->forceFill(['created_by' => $record->created_by ?? Auth::id()]);
+                                // Model tự ghi người xác nhận + giờ chốt; đơn web chưa ai
+                                // phụ trách thì người xác nhận nhận luôn (hưởng hoa hồng)
                                 $record->update(['status' => 'confirmed']);
                             });
                         } catch (\RuntimeException $e) {

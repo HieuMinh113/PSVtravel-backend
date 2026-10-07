@@ -13,10 +13,10 @@ use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+
 class Booking extends Model
 {
     use LogsActivity, SoftDeletes;
-
 
     protected $fillable = [
         'booking_code', 'tour_id', 'tour_departure_id', 'user_id',
@@ -26,6 +26,22 @@ class Booking extends Model
         'status', 'payment_status', 'note', 'admin_note',
         'cancelled_by', 'cancel_reason', 'cancelled_at',
         'deposit_percent', 'remind_on',
+    ];
+
+    public const NGUON = ['quan_tri' => 'Nhân viên tạo', 'web' => 'Khách đặt web'];
+
+    /** Đơn đã chốt (được tính vào thống kê / hoa hồng của tháng xác nhận). */
+    public const DA_CHOT = ['confirmed', 'completed'];
+
+    /**
+     * Tình trạng tiền để tính hoa hồng: khách mới đang cọc hay đã trả đủ.
+     * Chỉ tính khoản kế toán đã duyệt.
+     */
+    public const TIEN = [
+        'chua_coc' => 'Chưa cọc',
+        'dang_coc' => 'Đang cọc',
+        'du_coc' => 'Đã đủ cọc',
+        'da_thu_du' => 'Đã thu đủ',
     ];
 
     /** Nhắc khách đóng phần còn lại trước ngày đi bao nhiêu ngày. */
@@ -52,6 +68,8 @@ class Booking extends Model
         'remind_on' => 'date',
         'reminded_at' => 'datetime',
         'remind_notified_at' => 'datetime',
+        'confirmed_at' => 'datetime',
+        'paid_total' => 'integer',
     ];
 
     // Tự sinh mã đơn nếu chưa có, vd PSV-20260801-A3F9
@@ -61,12 +79,24 @@ class Booking extends Model
             if (empty($booking->booking_code)) {
                 $booking->booking_code = 'PSV-'.now()->format('Ymd').'-'.strtoupper(Str::random(4));
             }
-            // Nhân viên tạo đơn trong trang quản trị = người nhận chuông nhắc
-            // khách. Đơn khách tự đặt trên web: người bấm Xác nhận sẽ nhận.
-            $booking->created_by ??= auth()->id();
+            // Nhân viên tạo đơn trong trang quản trị = người phụ trách (hưởng
+            // hoa hồng, nhận chuông nhắc khách). Đơn khách tự đặt trên web:
+            // người bấm Xác nhận sẽ phụ trách.
+            if ($booking->source !== 'web') {
+                $booking->created_by ??= auth()->id();
+                $booking->assigned_to ??= $booking->created_by;
+            }
         });
 
         static::saving(function (Booking $booking) {
+            // Chốt đơn: ghi ai xác nhận, lúc nào (tháng tính hoa hồng). Tạo
+            // thẳng ở trạng thái "Đã xác nhận" thì người tạo là người xác nhận.
+            if (in_array($booking->status, self::DA_CHOT, true) && $booking->confirmed_at === null) {
+                $booking->confirmed_at = now();
+                $booking->confirmed_by ??= auth()->id();
+            }
+            $booking->assigned_to ??= $booking->confirmed_by;
+
             // Tiền cọc = tổng × tỷ lệ, làm tròn nghìn đồng
             $booking->deposit_amount = $booking->deposit_percent
                 ? (int) (round($booking->total_price * $booking->deposit_percent / 100 / 1000) * 1000)
@@ -157,6 +187,38 @@ class Booking extends Model
         return $v === null ? '' : rtrim(rtrim(number_format($v, 2, ',', ''), '0'), ',').'%';
     }
 
+    public function tinhTrangTien(): string
+    {
+        $daThu = (int) $this->paid_total;
+
+        return match (true) {
+            $daThu <= 0 => 'chua_coc',
+            $daThu >= (int) $this->total_price => 'da_thu_du',
+            $this->deposit_amount && $daThu >= $this->deposit_amount => 'du_coc',
+            default => 'dang_coc',
+        };
+    }
+
+    /** Đơn chốt (xác nhận) trong tháng $thang dạng "2026-10". */
+    public function scopeChotTrongThang($query, string $thang)
+    {
+        $dau = Carbon::createFromFormat('!Y-m', $thang)->startOfMonth();
+
+        return $query->whereNotNull('confirmed_at')
+            ->where('confirmed_at', '>=', $dau)
+            ->where('confirmed_at', '<', $dau->copy()->addMonth());
+    }
+
+    public function nguoiPhuTrach(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function nguoiXacNhan(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
     public function nguoiTao(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -184,14 +246,17 @@ class Booking extends Model
     {
         return $this->belongsTo(User::class);
     }
+
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
     }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
     }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -200,6 +265,7 @@ class Booking extends Model
                 'tour_departure_id', 'adults', 'children',
                 'customer_name', 'customer_phone', 'cancel_reason',
                 'deposit_percent', 'deposit_amount', 'remind_on', 'reminded_at',
+                'assigned_to', 'confirmed_by',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()

@@ -2,13 +2,14 @@
 
 namespace App\Filament\Resources\Bookings\RelationManagers;
 
+use App\Filament\Resources\Payments\KhoanThu;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -22,6 +23,14 @@ class PaymentsRelationManager extends RelationManager
 
     protected static ?string $title = 'Thanh toán';
 
+    protected static ?string $modelLabel = 'khoản thu';
+
+    // Kế toán (chỉ xem đơn) vẫn phải thấy và duyệt được khoản thu ở trang xem đơn
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     // Hiện số tiền còn thiếu ngay trên tiêu đề khối
     public function getTableHeading(): string
     {
@@ -29,9 +38,11 @@ class PaymentsRelationManager extends RelationManager
 
         $daThu = $don->payments()->where('status', 'success')->sum('amount');
         $conThieu = max(0, (int) $don->total_price - (int) $daThu);
+        $choDuyet = $don->payments()->where('status', 'pending')->sum('amount');
 
         return 'Thanh toán — đã thu '.number_format($daThu, 0, ',', '.')
-            .'₫ / còn thiếu '.number_format($conThieu, 0, ',', '.').'₫';
+            .'₫ / còn thiếu '.number_format($conThieu, 0, ',', '.').'₫'
+            .($choDuyet > 0 ? ' · chờ kế toán duyệt '.number_format($choDuyet, 0, ',', '.').'₫' : '');
     }
 
     public function form(Schema $schema): Schema
@@ -51,6 +62,7 @@ class PaymentsRelationManager extends RelationManager
                     'card' => 'Quẹt thẻ',
                 ])
                 ->default('bank_transfer')
+                ->live()
                 ->required(),
 
             DateTimePicker::make('paid_at')
@@ -60,21 +72,22 @@ class PaymentsRelationManager extends RelationManager
                 ->seconds(false)
                 ->default(now())
                 ->required(),
+            // Chỉ kế toán chọn trạng thái. Nhân viên ghi khoản thu thì luôn ở
+            // "Chờ kế toán duyệt" — chưa tính vào đã thu cho tới khi kế toán duyệt.
             Select::make('status')
                 ->label('Trạng thái')
-                ->options([
-                    'success' => 'Đã nhận tiền',
-                    'pending' => 'Chờ xác nhận',
-                    'failed' => 'Thất bại',
-                ])
+                ->options(Payment::TRANG_THAI)
                 ->default('success')
                 ->required()
+                ->visible(fn () => KhoanThu::laKeToan())
                 ->helperText('Chỉ khoản "Đã nhận tiền" mới tính vào tổng đã thu'),
 
             TextInput::make('transaction_ref')
                 ->label('Mã giao dịch / số phiếu thu')
                 ->helperText('Để trống nếu thu tiền mặt')
                 ->maxLength(255),
+
+            KhoanThu::oChungTu(),
 
             Textarea::make('note')
                 ->label('Ghi chú')
@@ -108,18 +121,18 @@ class PaymentsRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'success' => 'Đã nhận tiền',
-                        'failed' => 'Thất bại',
-                        default => 'Chờ xác nhận',
-                    })
+                    ->formatStateUsing(fn (string $state): string => Payment::TRANG_THAI[$state] ?? $state)
+                    ->description(fn (Payment $record): ?string => $record->approvedBy
+                        ? $record->approvedBy->name.' · '.$record->approved_at?->format('d/m H:i')
+                        : null)
                     ->color(fn (string $state): string => match ($state) {
                         'success' => 'success',
                         'failed' => 'danger',
                         default => 'warning',
                     }),
+                KhoanThu::cotChungTu(),
                 TextColumn::make('receivedBy.name')
-                    ->label('Người thu')
+                    ->label('Người nhập')
                     ->placeholder('—'),
                 TextColumn::make('transaction_ref')
                     ->label('Mã GD')
@@ -136,14 +149,34 @@ class PaymentsRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Ghi nhận khoản thu')
+                    ->modalHeading('Ghi nhận khoản thu')
+                    ->createAnother(false)
                     ->mutateDataUsing(function (array $data): array {
                         $data['received_by'] = Auth::id();
+                        if (! KhoanThu::laKeToan()) {
+                            $data['status'] = 'pending';
+                        }
 
                         return $data;
+                    })
+                    ->after(function (Payment $record) {
+                        if ($record->status === 'pending') {
+                            KhoanThu::baoKeToan($record);
+                        }
                     }),
             ])
             ->recordActions([
-                EditAction::make(),
+                KhoanThu::nutDuyet(),
+                KhoanThu::nutTuChoi(),
+                KhoanThu::xemChungTu()->iconButton(),
+                EditAction::make()
+                    ->mutateDataUsing(function (array $data): array {
+                        if (! KhoanThu::laKeToan()) {
+                            unset($data['status']);
+                        }
+
+                        return $data;
+                    }),
                 DeleteAction::make(),
             ])
             ->toolbarActions([]);

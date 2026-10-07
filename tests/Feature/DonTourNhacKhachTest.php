@@ -129,7 +129,7 @@ class DonTourNhacKhachTest extends TestCase
         $daHuy = $this->don(['remind_on' => '2026-10-05', 'status' => 'cancelled']);
         auth()->logout();
         $webChuaAiNhan = $this->don(['remind_on' => '2026-10-06', 'status' => 'pending']);
-        $this->assertNull($webChuaAiNhan->created_by);
+        $this->assertNull($webChuaAiNhan->assigned_to);
 
         $this->artisan('don-tour:nhac-nhan-khach')->assertSuccessful();
 
@@ -196,8 +196,12 @@ class DonTourNhacKhachTest extends TestCase
         $this->actingAs($nv);
 
         Livewire::test(ListBookings::class)->callTableAction('confirm', $don);
-        $this->assertSame($nv->id, $don->fresh()->created_by);
-        $this->assertSame('confirmed', $don->fresh()->status);
+        $don->refresh();
+        $this->assertNull($don->created_by); // khách tự đặt, không phải nhân viên tạo
+        $this->assertSame($nv->id, $don->confirmed_by);
+        $this->assertSame($nv->id, $don->assigned_to); // người xác nhận phụ trách
+        $this->assertNotNull($don->confirmed_at);
+        $this->assertSame('confirmed', $don->status);
     }
 
     public function test_phieu_xac_nhan_pdf_va_email_co_tien_coc(): void

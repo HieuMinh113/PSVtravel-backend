@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder;
+use Modules\Booking\Database\Seeders\QuyenDonTourSeeder;
 use Modules\Visa\Database\Seeders\QuyenVisaSeeder;
 use Spatie\Permission\Models\Role;
 
@@ -50,6 +51,8 @@ class RoleSeeder extends Seeder
         $this->call(QuyenLienMinhSeeder::class);
         // Tương tự cho vai trò visa (hồ sơ visa + mẫu checklist)
         $this->call(QuyenVisaSeeder::class);
+        // Quyền quản lý đơn tour + vai trò kế toán (duyệt khoản thu)
+        $this->call(QuyenDonTourSeeder::class);
 
         // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
         // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này

@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Modules\Booking\Models\Payment;
 use Modules\Visa\Models\VisaCase;
 
 /**
@@ -105,6 +107,11 @@ class DonDuLieuMau extends Command
                 // Hồ sơ visa có file giấy tờ trên ổ đĩa — xoá qua model để file đi theo
                 if ($ten === 'visa_cases') {
                     VisaCase::withTrashed()->get()->each->forceDelete();
+                }
+                // Ảnh chứng minh chuyển khoản của khoản thu
+                if ($ten === 'payments' && Schema::hasColumn('payments', 'proof_images')) {
+                    $anh = Payment::whereNotNull('proof_images')->pluck('proof_images')->flatten()->filter()->all();
+                    $anh && Storage::disk(Payment::DIA_CHUNG_TU)->delete($anh);
                 }
                 // delete() thay vì truncate() để chạy được trong transaction
                 // và không vướng ràng buộc khoá ngoại trên Postgres

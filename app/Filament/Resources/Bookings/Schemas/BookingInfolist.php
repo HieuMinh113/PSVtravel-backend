@@ -86,7 +86,7 @@ class BookingInfolist
                     ->label('Tiền cọc')
                     ->placeholder('Không thu cọc')
                     ->formatStateUsing(fn ($state, $record) => number_format((int) $state, 0, ',', '.').'đ ('
-                        .\Modules\Booking\Models\Booking::phanTram($record->deposit_percent).')'
+                        .Booking::phanTram($record->deposit_percent).')'
                         .($record->duCoc() ? ' — đã đủ cọc' : ' — chưa đủ cọc')),
                 TextEntry::make('con_lai')
                     ->label('Đã thu / còn lại')
@@ -102,9 +102,17 @@ class BookingInfolist
                         $record->canNhacKhach() => 'Tới hạn — bấm "Nhắc đóng tiền" ở trên',
                         default => null,
                     }),
+                TextEntry::make('nguoiPhuTrach.name')
+                    ->label('Người phụ trách (hưởng hoa hồng)')
+                    ->placeholder('Khách đặt trên web, chưa ai xác nhận')
+                    ->weight('bold'),
                 TextEntry::make('nguoiTao.name')
-                    ->label('Người tạo / phụ trách')
-                    ->placeholder('Khách đặt trên web, chưa ai xác nhận'),
+                    ->label('Người tạo đơn')
+                    ->placeholder('Khách tự đặt trên website'),
+                TextEntry::make('nguoiXacNhan.name')
+                    ->label('Người xác nhận')
+                    ->placeholder('Chưa xác nhận')
+                    ->helperText(fn (Booking $record) => $record->confirmed_at ? 'Lúc '.$record->confirmed_at->format('H:i d/m/Y') : null),
 
                 TextEntry::make('note')
                     ->label('Ghi chú của khách')

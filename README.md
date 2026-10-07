@@ -77,6 +77,8 @@ Có sẵn để thử các việc nghiệp vụ:
 | `visa1@psvtravel.com` | `NhanVien@123456` | Nhân viên visa: chỉ thấy hồ sơ của mình + hồ sơ chưa ai nhận |
 | `visa2@psvtravel.com` | `NhanVien@123456` | Nhân viên visa thứ hai (giữ đoàn Hàn Quốc) |
 | `dieuhanh@psvtravel.com` | `NhanVien@123456` | Điều hành: tra chỗ liên minh |
+| `sale@psvtravel.com` | `NhanVien@123456` | Kinh doanh: tạo đơn, ghi khoản thu kèm ảnh chuyển khoản, thống kê đơn của mình |
+| `ketoan@psvtravel.com` | `NhanVien@123456` | Kế toán: Duyệt khoản thu, xem thống kê doanh số của mọi người |
 | `khach@example.com` | `Khach@123456` | Khách đăng nhập website: tab Hồ sơ visa, đơn đặt tour |
 
 - **Tour** (14 tour): trong nước Miền Bắc / Trung / Nam / Tây Nguyên, nước ngoài

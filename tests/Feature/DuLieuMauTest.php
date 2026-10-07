@@ -8,6 +8,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Modules\Booking\Models\Booking;
+use Modules\Booking\Models\Payment;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use Modules\Visa\Models\VisaCase;
@@ -49,10 +50,20 @@ class DuLieuMauTest extends TestCase
         $toiHan = Booking::where('customer_email', 'khach3@example.com')->sole();
         $this->assertTrue($toiHan->canNhacKhach());
         $admin = User::where('email', 'admin@psvtravel.com')->firstOrFail();
-        $this->assertGreaterThanOrEqual(2, $admin->notifications()->count()); // nhắc khách + hồ sơ web
+        $this->assertGreaterThanOrEqual(1, $admin->notifications()->count()); // hồ sơ visa web
+        $this->assertSame(1, User::where('email', 'sale@psvtravel.com')->sole()->notifications()->count()); // tới hạn nhắn khách
+
+        // Kế toán + khoản thu chờ duyệt có ảnh chuyển khoản; trang thống kê mở được
+        $this->assertTrue(User::where('email', 'ketoan@psvtravel.com')->firstOrFail()->hasRole('ke_toan'));
+        $choDuyet = Payment::where('status', 'pending')->whereNotNull('received_by')->sole();
+        Storage::disk('rieng')->assertExists($choDuyet->proof_images[0]);
+        $this->assertSame(User::where('email', 'sale@psvtravel.com')->value('id'), $toiHan->assigned_to);
+        $this->actingAs(User::where('email', 'ketoan@psvtravel.com')->sole())->get('/admin/thong-ke-doanh-so')->assertOk()->assertSee('Kinh doanh — Thu Trang');
+        $this->get('/admin/khoan-thu')->assertOk();
 
         $this->artisan('psv:don-du-lieu-mau', ['--don-hang' => true, '--force' => true])->assertSuccessful();
         $this->assertSame(0, VisaCase::withTrashed()->count());
         $tep->each(fn ($d) => Storage::disk('rieng')->assertMissing($d));
+        Storage::disk('rieng')->assertMissing($choDuyet->proof_images[0]);
     }
 }

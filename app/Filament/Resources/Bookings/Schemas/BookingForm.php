@@ -4,14 +4,15 @@ namespace App\Filament\Resources\Bookings\Schemas;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Modules\Booking\Models\Booking;
-use Modules\Tour\Models\TourDeparture;
-use Filament\Schemas\Components\Utilities\Set;
 use Modules\Tour\Models\Tour;
+use Modules\Tour\Models\TourDeparture;
+
 class BookingForm
 {
     public static function configure(Schema $schema): Schema
@@ -170,6 +171,19 @@ class BookingForm
                 ->displayFormat('d/m/Y')
                 ->helperText(fn (?Booking $record) => self::moTaNhac($record)),
 
+            // Người hưởng hoa hồng của đơn. Mặc định người tạo (đơn web: người
+            // xác nhận). Chỉ quản lý được đổi — ô khoá thì không lưu giá trị.
+            Select::make('assigned_to')
+                ->label('Người phụ trách (hưởng hoa hồng)')
+                ->relationship('nguoiPhuTrach', 'name', fn ($query) => $query->where(fn ($q) => $q->whereHas('roles.permissions')->orWhereHas('permissions')))
+                ->searchable()
+                ->preload()
+                ->default(fn () => auth()->id())
+                ->disabled(fn () => ! auth()->user()?->can('giao', Booking::class))
+                ->helperText(fn () => auth()->user()?->can('giao', Booking::class)
+                    ? 'Đổi khi giao đơn cho nhân viên khác — thống kê hoa hồng tính theo người này.'
+                    : 'Chỉ quản lý được đổi người phụ trách.'),
+
             Textarea::make('note')
                 ->label('Ghi chú của khách')
                 ->rows(3)
@@ -180,6 +194,7 @@ class BookingForm
                 ->columnSpanFull(),
         ]);
     }
+
     /** "Tiền cọc: 3.000.000đ" — tính theo tổng tiền đang có trên form. */
     protected static function moTaCoc(Get $get): string
     {
@@ -211,4 +226,4 @@ class BookingForm
 
         $set('total_price', ($nguoiLon * $giaNguoiLon) + ($treEm * $giaTreEm));
     }
-} 
+}

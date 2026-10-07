@@ -15,6 +15,8 @@ use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
 use Modules\Visa\Models\VisaProvider;
 use Modules\Visa\Services\BaoHoSoVisaMoi;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 /**
  * Dữ liệu mẫu cho các việc nghiệp vụ: tài khoản theo vai trò, đơn tour có tiền
@@ -36,22 +38,22 @@ class DuLieuMauNghiepVuSeeder extends Seeder
     {
         $this->adminId = User::where('email', 'admin@psvtravel.com')->value('id');
 
-        [$visa1, $visa2, $khach] = $this->taiKhoan();
-        $this->donTour($khach);
+        [$visa1, $visa2, $khach, $sale, $keToan] = $this->taiKhoan();
+        $this->donTour($khach, $sale);
         $this->hoSoVisa($visa1, $visa2, $khach);
 
         // Bật chuông "tới hạn nhắn khách" ngay, khỏi đợi lịch 8h/13h
         Artisan::call('don-tour:nhac-nhan-khach');
     }
 
-    /** @return array{0: ?User, 1: ?User, 2: ?User} */
+    /** @return array{0: ?User, 1: ?User, 2: ?User, 3: ?User, 4: ?User} */
     private function taiKhoan(): array
     {
         // Mật khẩu ai cũng biết — KHÔNG tạo trên máy chủ thật
         if (app()->isProduction()) {
             $this->command?->warn('APP_ENV=production: bỏ qua tạo tài khoản mẫu (mật khẩu công khai).');
 
-            return [null, null, null];
+            return [null, null, null, null, null];
         }
 
         $tao = function (string $email, string $ten, string $matKhau, string $vaiTro): User {
@@ -70,10 +72,18 @@ class DuLieuMauNghiepVuSeeder extends Seeder
         $khach = $tao('khach@example.com', 'Khách Mẫu Thử', self::MAT_KHAU_KHACH, 'customer');
         $khach->forceFill(['phone' => '0900000001'])->save();
 
-        return [$visa1, $visa2, $khach];
+        // Nhân viên kinh doanh (vai trò staff: xử lý đơn) + kế toán duyệt khoản thu
+        Role::findByName('staff', 'web')->givePermissionTo(
+            collect(['ViewAny:Booking', 'View:Booking', 'Create:Booking', 'Update:Booking'])
+                ->map(fn ($q) => Permission::findOrCreate($q, 'web'))
+        );
+        $sale = $tao('sale@psvtravel.com', 'Kinh doanh — Thu Trang', self::MAT_KHAU_NHAN_VIEN, 'staff');
+        $keToan = $tao('ketoan@psvtravel.com', 'Kế toán — Mỹ Linh', self::MAT_KHAU_NHAN_VIEN, 'ke_toan');
+
+        return [$visa1, $visa2, $khach, $sale, $keToan];
     }
 
-    private function donTour(?User $khach): void
+    private function donTour(?User $khach, ?User $sale): void
     {
         $tour1 = Tour::where('slug', 'da-nang-hoi-an-3n2d')->first();
         $tour2 = Tour::where('slug', 'thai-lan-bangkok-pattaya-5n4d')->first() ?? Tour::where('type', 'abroad')->first();
@@ -85,15 +95,21 @@ class DuLieuMauNghiepVuSeeder extends Seeder
 
         // Hai đơn cũ của DemoSeeder: thêm tỷ lệ cọc + người phụ trách
         Booking::where('customer_email', 'khach2@example.com')->get()
-            ->each(fn (Booking $b) => $b->forceFill(['created_by' => $b->created_by ?? $this->adminId])
+            ->each(fn (Booking $b) => $b->forceFill(['created_by' => $b->created_by ?? $this->adminId, 'assigned_to' => $b->assigned_to ?? $this->adminId])
                 ->fill(['deposit_percent' => 50])->save());
         Booking::where('customer_email', 'khach1@example.com')->get()
-            ->each(fn (Booking $b) => $b->fill(['deposit_percent' => 30])->save());
+            ->each(fn (Booking $b) => $b->forceFill(['source' => 'web'])->fill(['deposit_percent' => 30])->save());
 
+        $saleId = $sale?->id ?? $this->adminId;
         $don = function (array $khoa, array $giaTri): Booking {
             $b = Booking::firstOrNew($khoa);
             $b->fill($giaTri);
-            $b->forceFill(['created_by' => $giaTri['created_by'] ?? $b->created_by]);
+            $b->forceFill([
+                'source' => $giaTri['source'] ?? 'quan_tri',
+                'created_by' => $giaTri['created_by'] ?? $b->created_by,
+                'assigned_to' => $giaTri['created_by'] ?? $b->assigned_to,
+                'confirmed_by' => $b->confirmed_by ?? ($giaTri['status'] === 'confirmed' ? $this->adminId : null),
+            ]);
             $b->save();
 
             return $b;
@@ -109,13 +125,20 @@ class DuLieuMauNghiepVuSeeder extends Seeder
             'total_price' => 3 * $tour2->adult_price,
             'status' => 'confirmed', 'payment_status' => 'unpaid',
             'deposit_percent' => 30, 'remind_on' => today()->toDateString(),
-            'created_by' => $this->adminId,
+            'created_by' => $saleId,
         ]);
         Payment::updateOrCreate(
             ['booking_id' => $toiHan->id, 'transaction_ref' => 'DEMO-COC-003'],
             ['method' => 'bank_transfer', 'amount' => 5_000_000, 'status' => 'success',
                 'received_by' => $this->adminId, 'paid_at' => now()->subDays(4), 'note' => 'Cọc đợt 1 (chưa đủ 30%).'],
         );
+        // Nhân viên vừa ghi nhận cọc đợt 2 kèm ảnh chuyển khoản → chờ kế toán duyệt
+        $choDuyet = Payment::firstOrNew(['booking_id' => $toiHan->id, 'transaction_ref' => 'DEMO-COC-003B']);
+        if (! $choDuyet->exists) {
+            $choDuyet->fill(['method' => 'bank_transfer', 'amount' => 3_000_000, 'status' => 'pending',
+                'received_by' => $saleId, 'paid_at' => now()->subHours(2), 'note' => 'Cọc đợt 2 — khách gửi ảnh qua Zalo.',
+                'proof_images' => [$this->anhChuyenKhoan($toiHan->booking_code, 3_000_000)]])->save();
+        }
 
         // Đã trả đủ → không còn bị nhắc
         $daDu = $don(['customer_email' => 'khach4@example.com', 'tour_id' => $tour1->id], [
@@ -125,7 +148,7 @@ class DuLieuMauNghiepVuSeeder extends Seeder
             'unit_price_adult' => $tour1->adult_price, 'unit_price_child' => 0,
             'total_price' => 2 * $tour1->adult_price,
             'status' => 'confirmed', 'payment_status' => 'unpaid',
-            'deposit_percent' => 50, 'created_by' => $this->adminId,
+            'deposit_percent' => 50, 'created_by' => $saleId,
         ]);
         Payment::updateOrCreate(
             ['booking_id' => $daDu->id, 'transaction_ref' => 'DEMO-DU-004'],
@@ -141,7 +164,7 @@ class DuLieuMauNghiepVuSeeder extends Seeder
                 'adults' => 1, 'children' => 1,
                 'unit_price_adult' => $tour1->adult_price, 'unit_price_child' => $tour1->child_price ?? 0,
                 'total_price' => $tour1->adult_price + ($tour1->child_price ?? 0),
-                'status' => 'pending', 'payment_status' => 'unpaid',
+                'status' => 'pending', 'payment_status' => 'unpaid', 'source' => 'web',
                 'note' => 'Đặt từ website (dữ liệu mẫu).',
             ]);
         }
@@ -279,6 +302,27 @@ class DuLieuMauNghiepVuSeeder extends Seeder
         }
 
         return $hs;
+    }
+
+    /** Ảnh biên lai chuyển khoản giả (ghi rõ MẪU) để thử màn hình kế toán duyệt. */
+    private function anhChuyenKhoan(string $maDon, int $soTien): string
+    {
+        $anh = imagecreatetruecolor(600, 900);
+        imagefill($anh, 0, 0, imagecolorallocate($anh, 245, 250, 245));
+        $chu = imagecolorallocate($anh, 20, 90, 50);
+        foreach (['BIEN LAI CHUYEN KHOAN - MAU', 'KHONG PHAI GIAO DICH THAT', '', 'So tien: '.number_format($soTien, 0, ',', '.').' VND',
+            'Noi dung: '.$maDon, 'Thoi gian: '.now()->format('H:i d/m/Y')] as $i => $dong) {
+            imagestring($anh, 5, 40, 60 + $i * 40, $dong, $chu);
+        }
+        ob_start();
+        imagejpeg($anh, null, 80);
+        $noiDung = ob_get_clean();
+        imagedestroy($anh);
+
+        $duong = 'chung-tu-thanh-toan/mau-'.$maDon.'.jpg';
+        Storage::disk('rieng')->put($duong, $noiDung);
+
+        return $duong;
     }
 
     /** Ảnh JPG có ghi chữ "MẪU" — đủ để xem trước, xuất ZIP. @return array{0: string, 1: string} */

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Booking\Policies;
 
+use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Modules\Booking\Models\Booking;
-use Illuminate\Auth\Access\HandlesAuthorization;
 
 class BookingPolicy
 {
     use HandlesAuthorization;
-    
+
     public function viewAny(AuthUser $authUser): bool
     {
         return $authUser->can('ViewAny:Booking');
@@ -20,6 +20,12 @@ class BookingPolicy
     public function view(AuthUser $authUser, Booking $booking): bool
     {
         return $authUser->can('View:Booking');
+    }
+
+    /** Đổi người phụ trách (hưởng hoa hồng) và xem thống kê của mọi nhân viên. */
+    public function giao(AuthUser $authUser): bool
+    {
+        return $authUser->can('ViewAll:Booking');
     }
 
     public function create(AuthUser $authUser): bool
@@ -71,5 +77,4 @@ class BookingPolicy
     {
         return $authUser->can('Reorder:Booking');
     }
-
 }

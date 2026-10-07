@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Filament\Resources\Bookings;
-use App\Filament\Resources\Bookings\RelationManagers;
+
 use App\Filament\Resources\Bookings\Pages\CreateBooking;
 use App\Filament\Resources\Bookings\Pages\EditBooking;
 use App\Filament\Resources\Bookings\Pages\ListBookings;
@@ -77,7 +77,7 @@ class BookingResource extends Resource
     /** Số đơn đã tới hạn nhắn khách đóng tiền mà chưa nhắn — của người đang xem. */
     public static function getNavigationBadge(): ?string
     {
-        $so = Booking::toiHanNhac()->where('created_by', auth()->id())->count();
+        $so = Booking::toiHanNhac()->where('assigned_to', auth()->id())->count();
 
         return $so ? (string) $so : null;
     }

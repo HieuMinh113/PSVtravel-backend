@@ -7,9 +7,9 @@ use App\Mail\BookingMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Modules\Page\Models\Setting;
 use Modules\Booking\Http\Requests\StoreBookingRequest;
 use Modules\Booking\Models\Booking;
+use Modules\Page\Models\Setting;
 use Modules\Tour\Models\Tour;
 
 class BookingApiController extends Controller
@@ -56,7 +56,8 @@ class BookingApiController extends Controller
         $tongTien = $data['adults'] * $donGiaNguoiLon
             + ($donGiaTreEm !== null ? ($data['children'] ?? 0) * $donGiaTreEm : 0);
 
-        $booking = Booking::create([
+        // Khách tự đặt: chưa ai phụ trách, người bấm Xác nhận sẽ nhận
+        $booking = (new Booking)->forceFill(['source' => 'web'])->fill([
             'tour_id' => $tour->id,
             'tour_departure_id' => $departure?->id,
             'user_id' => auth('sanctum')->id(),
@@ -72,6 +73,7 @@ class BookingApiController extends Controller
             'payment_status' => 'unpaid',
             'note' => $data['note'] ?? null,
         ]);
+        $booking->save();
 
         $this->guiMail($booking);
 

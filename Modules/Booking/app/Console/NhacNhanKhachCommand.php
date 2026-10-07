@@ -28,10 +28,10 @@ class NhacNhanKhachCommand extends Command
 
         Booking::toiHanNhac()
             ->whereNull('remind_notified_at')
-            ->with(['tour:id,name', 'departure:id,start_date', 'nguoiTao'])
+            ->with(['tour:id,name', 'departure:id,start_date', 'nguoiPhuTrach'])
             ->chunkById(100, function ($dsDon) use (&$soDon) {
                 foreach ($dsDon as $don) {
-                    $nguoiNhan = $don->nguoiTao ? collect([$don->nguoiTao]) : $this->nguoiSuaDon();
+                    $nguoiNhan = $don->nguoiPhuTrach ? collect([$don->nguoiPhuTrach]) : $this->nguoiSuaDon();
                     if ($nguoiNhan->isEmpty()) {
                         continue;
                     }
