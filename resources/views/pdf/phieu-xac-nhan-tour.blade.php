@@ -10,24 +10,35 @@
 <style>
     /* DejaVu Sans có sẵn trong dompdf và đủ dấu tiếng Việt */
     * { font-family: "DejaVu Sans", sans-serif; }
+    @page { margin: 26px 36px; }
     body { font-size: 11.5px; color: #0b2440; margin: 0; }
     .dau { border-bottom: 2px solid #0169A9; padding-bottom: 10px; margin-bottom: 14px; }
+    .dau-anh img { width: 100%; }
+    .giay-phep { text-align: right; font-size: 9px; color: #4a5b6b; margin: 0 0 6px; }
     .cong-ty { font-size: 15px; font-weight: bold; color: #0169A9; }
     .nho { font-size: 10px; color: #4a5b6b; line-height: 1.5; }
-    h1 { text-align: center; font-size: 17px; margin: 6px 0 2px; letter-spacing: .5px; }
-    .ma { text-align: center; font-size: 11px; color: #4a5b6b; margin-bottom: 14px; }
+    h1 { text-align: center; font-size: 17px; margin: 2px 0 2px; letter-spacing: .5px; }
+    .ma { text-align: center; font-size: 11px; color: #4a5b6b; margin-bottom: 8px; }
     table { width: 100%; border-collapse: collapse; }
-    .bang td { border: 1px solid #c9dbe7; padding: 6px 8px; vertical-align: top; }
+    .bang td { border: 1px solid #c9dbe7; padding: 4px 8px; vertical-align: top; }
     .bang td.nhan { width: 38%; background: #f1f7fb; color: #33475b; }
-    .muc { font-size: 12px; font-weight: bold; color: #0169A9; margin: 14px 0 6px; text-transform: uppercase; }
+    .muc { font-size: 12px; font-weight: bold; color: #0169A9; margin: 10px 0 5px; text-transform: uppercase; }
     .dam { font-weight: bold; }
     .noi-bat td { background: #fff4e8; font-weight: bold; color: #b45309; }
-    .ky td { text-align: center; padding-top: 24px; }
-    .ghi-chu { border: 1px dashed #c9dbe7; padding: 8px 10px; white-space: pre-line; line-height: 1.6; }
+    .ky { page-break-inside: avoid; }
+    .ky td { text-align: center; padding-top: 16px; height: 90px; vertical-align: top; }
+    .ghi-chu { border: 1px dashed #c9dbe7; padding: 6px 10px; white-space: pre-line; line-height: 1.5; }
 </style>
 </head>
 <body>
 
+@if (!empty($anhDau))
+    {{-- Băng rôn công ty (Cấu hình chung → Ảnh đầu phiếu xác nhận đặt tour) --}}
+    <div class="dau-anh"><img src="{{ $anhDau }}" alt="{{ $tenCongTy }}"></div>
+    @if (!empty($cauHinh['license_number']))
+        <div class="giay-phep">Giấy phép kinh doanh lữ hành quốc tế số: {{ $cauHinh['license_number'] }}</div>
+    @endif
+@else
 <div class="dau">
     <div class="cong-ty">{{ $tenCongTy }}</div>
     <div class="nho">
@@ -38,6 +49,7 @@
         @if (!empty($cauHinh['tax_code'])) · MST: {{ $cauHinh['tax_code'] }}@endif
     </div>
 </div>
+@endif
 
 <h1>PHIẾU XÁC NHẬN ĐẶT TOUR</h1>
 <div class="ma">Mã đơn: <strong>{{ $don->booking_code }}</strong> · Ngày lập: {{ now()->format('d/m/Y') }}</div>

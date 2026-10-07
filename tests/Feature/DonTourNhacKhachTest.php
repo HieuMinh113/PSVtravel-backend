@@ -12,7 +12,9 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Modules\Booking\Http\Controllers\PhieuXacNhanController;
 use Modules\Booking\Models\Booking;
 use Modules\Booking\Models\Payment;
 use Modules\Tour\Models\Tour;
@@ -211,6 +213,17 @@ class DonTourNhacKhachTest extends TestCase
         $this->assertSame('application/pdf', $tl->headers->get('content-type'));
         $this->assertStringStartsWith('%PDF', $tl->getContent());
         $this->assertStringContainsString('Phieu-xac-nhan-'.$don->booking_code.'.pdf', $tl->headers->get('content-disposition'));
+
+        // Ảnh đầu phiếu: mặc định là băng rôn đi kèm mã nguồn; tải ảnh khác ở
+        // Cấu hình chung (kể cả WebP) thì dùng ảnh đó, đổi sang PNG cho dompdf
+        $this->assertStringStartsWith('data:image/jpeg;base64,', PhieuXacNhanController::anhDau(null));
+        Storage::fake('public');
+        $anh = imagecreatetruecolor(20, 5);
+        ob_start();
+        imagewebp($anh);
+        Storage::disk('public')->put('settings/dau-phieu.webp', ob_get_clean());
+        $this->assertStringStartsWith('data:image/png;base64,', PhieuXacNhanController::anhDau('settings/dau-phieu.webp'));
+        $this->assertStringStartsWith('data:image/jpeg;base64,', PhieuXacNhanController::anhDau('settings/khong-co.png'));
 
         $html = (new BookingMail($don->load(['tour', 'departure']), BookingMail::XAC_NHAN))->render();
         $this->assertStringContainsString('Tiền cọc (30%)', $html);
