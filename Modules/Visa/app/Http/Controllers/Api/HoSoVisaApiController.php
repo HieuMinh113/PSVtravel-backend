@@ -51,7 +51,7 @@ class HoSoVisaApiController extends Controller
 
         return response()->json(['data' => [
             'note' => $mau?->note,
-            'items' => collect(VisaCase::chepMau($mau))
+            'items' => collect(VisaCase::chepMau($mau, $data['profile'] ?? null))
                 ->map(fn ($g, $i) => ['muc' => $i, 'ten' => $g['ten'], 'ghi_chu' => $g['ghi_chu'], 'nhom' => $g['nhom']])
                 ->values(),
         ]]);
@@ -138,7 +138,7 @@ class HoSoVisaApiController extends Controller
             'profile' => $data['profile'] ?? null,
             'travel_date' => $data['travel_date'] ?? null,
             'visa_checklist_id' => $mau?->id,
-            'checklist' => VisaCase::chepMau($mau),
+            'checklist' => VisaCase::chepMau($mau, $data['profile'] ?? null),
             'customer_note' => $data['note'] ?? null,
             'thong_tin' => PhieuThongTin::loc($data['thong_tin'] ?? []) ?: null,
             'status' => 'moi',

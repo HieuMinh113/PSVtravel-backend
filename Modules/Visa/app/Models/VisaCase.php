@@ -30,7 +30,9 @@ class VisaCase extends Model
 
     public const DOI_TUONG = [
         'nhan_vien' => 'Nhân viên',
+        'nha_nuoc' => 'Công chức / viên chức nhà nước',
         'chu_doanh_nghiep' => 'Chủ doanh nghiệp',
+        'ho_kinh_doanh' => 'Hộ kinh doanh',
         'tu_do' => 'Lao động tự do',
         'huu_tri' => 'Hưu trí',
         'hoc_sinh' => 'Học sinh / sinh viên',
@@ -255,10 +257,16 @@ class VisaCase extends Model
     }
 
     /** Chép danh sách giấy tờ của mẫu thành checklist hồ sơ (tất cả "chưa có"). */
-    public static function chepMau(?VisaChecklist $mau): array
+    /**
+     * Giấy tờ của mẫu có thể ghi "chỉ cho" một số đối tượng (vd. Giấy phép kinh
+     * doanh chỉ cho chủ doanh nghiệp). Biết đối tượng thì chỉ chép giấy của
+     * đối tượng đó; chưa biết thì chép hết để nhân viên tự bỏ bớt.
+     */
+    public static function chepMau(?VisaChecklist $mau, ?string $doiTuong = null): array
     {
         return collect($mau?->items ?? [])
             ->filter(fn ($g) => filled($g['ten'] ?? null))
+            ->filter(fn ($g) => blank($doiTuong) || empty($g['chi_cho']) || in_array($doiTuong, (array) $g['chi_cho'], true))
             ->map(fn ($g) => [
                 'nhom' => $g['nhom'] ?? null,
                 'ten' => $g['ten'],

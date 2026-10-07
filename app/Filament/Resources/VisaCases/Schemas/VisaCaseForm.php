@@ -343,10 +343,12 @@ class VisaCaseForm
         if (self::daNhanGiay($get('checklist'))) {
             return;
         }
+        // Cùng mẫu nhưng đổi đối tượng vẫn chép lại: mẫu chung có giấy "chỉ cho"
+        // từng đối tượng, đổi nhân viên → chủ doanh nghiệp là đổi danh sách.
         $mau = VisaChecklist::timMau($get('country'), $get('purpose'), $get('profile'));
-        if ($mau && (int) $get('visa_checklist_id') !== $mau->id) {
+        if ($mau) {
             $set('visa_checklist_id', $mau->id);
-            $set('checklist', VisaCase::chepMau($mau));
+            $set('checklist', VisaCase::chepMau($mau, $get('profile')));
         }
     }
 
@@ -360,7 +362,7 @@ class VisaCaseForm
         if (! $mau) {
             return;
         }
-        $moi = VisaCase::chepMau($mau);
+        $moi = VisaCase::chepMau($mau, $get('profile'));
         $hienTai = array_values($get('checklist') ?? []);
 
         if (! self::daNhanGiay($hienTai)) {

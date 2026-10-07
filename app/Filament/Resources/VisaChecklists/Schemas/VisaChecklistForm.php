@@ -40,7 +40,8 @@ class VisaChecklistForm
                 Select::make('profile')
                     ->label('Đối tượng')
                     ->options(VisaCase::DOI_TUONG)
-                    ->placeholder('Chung — mọi đối tượng'),
+                    ->placeholder('Chung — mọi đối tượng')
+                    ->helperText('Mẫu chung thì để trống, rồi ghi "Chỉ cho đối tượng" ở từng giấy tờ.'),
                 Toggle::make('is_active')
                     ->label('Đang dùng')
                     ->default(true)
@@ -49,18 +50,25 @@ class VisaChecklistForm
                 Repeater::make('items')
                     ->label('Danh sách giấy tờ')
                     ->table([
-                        TableColumn::make('Nhóm')->width('14rem'),
+                        TableColumn::make('Nhóm')->width('12rem'),
                         TableColumn::make('Giấy tờ')->markAsRequired(),
                         TableColumn::make('Ghi chú'),
+                        TableColumn::make('Chỉ cho đối tượng')->width('15rem'),
                     ])
                     ->schema([
                         TextInput::make('nhom')
                             ->placeholder('Giấy tờ cá nhân')
-                            ->datalist(['Giấy tờ cá nhân', 'Công việc', 'Tài chính', 'Phía người mời', 'Thông tin cần']),
+                            ->datalist(['Hồ sơ cá nhân', 'Chứng minh công việc', 'Chứng minh tài chính', 'Trường hợp công tác', 'Trường hợp thăm thân', 'Tờ khai', 'Phía người mời']),
                         TextInput::make('ten')
                             ->required(),
                         TextInput::make('ghi_chu')
                             ->placeholder('VD: sao y công chứng không quá 3 tháng'),
+                        // Để trống = mọi đối tượng. Chọn thì hồ sơ của đối tượng
+                        // khác sẽ không chép dòng này (vd. GPKD chỉ cho chủ DN).
+                        Select::make('chi_cho')
+                            ->multiple()
+                            ->options(VisaCase::DOI_TUONG)
+                            ->placeholder('Mọi đối tượng'),
                     ])
                     ->defaultItems(1)
                     ->addActionLabel('Thêm giấy tờ')

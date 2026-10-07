@@ -3,6 +3,7 @@
 namespace Modules\Visa\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 use Modules\Visa\Models\VisaChecklist;
 
 /**
@@ -21,6 +22,36 @@ class MauChecklistVisaSeeder extends Seeder
         foreach ([...self::mau(), ...self::mauDoanHan()] as $i => $m) {
             VisaChecklist::create($m + ['sort_order' => $i]);
         }
+    }
+
+    /**
+     * 35 mẫu của 17 nước chép từ bộ "FILE THỦ TỤC HỒ SƠ NOLOGO" (xem
+     * database/data/mau-thu-tuc-nlg.php). File thủ tục / form mẫu đi kèm được
+     * chép vào ổ riêng tư làm "File mẫu" của mẫu.
+     */
+    public static function themMauThuTucNlg(): void
+    {
+        $thuMucNguon = module_path('Visa', 'database/data/thu-tuc');
+        $dia = Storage::disk('rieng');
+
+        $dsMau = collect(require module_path('Visa', 'database/data/mau-thu-tuc-nlg.php'))
+            ->map(function (array $m) use ($thuMucNguon, $dia) {
+                $duong = [];
+                $ten = [];
+                foreach ($m['tep'] ?? [] as $file => $tenHienThi) {
+                    $dich = 'mau-visa/'.$file;
+                    if (! $dia->exists($dich) && is_file($thuMucNguon.'/'.$file)) {
+                        $dia->put($dich, file_get_contents($thuMucNguon.'/'.$file));
+                    }
+                    $duong[] = $dich;
+                    $ten[$dich] = $tenHienThi;
+                }
+                unset($m['tep']);
+
+                return $m + ['attachments' => $duong ?: null, 'attachment_names' => $ten ?: null];
+            })->all();
+
+        self::themMauNeuChuaCo($dsMau);
     }
 
     /** Thêm các mẫu chưa có (so theo tên) — dùng cho migration bổ sung mẫu về sau. */

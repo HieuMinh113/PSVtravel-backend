@@ -65,7 +65,7 @@ class HoSoVisaTest extends TestCase
         $this->assertTrue($vaiTro->hasPermissionTo('Create:VisaChecklist'));
         $this->assertFalse($vaiTro->hasPermissionTo(Permission::findOrCreate('ViewAny:Tour', 'web')));
 
-        $this->assertSame(11, VisaChecklist::count());
+        $this->assertSame(46, VisaChecklist::count());
         $tq = $this->mau('Trung Quốc — Du lịch — Nhân viên');
         $this->assertSame('Hộ chiếu bản gốc', $tq->items[0]['ten']);
         $this->assertSame('Xác nhận việc làm', collect($tq->items)->last()['ten']);
@@ -77,7 +77,9 @@ class HoSoVisaTest extends TestCase
         // Mẫu công tác ghi "chung" đối tượng → dùng cho mọi đối tượng
         $this->assertSame('Trung Quốc — Công tác', VisaChecklist::timMau('Trung Quốc', 'cong_tac', 'nhan_vien')?->name);
         // Mẫu Hàn ghi rõ học sinh → không đưa cho người đi làm
-        $this->assertNull(VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'tu_do'));
+        // Mẫu ghi rõ đối tượng được ưu tiên; không có thì dùng mẫu chung của nước
+        $this->assertSame('Hàn Quốc — Đoàn du lịch — Nhân viên', VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'nhan_vien')?->name);
+        $this->assertSame('Hàn Quốc — Du lịch', VisaChecklist::timMau('Hàn Quốc', 'du_lich', 'tu_do')?->name);
         $this->assertSame('Ai Cập — Du lịch', VisaChecklist::timMau('Ai Cập', 'du_lich', 'huu_tri')?->name);
         $this->assertNull(VisaChecklist::timMau(null, 'du_lich', null));
 
@@ -692,6 +694,35 @@ class HoSoVisaTest extends TestCase
 
         // Chạy lại không thêm trùng
         MauChecklistVisaSeeder::themMauNeuChuaCo(MauChecklistVisaSeeder::mauDoanHan());
-        $this->assertSame(11, VisaChecklist::count());
+        $this->assertSame(46, VisaChecklist::count());
+    }
+
+    public function test_mau_17_nuoc_chi_chep_giay_cua_dung_doi_tuong(): void
+    {
+        $nhat = $this->mau('Nhật Bản — Du lịch');
+        $this->assertSame(['mau-visa/nhat-ban-thu-tuc.pdf', 'mau-visa/nhat-ban-phieu-thong-tin.docx'], $nhat->attachments);
+        $this->assertSame('Phiếu thông tin xin visa Nhật Bản.docx', $nhat->attachment_names['mau-visa/nhat-ban-phieu-thong-tin.docx']);
+        $this->assertTrue(Storage::disk('rieng')->exists('mau-visa/nhat-ban-thu-tuc.pdf'));
+
+        $ten = fn (?string $doiTuong) => collect(VisaCase::chepMau($nhat, $doiTuong))->pluck('ten');
+        $this->assertContains('Hợp đồng lao động hoặc quyết định bổ nhiệm', $ten('nhan_vien'));
+        $this->assertNotContains('Giấy phép kinh doanh', $ten('nhan_vien'));
+        $this->assertContains('Giấy phép kinh doanh', $ten('chu_doanh_nghiep'));
+        $this->assertNotContains('Sao kê lương 6 tháng gần nhất', $ten('chu_doanh_nghiep'));
+        $this->assertContains('Thuế 3 tháng gần nhất', $ten('ho_kinh_doanh'));
+        $this->assertContains('Hộ chiếu', $ten('huu_tri'));
+        $this->assertCount(count($nhat->items), $ten(null)); // chưa biết đối tượng → chép hết
+
+        // Nước có 3 mục đích: mẫu thăm thân có thêm phần người mời
+        $this->assertSame('Đức — Thăm thân', VisaChecklist::timMau('Đức', 'tham_than', 'nhan_vien')->name);
+        $this->assertContains('Giấy bảo lãnh của Tòa Thị chính nơi người mời cư trú', collect($this->mau('Đức — Thăm thân')->items)->pluck('ten'));
+        $this->assertNull(VisaChecklist::timMau('Ba Lan', 'cong_tac', 'nhan_vien')); // file Ba Lan không có công tác
+
+        // Web: danh sách giấy theo đối tượng
+        VisaCountry::create(['name' => 'Nhật Bản', 'slug' => 'nhat-ban', 'status' => 'published']);
+        $this->getJson('/api/v1/visa-applications/checklist?visa_country=nhat-ban&purpose=du_lich&profile=chu_doanh_nghiep')
+            ->assertOk()
+            ->assertJsonFragment(['ten' => 'Giấy phép kinh doanh'])
+            ->assertJsonMissing(['ten' => 'Bảo hiểm xã hội']);
     }
 }
