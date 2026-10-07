@@ -4,7 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder;
+use Modules\Visa\Database\Seeders\QuyenVisaSeeder;
 use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
@@ -44,8 +47,19 @@ class RoleSeeder extends Seeder
 
         // Quyền liên minh cho super_admin/admin + vai trò điều hành. Migration
         // cũng tạo, nhưng trên máy mới cài nó chạy TRƯỚC khi có super_admin.
-        $this->call(\Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder::class);
+        $this->call(QuyenLienMinhSeeder::class);
         // Tương tự cho vai trò visa (hồ sơ visa + mẫu checklist)
-        $this->call(\Modules\Visa\Database\Seeders\QuyenVisaSeeder::class);
+        $this->call(QuyenVisaSeeder::class);
+
+        // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
+        // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này
+        // thì máy mới cài chỉ thấy vài mục — đã xảy ra với máy kiểm thử
+        // 07/10/2026. Chỉ THÊM quyền cho super_admin, không đụng vai trò khác.
+        Artisan::call('shield:generate', [
+            '--all' => true,
+            '--panel' => 'admin',
+            '--option' => 'permissions',
+            '--no-interaction' => true,
+        ]);
     }
 }

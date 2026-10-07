@@ -119,6 +119,10 @@ $COMPOSE run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 app composer install -
 
 echo "==> 5/8  Cập nhật cấu trúc cơ sở dữ liệu"
 $COMPOSE run --rm app php artisan migrate --force
+# Mục quản trị mới (resource mới) cần quyền mới; lệnh này tạo quyền còn
+# thiếu và cấp cho super_admin — chỉ thêm, không gỡ quyền của vai trò nào.
+$COMPOSE run --rm app php artisan shield:generate --all --panel=admin --option=permissions --no-interaction \
+    || echo "!! Không tạo được quyền mới — vào Vai trò tick tay cho super_admin"
 
 echo "==> 6/8  Khởi động lại các dịch vụ"
 # --force-recreate cho frontend: ảnh Docker mới chỉ có tác dụng khi container

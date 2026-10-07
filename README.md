@@ -39,7 +39,8 @@ docker compose exec app php artisan db:seed --class="Modules\Page\Database\Seede
 # 8. Cho phép website đọc ảnh đã upload
 docker compose exec app php artisan storage:link
 
-# 9. Cấp đủ quyền cho tài khoản Toàn quyền (máy mới cài chưa có quyền nào)
+# 9. (Bước 6 đã tự làm) Tạo lại quyền + cấp hết cho super_admin — chạy khi
+#    tài khoản admin thiếu mục trong menu, hoặc sau khi thêm mục quản trị mới
 docker compose exec app php artisan shield:generate --all --panel=admin --option=permissions
 ```
 
