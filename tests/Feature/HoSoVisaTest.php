@@ -24,6 +24,7 @@ use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
 use Modules\Visa\Models\VisaCountry;
 use Modules\Visa\Services\XuatHoSoVisa;
+use Modules\Visa\Services\XuatMauChecklist;
 use Modules\Visa\Services\XuatTam;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
@@ -724,5 +725,42 @@ class HoSoVisaTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['ten' => 'Giấy phép kinh doanh'])
             ->assertJsonMissing(['ten' => 'Bảo hiểm xã hội']);
+    }
+
+    public function test_xuat_mau_checklist_word_pdf_kem_file_mau(): void
+    {
+        $mau = $this->mau('Nhật Bản — Du lịch');
+        $this->assertNotEmpty($mau->attachments);
+        $mau->update(['note' => 'Nộp trước ngày đi 15 ngày.']);
+
+        [$tam, $ten] = app(XuatMauChecklist::class)->zip(collect([$mau]), 'ca_hai');
+        $this->assertSame('Checklist - Nhật Bản — Du lịch.zip', $ten);
+        $muc = $this->mucTrongZip($tam);
+        $this->assertArrayHasKey('Danh sách giấy tờ - Nhật Bản — Du lịch.docx', $muc);
+        $this->assertStringStartsWith('%PDF', $muc['Danh sách giấy tờ - Nhật Bản — Du lịch.pdf']);
+        $this->assertNotEmpty(array_filter(array_keys($muc), fn ($k) => str_starts_with($k, 'File mẫu/')));
+
+        // Nội dung Word: tiêu đề, giấy tờ đầu tiên, lưu ý
+        $docx = tempnam(sys_get_temp_dir(), 't');
+        file_put_contents($docx, $muc['Danh sách giấy tờ - Nhật Bản — Du lịch.docx']);
+        $xml = $this->mucTrongZip($docx)['word/document.xml'];
+        $this->assertStringContainsString('DANH SÁCH GIẤY TỜ XIN VISA NHẬT BẢN', $xml);
+        $this->assertStringContainsString(htmlspecialchars($mau->items[0]['ten'], ENT_XML1), $xml);
+        $this->assertStringContainsString('Nộp trước ngày đi 15 ngày.', $xml);
+
+        // Nhiều mẫu → mỗi mẫu một thư mục, chỉ Word
+        [$tam2, $ten2] = app(XuatMauChecklist::class)
+            ->zip(collect([$mau, $this->mau('Ai Cập — Du lịch')]), 'word');
+        $this->assertSame('Checklist visa - 2 mẫu.zip', $ten2);
+        $muc2 = array_keys($this->mucTrongZip($tam2));
+        $this->assertContains('Ai Cập — Du lịch/Danh sách giấy tờ - Ai Cập — Du lịch.docx', $muc2);
+        $this->assertEmpty(array_filter($muc2, fn ($k) => str_contains($k, 'Danh sách giấy tờ') && str_ends_with($k, '.pdf')));
+
+        // Nút trong trang quản trị → chuyển sang link tải có chữ ký
+        $this->actingAs($this->nhanVienVisa());
+        Livewire::test(ListVisaChecklists::class)
+            ->callTableAction('xuatFile', $mau, data: ['dinh_dang' => 'pdf'])
+            ->assertHasNoTableActionErrors()
+            ->assertRedirectContains('/tai-zip/');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VisaChecklists\Pages;
 
+use App\Filament\Resources\VisaChecklists\Actions\XuatMauAction;
 use App\Filament\Resources\VisaChecklists\VisaChecklistResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -12,7 +13,7 @@ class EditVisaChecklist extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [DeleteAction::make()];
+        return [XuatMauAction::make(), DeleteAction::make()];
     }
 
     protected function getRedirectUrl(): string

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VisaChecklists\Tables;
 
+use App\Filament\Resources\VisaChecklists\Actions\XuatMauAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ReplicateAction;
@@ -57,8 +58,12 @@ class VisaChecklistsTable
                         return $data;
                     })
                     ->excludeAttributes(['attachments', 'attachment_names']),
+                XuatMauAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
+            ])
+            ->toolbarActions([
+                XuatMauAction::hangLoat(),
             ]);
     }
 }

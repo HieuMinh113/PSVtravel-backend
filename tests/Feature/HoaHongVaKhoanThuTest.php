@@ -21,6 +21,7 @@ use Modules\Booking\Models\Booking;
 use Modules\Booking\Models\Payment;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -244,6 +245,19 @@ class HoaHongVaKhoanThuTest extends TestCase
         $trang->filterTable('tien', null)->filterTable('thang', '2026-09')->assertCanSeeTableRecords([$cu])->assertCanNotSeeTableRecords([$a1]);
 
         Livewire::test(ThongKeDoanhSo::class)->callAction('xuatExcel')->assertFileDownloaded('Thong-ke-doanh-so-10-2026.xlsx');
+
+        // Excel theo đúng bộ lọc đang chọn: chỉ đơn của B, ghi bộ lọc lên đầu file
+        $tl = Livewire::test(ThongKeDoanhSo::class)->filterTable('assigned_to', $b->id)->callAction('xuatExcel');
+        $taiVe = data_get($tl->effects, 'download');
+        $this->assertStringStartsWith('Thong-ke-doanh-so-10-2026-', $taiVe['name']);
+        $file = tempnam(sys_get_temp_dir(), 'x');
+        file_put_contents($file, base64_decode($taiVe['content']));
+        $wb = IOFactory::load($file);
+        $this->assertStringContainsString('Phụ trách: '.$b->name, $wb->getSheet(0)->getCell('A1')->getValue());
+        $maDon = array_column($wb->getSheet(1)->toArray(), 0);
+        $this->assertContains($b1->booking_code, $maDon);
+        $this->assertNotContains($a1->booking_code, $maDon);
+        $this->assertCount(3, $maDon); // tiêu đề + 2 đơn của B
 
         // Nhân viên: chỉ thấy đơn của mình
         $this->actingAs($b);

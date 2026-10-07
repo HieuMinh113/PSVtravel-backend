@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\Bookings\BookingResource;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -19,6 +20,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Modules\Booking\Models\Booking;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -129,6 +131,9 @@ class ThongKeDoanhSo extends Page implements HasTable
                     ->label('Tình trạng tour')
                     ->options(['confirmed' => 'Chưa đi / đang đi', 'completed' => 'Hoàn thành', 'cancelled' => 'Đã huỷ']),
             ], layout: FiltersLayout::AboveContent)
+            // Chọn là lọc ngay (không cần bấm "Áp dụng"), để bảng tổng hợp và
+            // file Excel luôn khớp với những gì đang chọn trên màn hình
+            ->deferFilters(false)
             ->filtersFormColumns(4)
             ->paginated([25, 50, 100]);
     }
@@ -167,6 +172,23 @@ class ThongKeDoanhSo extends Page implements HasTable
             default => $q,
         };
     }
+
+    /** "Tháng 10/2026 · Phụ trách: Thu Trang · Tiền: Đang cọc" — ghi lên đầu file Excel. */
+    public function moTaBoLoc(): string
+    {
+        $giaTri = fn (string $k) => $this->tableFilters[$k]['value'] ?? null;
+        $phuTrach = $giaTri('assigned_to') ? User::whereKey($giaTri('assigned_to'))->value('name') : null;
+
+        return collect([
+            $this->thangDangXem() ? 'Tháng '.$this->thangDangXem() : 'Mọi tháng',
+            $phuTrach ? 'Phụ trách: '.$phuTrach : (self::xemTatCa() ? null : 'Phụ trách: '.auth()->user()?->name),
+            $giaTri('tien') ? 'Tiền: '.(Booking::TIEN[$giaTri('tien')] ?? $giaTri('tien')) : null,
+            $giaTri('status') ? 'Tour: '.(self::TOUR[$giaTri('status')] ?? $giaTri('status')) : null,
+            filled($this->tableSearch ?? null) ? 'Tìm: '.$this->tableSearch : null,
+        ])->filter()->implode(' · ');
+    }
+
+    public const TOUR = ['confirmed' => 'Chưa đi / đang đi', 'completed' => 'Hoàn thành', 'cancelled' => 'Đã huỷ'];
 
     public function thangDangXem(): ?string
     {
@@ -229,8 +251,9 @@ class ThongKeDoanhSo extends Page implements HasTable
 
         $wb = new Spreadsheet;
         $s1 = $wb->getActiveSheet()->setTitle('Tổng hợp');
-        $s1->fromArray(array_values(self::COT_TONG_HOP), null, 'A1');
-        $s1->fromArray($this->tongHop()->map(fn ($d) => array_map(fn ($k) => $d[$k], array_keys(self::COT_TONG_HOP)))->all(), null, 'A2');
+        $s1->setCellValue('A1', 'THỐNG KÊ DOANH SỐ — '.$this->moTaBoLoc());
+        $s1->fromArray(array_values(self::COT_TONG_HOP), null, 'A3');
+        $s1->fromArray($this->tongHop()->map(fn ($d) => array_map(fn ($k) => $d[$k], array_keys(self::COT_TONG_HOP)))->all(), null, 'A4');
 
         $s2 = $wb->createSheet()->setTitle('Chi tiết đơn');
         $s2->fromArray(['Mã đơn', 'Ngày chốt', 'Phụ trách', 'Người tạo', 'Người xác nhận', 'Khách hàng', 'Điện thoại',
@@ -247,9 +270,12 @@ class ThongKeDoanhSo extends Page implements HasTable
         ])->all(), null, 'A2');
         $s2->getStyle('G:G')->getNumberFormat()->setFormatCode('@');
 
+        $s1->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $s1->getStyle('3:3')->getFont()->setBold(true);
+        $s1->freezePane('A4');
+        $s2->getStyle('1:1')->getFont()->setBold(true);
+        $s2->freezePane('A2');
         foreach ([$s1, $s2] as $s) {
-            $s->getStyle('1:1')->getFont()->setBold(true);
-            $s->freezePane('A2');
             foreach (range('A', $s->getHighestColumn()) as $c) {
                 $s->getColumnDimension($c)->setAutoSize(true);
             }
@@ -261,7 +287,9 @@ class ThongKeDoanhSo extends Page implements HasTable
             $s2->getStyle($c.':'.$c)->getNumberFormat()->setFormatCode('#,##0');
         }
 
-        $ten = 'Thong-ke-doanh-so-'.str_replace('/', '-', $this->thangDangXem() ?? 'tat-ca').'.xlsx';
+        $phuTrach = ($id = $this->tableFilters['assigned_to']['value'] ?? null) ? User::whereKey($id)->value('name') : null;
+        $ten = 'Thong-ke-doanh-so-'.str_replace('/', '-', $this->thangDangXem() ?? 'tat-ca')
+            .($phuTrach ? '-'.Str::slug($phuTrach) : '').'.xlsx';
 
         return response()->streamDownload(fn () => (new Xlsx($wb))->save('php://output'), $ten, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
