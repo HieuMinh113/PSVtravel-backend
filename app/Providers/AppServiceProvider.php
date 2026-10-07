@@ -83,6 +83,14 @@ class AppServiceProvider extends ServiceProvider
             return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());
         });
 
+        // Khách nộp hồ sơ visa trên web: 5 hồ sơ/giờ/IP; gửi file: 30 file/phút/IP
+        \Illuminate\Support\Facades\RateLimiter::for('visa-nop', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perHour(5)->by($request->ip());
+        });
+        \Illuminate\Support\Facades\RateLimiter::for('visa-tep', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(30)->by($request->ip());
+        });
+
         // Ghi nhận lượt đọc cẩm nang: 30 lần/phút/IP — đủ cho người đọc thật,
         // chặn kịch bản bơm lượt xem
         \Illuminate\Support\Facades\RateLimiter::for('view', function (\Illuminate\Http\Request $request) {

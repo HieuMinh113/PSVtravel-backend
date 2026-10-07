@@ -149,7 +149,20 @@ File scan giấy tờ khách nằm ở `storage/app/private/ho-so-visa` (không 
 chỉ mở được bằng link có chữ ký do trang quản trị tạo, qua đường dẫn
 `/tep-rieng/...`. Xoá hẳn hồ sơ thì file cũng bị xoá.
 
-Ai được xem: vai trò `visa` (cấp ở Người dùng), cùng super_admin và admin.
+**Khách nộp trên website**: trang *Làm visa → [nước] → Nộp hồ sơ online*
+(`/lam-visa/{slug}/nop-ho-so`). Không bắt buộc đăng nhập; đang đăng nhập thì
+hồ sơ gắn vào tài khoản và khách xem trạng thái + giấy tờ còn thiếu ở *Tài
+khoản → Hồ sơ visa*. Gửi kèm tối đa 10 file ảnh/PDF, mỗi file 10MB (gửi từng
+file một vì nginx nhận tối đa 20MB mỗi lần). Có hồ sơ mới: chuông báo cho nhân
+viên visa + admin, email xác nhận cho khách (nếu có email).
+
+Ai thấy gì:
+
+- Vai trò `visa` (cấp ở Người dùng): chỉ thấy hồ sơ mình phụ trách + hồ sơ
+  khách nộp **chưa ai nhận** (tab *Chưa ai nhận*, bấm **Nhận hồ sơ** — ai bấm
+  trước được trước). Không chuyển hồ sơ cho người khác được.
+- super_admin, admin (quyền `ViewAll:VisaCase`): thấy mọi hồ sơ, giao / chuyển
+  hồ sơ ở ô *Nhân viên phụ trách*.
 
 ---
 

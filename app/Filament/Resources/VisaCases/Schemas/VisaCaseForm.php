@@ -102,11 +102,17 @@ class VisaCaseForm
                             ->options(fn () => VisaProvider::dangHoatDong()->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->placeholder('PSV tự nộp'),
+                        // Chỉ admin (quyền xem mọi hồ sơ) được giao / chuyển hồ sơ.
+                        // Nhân viên thấy ô khoá; trang tạo / sửa cũng bỏ giá trị
+                        // gửi lên nếu không có quyền — không tin vào ô bị khoá.
                         Select::make('assigned_to')
                             ->label('Nhân viên phụ trách')
                             ->options(fn () => self::nhanVienVisa())
                             ->searchable()
-                            ->default(fn () => auth()->id()),
+                            ->placeholder('Chưa ai nhận')
+                            ->default(fn () => auth()->id())
+                            ->disabled(fn () => ! auth()->user()?->can('giao', VisaCase::class))
+                            ->helperText(fn () => auth()->user()?->can('giao', VisaCase::class) ? null : 'Chỉ quản trị viên được chuyển hồ sơ cho người khác.'),
                     ])
                     ->columns(3)
                     ->columnSpanFull(),
@@ -218,8 +224,15 @@ class VisaCaseForm
                     ->columns(3)
                     ->columnSpanFull(),
 
+                Textarea::make('customer_note')
+                    ->label('Lời nhắn của khách (gửi kèm lúc nộp trên web)')
+                    ->rows(3)
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->visible(fn (?VisaCase $record) => filled($record?->customer_note))
+                    ->columnSpanFull(),
                 Textarea::make('note')
-                    ->label('Ghi chú')
+                    ->label('Ghi chú nội bộ')
                     ->rows(3)
                     ->columnSpanFull(),
             ]);

@@ -7,16 +7,21 @@ use App\Filament\Resources\VisaCases\Pages\EditVisaCase;
 use App\Filament\Resources\VisaCases\Pages\ListVisaCases;
 use App\Filament\Resources\VisaCases\VisaCaseResource;
 use App\Filament\Resources\VisaChecklists\Pages\ListVisaChecklists;
+use App\Mail\HoSoVisaMail;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Modules\Visa\Models\VisaCase;
 use Modules\Visa\Models\VisaChecklist;
+use Modules\Visa\Models\VisaCountry;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -239,5 +244,221 @@ class HoSoVisaTest extends TestCase
         // super_admin / admin cũng có quyền visa (máy mới cài: RoleSeeder cấp)
         $this->seed(RoleSeeder::class);
         $this->assertTrue(Role::findByName('admin', 'web')->hasPermissionTo('ViewAny:VisaCase'));
+    }
+
+    // ------------------------------------------------------------------
+    // Chỉ thấy hồ sơ của mình + nhận hồ sơ + khách nộp trên web
+    // ------------------------------------------------------------------
+
+    private function quanTri(): User
+    {
+        $this->seed(RoleSeeder::class);
+        $u = User::factory()->create();
+        $u->assignRole('admin');
+
+        return $u;
+    }
+
+    private function nuocTrungQuoc(): VisaCountry
+    {
+        return VisaCountry::create(['name' => 'Trung Quốc', 'slug' => 'trung-quoc', 'status' => 'published', 'price' => 1500000]);
+    }
+
+    private function nopWeb(array $them = []): TestResponse
+    {
+        return $this->postJson('/api/v1/visa-applications', [
+            'visa_country' => 'trung-quoc',
+            'full_name' => 'Pham Thi Mai',
+            'phone' => '0909 111 222',
+            'email' => 'mai@example.com',
+            'purpose' => 'du_lich',
+            'profile' => 'nhan_vien',
+            'travel_date' => '2026-12-01',
+            'note' => 'Đi cùng chồng',
+            'dong_y' => true,
+            ...$them,
+        ]);
+    }
+
+    public function test_nhan_vien_chi_thay_ho_so_cua_minh_va_ho_so_chua_ai_nhan(): void
+    {
+        $a = $this->nhanVienVisa();
+        $b = $this->nhanVienVisa();
+        $cuaA = VisaCase::create(['full_name' => 'KHACH A', 'country' => 'Ai Cập', 'assigned_to' => $a->id]);
+        $cuaB = VisaCase::create(['full_name' => 'KHACH B', 'country' => 'Ai Cập', 'assigned_to' => $b->id]);
+        $trong = tap((new VisaCase)->forceFill(['full_name' => 'KHACH WEB', 'country' => 'Ai Cập', 'source' => 'website']))->save();
+
+        $this->actingAs($a);
+        Livewire::test(ListVisaCases::class)
+            ->set('activeTab', 'tat_ca')
+            ->assertCanSeeTableRecords([$cuaA, $trong])
+            ->assertCanNotSeeTableRecords([$cuaB])
+            ->set('activeTab', 'chua_nhan')
+            ->assertCanSeeTableRecords([$trong])
+            ->assertCanNotSeeTableRecords([$cuaA]);
+
+        $this->get(VisaCaseResource::getUrl('edit', ['record' => $cuaB]))->assertNotFound();
+        // Hồ sơ chưa ai nhận: thấy trong danh sách nhưng chưa sửa được
+        $this->get(VisaCaseResource::getUrl('edit', ['record' => $trong]))->assertForbidden();
+        $this->assertSame('1', VisaCaseResource::getNavigationBadge());
+
+        // Admin thấy hết
+        $this->actingAs($this->quanTri());
+        Livewire::test(ListVisaCases::class)
+            ->set('activeTab', 'tat_ca')
+            ->assertCanSeeTableRecords([$cuaA, $cuaB, $trong]);
+    }
+
+    public function test_nhan_ho_so_ai_bam_truoc_duoc_truoc(): void
+    {
+        $a = $this->nhanVienVisa();
+        $b = $this->nhanVienVisa();
+        $trong = tap((new VisaCase)->forceFill(['full_name' => 'KHACH WEB', 'country' => 'Ai Cập', 'source' => 'website']))->save();
+
+        $this->actingAs($a);
+        Livewire::test(ListVisaCases::class)
+            ->set('activeTab', 'chua_nhan')
+            ->callTableAction('nhanHoSo', $trong)
+            ->assertRedirect(VisaCaseResource::getUrl('edit', ['record' => $trong]));
+        $this->assertSame($a->id, $trong->fresh()->assigned_to);
+
+        // B bấm sau: hồ sơ đã có chủ → không nhận được, cũng không còn thấy
+        $this->assertFalse($trong->fresh()->nhanBoi($b));
+        $this->assertFalse($b->can('nhan', $trong->fresh()));
+        $this->actingAs($b);
+        Livewire::test(ListVisaCases::class)->set('activeTab', 'tat_ca')->assertCanNotSeeTableRecords([$trong]);
+    }
+
+    public function test_nhan_vien_khong_chuyen_duoc_ho_so_admin_thi_duoc(): void
+    {
+        $a = $this->nhanVienVisa();
+        $b = $this->nhanVienVisa();
+        $hs = VisaCase::create(['full_name' => 'KHACH A', 'country' => 'Ai Cập', 'assigned_to' => $a->id]);
+
+        $this->actingAs($a);
+        Livewire::test(EditVisaCase::class, ['record' => $hs->getRouteKey()])
+            ->assertFormFieldIsDisabled('assigned_to')
+            ->fillForm(['assigned_to' => $b->id, 'note' => 'đã gọi khách'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame($a->id, $hs->fresh()->assigned_to);
+        $this->assertSame('đã gọi khách', $hs->fresh()->note);
+
+        // Nhân viên tạo hồ sơ → luôn là của chính mình
+        Livewire::test(CreateVisaCase::class)
+            ->fillForm(['full_name' => 'KHACH MOI', 'country' => 'Ai Cập', 'assigned_to' => $b->id])
+            ->call('create')
+            ->assertHasNoFormErrors();
+        $this->assertSame($a->id, VisaCase::where('full_name', 'KHACH MOI')->value('assigned_to'));
+
+        $this->actingAs($this->quanTri());
+        Livewire::test(EditVisaCase::class, ['record' => $hs->getRouteKey()])
+            ->assertFormFieldIsEnabled('assigned_to')
+            ->fillForm(['assigned_to' => $b->id])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame($b->id, $hs->fresh()->assigned_to);
+    }
+
+    public function test_khach_nop_ho_so_tren_web_bao_chuong_va_gui_mail(): void
+    {
+        Mail::fake();
+        $this->nuocTrungQuoc();
+        $a = $this->nhanVienVisa();
+        $sale = User::factory()->create();
+
+        $tl = $this->nopWeb()->assertCreated()
+            ->assertJsonPath('data.max_files', 10)
+            ->assertJsonPath('data.documents.0', 'Hộ chiếu bản gốc');
+
+        $hs = VisaCase::firstOrFail();
+        $this->assertSame($tl->json('data.code'), $hs->code);
+        $this->assertSame('website', $hs->source);
+        $this->assertNull($hs->assigned_to);
+        $this->assertNull($hs->user_id);
+        $this->assertSame('PHAM THI MAI', $hs->full_name);
+        $this->assertSame('Trung Quốc', $hs->country);
+        $this->assertSame('Trung Quốc — Du lịch — Nhân viên', $hs->mauChecklist->name);
+        $this->assertSame('Đi cùng chồng', $hs->customer_note);
+        $this->assertNull($hs->note);
+
+        $this->assertSame(1, $a->notifications()->count());
+        $this->assertSame(0, $sale->notifications()->count());
+        Mail::assertQueued(HoSoVisaMail::class, fn ($m) => $m->hasTo('mai@example.com') && $m->hoSo->is($hs));
+        $this->assertStringContainsString($hs->code, (new HoSoVisaMail($hs))->render());
+
+        // Bấm gửi lần hai → cùng hồ sơ, không tạo trùng
+        $this->nopWeb()->assertOk()->assertJsonPath('data.code', $hs->code);
+        $this->assertSame(1, VisaCase::count());
+    }
+
+    public function test_nop_web_kiem_tra_du_lieu_va_chan_bot(): void
+    {
+        $this->nuocTrungQuoc();
+        VisaCountry::create(['name' => 'Ẩn', 'slug' => 'an', 'status' => 'hidden']);
+
+        $this->nopWeb(['phone' => 'abc', 'dong_y' => false, 'visa_country' => 'an'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['phone', 'dong_y', 'visa_country']);
+        $this->nopWeb(['website' => 'http://spam'])->assertUnprocessable();
+        $this->assertSame(0, VisaCase::count());
+    }
+
+    public function test_khach_gui_tung_file_toi_da_10_bang_ma_tai(): void
+    {
+        Storage::fake('rieng');
+        $this->nuocTrungQuoc();
+        $tl = $this->nopWeb()->assertCreated();
+        $ma = $tl->json('data.code');
+        $token = $tl->json('data.upload_token');
+        $gui = fn (array $them) => $this->post("/api/v1/visa-applications/{$ma}/files", $them, ['Accept' => 'application/json']);
+
+        $gui(['token' => $token, 'file' => UploadedFile::fake()->create('ho chieu.pdf', 500, 'application/pdf')])->assertCreated();
+        $gui(['token' => 'sai', 'file' => UploadedFile::fake()->image('a.jpg')])->assertForbidden();
+        $gui(['token' => $token, 'file' => UploadedFile::fake()->create('virus.exe', 10, 'application/x-msdownload')])->assertUnprocessable();
+        $gui(['token' => $token, 'file' => UploadedFile::fake()->create('to.pdf', 11 * 1024, 'application/pdf')])->assertUnprocessable();
+
+        $hs = VisaCase::where('code', $ma)->first();
+        $this->assertCount(1, $hs->files);
+        $this->assertSame('ho chieu.pdf', $hs->file_names[$hs->files[0]]);
+        Storage::disk('rieng')->assertExists($hs->files[0]);
+
+        for ($i = 2; $i <= 10; $i++) {
+            $gui(['token' => $token, 'file' => UploadedFile::fake()->image("anh{$i}.png")])->assertCreated();
+        }
+        $gui(['token' => $token, 'file' => UploadedFile::fake()->image('anh11.png')])->assertUnprocessable();
+        $this->assertCount(10, $hs->fresh()->files);
+
+        // Hết 2 giờ → mã tải file hết hạn
+        $this->travel(3)->hours();
+        $gui(['token' => $token, 'file' => UploadedFile::fake()->image('muon.png')])->assertForbidden();
+    }
+
+    public function test_khach_dang_nhap_xem_ho_so_cua_minh_o_tai_khoan(): void
+    {
+        $this->nuocTrungQuoc();
+        $khach = User::factory()->create();
+        $nguoiKhac = User::factory()->create();
+        Sanctum::actingAs($khach);
+
+        $this->nopWeb()->assertCreated();
+        $hs = VisaCase::firstOrFail();
+        $this->assertSame($khach->id, $hs->user_id);
+        $hs->update(['status' => 'dang_gom', 'note' => 'GHI CHU NOI BO', 'cost' => 999000,
+            'checklist' => [['ten' => 'Hộ chiếu bản gốc', 'trang_thai' => 'da_nhan'], ['ten' => 'CCCD photo', 'trang_thai' => 'thieu']]]);
+        tap((new VisaCase)->forceFill(['full_name' => 'NGUOI KHAC', 'country' => 'Ai Cập', 'user_id' => $nguoiKhac->id]))->save();
+
+        $tl = $this->getJson('/api/v1/auth/visa-cases')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.code', $hs->code)
+            ->assertJsonPath('data.0.status_label', 'Đang gom giấy tờ')
+            ->assertJsonPath('data.0.documents_received', 1)
+            ->assertJsonPath('data.0.missing_documents', ['CCCD photo']);
+        $this->assertStringNotContainsString('GHI CHU NOI BO', $tl->getContent());
+        $this->assertStringNotContainsString('999000', $tl->getContent());
+
+        // Chưa đăng nhập thì không xem được
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/auth/visa-cases')->assertUnauthorized();
     }
 }

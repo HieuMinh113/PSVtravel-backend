@@ -3,6 +3,8 @@
 namespace Modules\Visa\Models;
 
 use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -65,6 +67,11 @@ class VisaCase extends Model
         'khong_can' => 'Không cần',
     ];
 
+    public const NGUON = [
+        'quan_tri' => 'Nhân viên tạo',
+        'website' => 'Khách nộp trên web',
+    ];
+
     protected $fillable = [
         'code', 'full_name', 'phone', 'email', 'birth_date', 'passport_no', 'passport_expiry', 'group_name',
         'country', 'purpose', 'profile', 'travel_date', 'visa_provider_id', 'visa_checklist_id',
@@ -73,7 +80,11 @@ class VisaCase extends Model
         'fee', 'cost', 'paid', 'assigned_to', 'created_by', 'note',
     ];
 
+    protected $hidden = ['upload_token_hash'];
+
     protected $casts = [
+        'upload_token_expires_at' => 'datetime',
+        'web_files_count' => 'integer',
         'birth_date' => 'date',
         'passport_expiry' => 'date',
         'travel_date' => 'date',
@@ -92,7 +103,12 @@ class VisaCase extends Model
 
     protected static function booted(): void
     {
+        // Hồ sơ nhân viên tạo thì giao luôn cho người tạo. Hồ sơ khách nộp trên
+        // web để trống — nằm ở mục "Chưa ai nhận" chờ nhân viên bấm nhận.
         static::creating(function (VisaCase $hs) {
+            if ($hs->source === 'website') {
+                return;
+            }
             $hs->created_by ??= auth()->id();
             $hs->assigned_to ??= auth()->id();
         });
@@ -107,6 +123,46 @@ class VisaCase extends Model
         // Xoá hẳn hồ sơ (không phải xoá tạm) thì xoá luôn file scan giấy tờ
         // khách — không giữ hộ chiếu, CCCD của người ta khi không còn cần.
         static::forceDeleted(fn (VisaCase $hs) => Storage::disk('rieng')->delete($hs->files ?? []));
+    }
+
+    /**
+     * Hồ sơ người này được thấy: có quyền xem mọi hồ sơ (admin) thì thấy hết;
+     * nhân viên visa chỉ thấy hồ sơ mình phụ trách + hồ sơ chưa ai nhận.
+     */
+    public function scopeNhinThayBoi(Builder $query, ?Authenticatable $u): Builder
+    {
+        if ($u?->can('ViewAll:VisaCase')) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q->where('assigned_to', $u?->getAuthIdentifier())->orWhereNull('assigned_to'));
+    }
+
+    public function chuaAiNhan(): bool
+    {
+        return $this->assigned_to === null;
+    }
+
+    /**
+     * Nhân viên bấm "Nhận hồ sơ". Chỉ cập nhật khi hồ sơ VẪN chưa ai nhận —
+     * hai người bấm cùng lúc thì chỉ người đầu được, người sau nhận false.
+     */
+    public function nhanBoi(Authenticatable $u): bool
+    {
+        $duoc = static::whereKey($this->getKey())->whereNull('assigned_to')
+            ->update(['assigned_to' => $u->getAuthIdentifier(), 'updated_at' => now()]) === 1;
+
+        if ($duoc) {
+            $this->refresh();
+            activity('visa_case')->performedOn($this)->causedBy($u)->log('Nhận hồ sơ');
+        }
+
+        return $duoc;
+    }
+
+    public function khachHang(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function provider(): BelongsTo

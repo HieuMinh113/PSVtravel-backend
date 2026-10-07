@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VisaCases\Tables;
 
+use App\Filament\Resources\VisaCases\Actions\NhanHoSoAction;
 use App\Filament\Resources\VisaCases\Actions\TinNhanGiayThieuAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -23,7 +24,12 @@ class VisaCasesTable
                     ->label('Khách')
                     ->searchable(['full_name', 'code', 'phone', 'passport_no', 'group_name'])
                     ->weight('bold')
-                    ->description(fn (VisaCase $record) => collect([$record->code, $record->phone, $record->group_name])->filter()->implode(' · ')),
+                    ->description(fn (VisaCase $record) => collect([
+                        $record->code,
+                        $record->phone,
+                        $record->group_name,
+                        $record->source === 'website' ? 'Nộp trên web' : null,
+                    ])->filter()->implode(' · ')),
                 TextColumn::make('country')
                     ->label('Nước')
                     ->sortable()
@@ -70,7 +76,7 @@ class VisaCasesTable
                     ->description(fn (VisaCase $record) => $record->hoChieuSapHetHan() ? 'Hộ chiếu < 6 tháng' : null),
                 TextColumn::make('nguoiPhuTrach.name')
                     ->label('Phụ trách')
-                    ->placeholder('—')
+                    ->placeholder('Chưa ai nhận')
                     ->toggleable(),
                 TextColumn::make('fee')
                     ->label('Thu khách')
@@ -100,6 +106,9 @@ class VisaCasesTable
                     ->label('Nước')
                     ->options(fn () => VisaCase::query()->distinct()->orderBy('country')->pluck('country', 'country')->all())
                     ->searchable(),
+                SelectFilter::make('source')
+                    ->label('Nguồn')
+                    ->options(VisaCase::NGUON),
                 SelectFilter::make('purpose')
                     ->label('Mục đích')
                     ->options(VisaCase::MUC_DICH),
@@ -122,6 +131,7 @@ class VisaCasesTable
                     ->query(fn (Builder $query) => $query->whereColumn('paid', '<', 'fee')),
             ])
             ->recordActions([
+                NhanHoSoAction::make(),
                 TinNhanGiayThieuAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
