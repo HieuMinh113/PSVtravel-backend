@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Visa\Models\VisaCase;
 
 /**
  * Xoá sạch dữ liệu mẫu (do DemoSeeder tạo) để bàn giao website chạy thật.
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Schema;
 class DonDuLieuMau extends Command
 {
     protected $signature = 'psv:don-du-lieu-mau
-                            {--don-hang : Xoá luôn đơn đặt tour, thanh toán và tin nhắn liên hệ}
+                            {--don-hang : Xoá luôn đơn đặt tour, thanh toán, hồ sơ visa và tin nhắn liên hệ}
                             {--force : Không hỏi xác nhận (dùng cho script tự động)}';
 
     protected $description = 'Xoá dữ liệu mẫu (tour, banner, review, cẩm nang...) để bắt đầu nhập dữ liệu thật';
@@ -40,6 +41,7 @@ class DonDuLieuMau extends Command
     // Tách riêng: đây là dữ liệu KINH DOANH do khách thật tạo ra,
     // xoá nhầm là mất lịch sử không lấy lại được
     private const BANG_DON_HANG = [
+        'visa_cases',
         'payments',
         'bookings',
         'contact_messages',
@@ -60,7 +62,7 @@ class DonDuLieuMau extends Command
         $this->info('Giữ nguyên: tài khoản, phân quyền, cài đặt, trang tĩnh.');
 
         if (! $this->option('don-hang')) {
-            $this->line('Đơn đặt tour, thanh toán và tin nhắn liên hệ được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
+            $this->line('Đơn đặt tour, thanh toán, hồ sơ visa và tin nhắn liên hệ được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
         }
 
         $this->newLine();
@@ -99,6 +101,10 @@ class DonDuLieuMau extends Command
                 }
 
                 $so = DB::table($ten)->count();
+                // Hồ sơ visa có file giấy tờ trên ổ đĩa — xoá qua model để file đi theo
+                if ($ten === 'visa_cases') {
+                    VisaCase::withTrashed()->get()->each->forceDelete();
+                }
                 // delete() thay vì truncate() để chạy được trong transaction
                 // và không vướng ràng buộc khoá ngoại trên Postgres
                 DB::table($ten)->delete();

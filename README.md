@@ -70,11 +70,30 @@ docker compose exec app php artisan db:seed --class=Database\\Seeders\\DemoSeede
 
 Đây là **dữ liệu giả**, chỉ dùng trên máy dev và staging. Ảnh lấy từ picsum.photos nên cần có mạng.
 
+Có sẵn để thử các việc nghiệp vụ:
+
+| Tài khoản | Mật khẩu | Dùng để thử |
+|---|---|---|
+| `visa1@psvtravel.com` | `NhanVien@123456` | Nhân viên visa: chỉ thấy hồ sơ của mình + hồ sơ chưa ai nhận |
+| `visa2@psvtravel.com` | `NhanVien@123456` | Nhân viên visa thứ hai (giữ đoàn Hàn Quốc) |
+| `dieuhanh@psvtravel.com` | `NhanVien@123456` | Điều hành: tra chỗ liên minh |
+| `khach@example.com` | `Khach@123456` | Khách đăng nhập website: tab Hồ sơ visa, đơn đặt tour |
+
+- **Hồ sơ visa** (8 hồ sơ, tên giả): 1 hồ sơ khách nộp web chưa ai nhận; 1 hồ sơ
+  Trung Quốc hẹn nộp sau 2 ngày, còn nợ phí, hộ chiếu sắp hết hạn; đoàn Hàn
+  Quốc 3 người (thử xuất ZIP cả đoàn); đã nộp / đậu / trượt. File đính kèm là
+  ảnh ghi chữ "FILE MAU".
+- **Đơn đặt tour**: có tỷ lệ cọc; 1 đơn tới hạn nhắn khách hôm nay (nút
+  "Nhắc đóng tiền", chuông, lọc "Cần nhắc khách"); 1 đơn đã trả đủ; 1 đơn khách
+  đặt từ web chưa xác nhận.
+- Tài khoản mẫu **không** được tạo khi `APP_ENV=production`.
+- Chạy lại lệnh nhiều lần không sinh trùng.
+
 Xoá sạch để bắt đầu nhập dữ liệu thật:
 
 ```bash
 docker compose exec app php artisan psv:don-du-lieu-mau --force
-docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --force   # xoá luôn đơn đặt tour
+docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --force   # xoá luôn đơn đặt tour + hồ sơ visa
 ```
 
 Lệnh này giữ nguyên tài khoản, phân quyền, Cài đặt và trang tĩnh.

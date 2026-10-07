@@ -297,6 +297,26 @@ class DemoSeeder extends Seeder
              'status' => 'active', 'note' => 'Đối tác chính, chiết khấu 10%.'],
         );
 
-        $this->command->info('Đã tạo xong dữ liệu mẫu: 2 tour + đơn/đánh giá/banner/cẩm nang/khoảnh khắc/vé/visa.');
+        foreach ([
+            ['nhat-ban', 'Nhật Bản', 1_900_000, 2],
+            ['trung-quoc', 'Trung Quốc', 1_800_000, 3],
+        ] as [$slug, $ten, $gia, $thuTu]) {
+            VisaCountry::updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $ten, 'flag_image' => $this->anh('visa-'.$slug, 400, 300),
+                    'visa_type' => 'tourist', 'price' => $gia,
+                    'processing_time' => '7-10 ngày làm việc', 'success_rate' => 92,
+                    'required_documents' => ['Hộ chiếu', 'Ảnh thẻ', 'Căn cước', 'Sao kê ngân hàng'],
+                    'description' => "<p>Dịch vụ visa du lịch {$ten} trọn gói.</p>",
+                    'status' => 'published', 'sort_order' => $thuTu,
+                ],
+            );
+        }
+
+        // Tài khoản theo vai trò, đơn tour có cọc + hạn nhắn khách, hồ sơ visa
+        $this->call(DuLieuMauNghiepVuSeeder::class);
+
+        $this->command->info('Đã tạo xong dữ liệu mẫu: 2 tour + đơn/đánh giá/banner/cẩm nang/khoảnh khắc/vé/visa + hồ sơ visa.');
     }
 }
