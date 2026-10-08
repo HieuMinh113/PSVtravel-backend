@@ -1,11 +1,27 @@
 /**
- * Trang Chấm công: mở camera trước, lấy vị trí GPS, nhận diện khuôn mặt bằng
- * face-api (chạy ngay trong trình duyệt, ảnh không gửi ra dịch vụ ngoài), gửi
- * ảnh + 128 số đặc trưng khuôn mặt + toạ độ lên máy chủ. Máy chủ so khuôn mặt
- * với ảnh đăng ký, tính trễ / sớm / ngoài công ty và hỏi lý do nếu cần.
+ * Trang Chấm công — quét khuôn mặt kiểu Face ID: bấm Chấm công vào / ra, đưa
+ * mặt vào khung, máy tự nhận ra và chấm, không có nút chụp.
+ *
+ *  1. Mở camera + lấy vị trí GPS cùng lúc.
+ *  2. Liên tục dò khuôn mặt bằng face-api (chạy ngay trong trình duyệt, ảnh
+ *     không gửi ra dịch vụ ngoài), nhắc "lại gần", "vào giữa khung", "giữ yên".
+ *  3. Mặt đúng chỗ và đứng yên → tính 128 số đặc trưng, gửi lên máy chủ kèm
+ *     chi_khi_khop. Máy chủ so với khuôn mặt đã đăng ký (trình duyệt không biết
+ *     khuôn mặt gốc): khớp thì chấm luôn, chưa khớp thì quét tiếp.
+ *  4. Quét lâu không khớp → cho quét lại hoặc gửi ảnh để quản lý duyệt.
+ *
+ * Đăng ký lần đầu cũng quét: lấy 5 mẫu liền nhau rồi lấy trung bình, so khớp
+ * về sau ổn định hơn một tấm chụp.
  *
  * Nạp bằng x-load của Filament: <div x-load x-load-src="…/cham-cong.js" x-data="chamCong({...})">
  */
+const SO_MAU_DANG_KY = 5
+const THOI_GIAN_QUET = 25000 // ms — hết giờ mà chưa khớp thì dừng, đỡ tốn pin
+const NHIP = 180 // ms giữa hai lần dò
+
+const khoangCach = (a, b) => Math.sqrt(a.reduce((t, v, i) => t + (v - b[i]) ** 2, 0))
+const trungBinh = (ds) => ds[0].map((_, i) => ds.reduce((t, d) => t + d[i], 0) / ds.length)
+
 export default function chamCong({ thuVien, moHinh }) {
     let faceapi = null
     let taiMoHinh = null
@@ -21,11 +37,12 @@ export default function chamCong({ thuVien, moHinh }) {
             document.head.appendChild(s)
         }).then(async (api) => {
             faceapi = api
+            // WebGL (card đồ hoạ) nhanh nhất; máy không có thì chạy bằng CPU — chậm hơn nhưng vẫn được
+            let coWebgl = false
             try {
-                await faceapi.tf.setBackend('webgl')
-            } catch (e) {
-                await faceapi.tf.setBackend('cpu')
-            }
+                coWebgl = await faceapi.tf.setBackend('webgl')
+            } catch (e) {}
+            if (!coWebgl) await faceapi.tf.setBackend('cpu')
             await faceapi.tf.ready()
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(moHinh),
@@ -33,33 +50,59 @@ export default function chamCong({ thuVien, moHinh }) {
                 faceapi.nets.faceRecognitionNet.loadFromUri(moHinh),
             ])
         })
-        taiMoHinh.catch(() => { taiMoHinh = null })
+        taiMoHinh.catch(() => {
+            taiMoHinh = null
+        })
 
         return taiMoHinh
     }
 
     const tuyChon = () => new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 })
 
+    const chupKhung = (video) => {
+        if (!video?.videoWidth) return null
+        const rong = Math.min(640, video.videoWidth)
+        const canvas = document.createElement('canvas')
+        canvas.width = rong
+        canvas.height = Math.round(video.videoHeight * (rong / video.videoWidth))
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+
+        return canvas
+    }
+
     return {
-        buoc: 'cho', // cho | camera | ly_do | xong
+        buoc: 'cho', // cho | quet | khong_nhan | ly_do | xong
+        pha: '', // trong lúc quét: mo | tim | chinh | giu | xac_minh | truot | khop
         loai: null, // vao | ra | dang_ky
         dongY: false,
-        trangThai: '',
+        goiY: '',
+        tienDo: 0,
         loi: '',
         thongBao: '',
         canhBao: [],
         viSao: [],
         lyDo: '',
         dangGui: false,
-        thayMat: false,
-        choChupKhongMat: false,
+        daKhop: false,
+        khongMoHinh: false,
+        tieuDeKhongNhan: '',
         stream: null,
         viTri: null,
         hoiViTri: null,
         anh: null,
         dacTrung: null,
+        _chiKhiKhop: true,
         _vong: null,
-        _henGio: null,
+        _batDauLuc: 0,
+        _onDinh: 0,
+        _truoc: null,
+        _truot: 0,
+        _choDen: 0,
+        _mau: [],
+
+        get nhanLoai() {
+            return { vao: 'Chấm công vào', ra: 'Chấm công ra', dang_ky: 'Đăng ký khuôn mặt' }[this.loai] || ''
+        },
 
         async batDau(loai) {
             this.datLai()
@@ -72,8 +115,10 @@ export default function chamCong({ thuVien, moHinh }) {
                 this.loi = 'Trình duyệt chỉ cho mở camera trên trang https (hoặc localhost). Mở trang quản trị bằng địa chỉ https.'
                 return
             }
-            this.buoc = 'camera'
-            this.trangThai = 'Đang mở camera…'
+            this.buoc = 'quet'
+            this.pha = 'mo'
+            this.goiY = 'Đang mở camera…'
+            this.$nextTick(() => this.$refs.video?.closest('.psv-quet')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
             if (loai !== 'dang_ky') this.layViTri()
             try {
                 this.stream = await navigator.mediaDevices.getUserMedia({
@@ -88,33 +133,165 @@ export default function chamCong({ thuVien, moHinh }) {
             const video = this.$refs.video
             video.srcObject = this.stream
             await video.play().catch(() => {})
-            this.trangThai = 'Đang tải bộ nhận diện khuôn mặt (lần đầu hơi lâu)…'
+            this.goiY = 'Đang tải bộ nhận diện khuôn mặt (lần đầu hơi lâu)…'
             try {
                 await napThuVien()
             } catch (e) {
-                this.trangThai = ''
-                this.loi = e.message + ' Vẫn chụp được, quản lý sẽ xem ảnh.'
-                this.choChupKhongMat = true
+                this.khongMoHinh = true
+                this.dungQuet(e.message)
                 return
             }
-            this.trangThai = 'Nhìn thẳng vào camera…'
-            this.doMat()
-            // Đeo khẩu trang / thiếu sáng mãi không thấy mặt → cho chụp, quản lý xem lại
-            if (loai !== 'dang_ky') this._henGio = setTimeout(() => { this.choChupKhongMat = true }, 8000)
+            if (this.buoc !== 'quet') return // đã bấm Huỷ trong lúc tải
+            this.pha = 'tim'
+            this.goiY = 'Đưa khuôn mặt vào trong khung'
+            this._batDauLuc = Date.now()
+            this.quet()
         },
 
-        doMat() {
+        /** Vòng dò liên tục: chỉ dò vị trí khuôn mặt (nhẹ); đủ điều kiện mới xác minh. */
+        quet() {
             const video = this.$refs.video
             const lap = async () => {
-                if (this.buoc !== 'camera' || !this.stream) return
-                try {
-                    const kq = await faceapi.detectSingleFace(video, tuyChon())
-                    this.thayMat = !!kq
-                    this.trangThai = kq ? 'Đã thấy khuôn mặt — bấm Chụp' : 'Chưa thấy khuôn mặt — nhìn thẳng, đủ sáng'
-                } catch (e) {}
-                this._vong = setTimeout(lap, 350)
+                if (this.buoc !== 'quet' || !this.stream) return
+                if (!['xac_minh', 'khop'].includes(this.pha)) {
+                    if (Date.now() - this._batDauLuc > THOI_GIAN_QUET * (this.loai === 'dang_ky' ? 2 : 1)) {
+                        this.dungQuet()
+                        return
+                    }
+                    let kq = null
+                    try {
+                        kq = await faceapi.detectSingleFace(video, tuyChon())
+                    } catch (e) {}
+                    if (this.buoc !== 'quet') return
+                    const tot = this.danhGia(kq)
+                    this._onDinh = tot ? this._onDinh + 1 : 0
+                    if (this._onDinh >= 2 && Date.now() >= this._choDen) await this.xacMinh()
+                }
+                this._vong = setTimeout(lap, NHIP)
             }
             lap()
+        },
+
+        /** Mặt đã đúng chỗ, đủ to, đứng yên chưa? Đồng thời đặt lời nhắc. */
+        danhGia(kq) {
+            if (this.pha === 'truot' && Date.now() < this._choDen) return false
+            if (!kq) {
+                this.pha = 'tim'
+                this.goiY = this._truot ? 'Chưa khớp — nhìn thẳng vào camera, giữ yên' : 'Đưa khuôn mặt vào trong khung'
+                this._truoc = null
+                return false
+            }
+            // Video hiển thị kiểu "cover" (bị cắt hai bên) → quy về phần đang nhìn thấy
+            const v = this.$refs.video
+            const r = v.getBoundingClientRect()
+            const s = r.width ? Math.max(r.width / v.videoWidth, r.height / v.videoHeight) : 1
+            const thayW = r.width ? r.width / s : v.videoWidth
+            const thayH = r.height ? r.height / s : v.videoHeight
+            const b = kq.box
+            const x = (b.x + b.width / 2 - (v.videoWidth - thayW) / 2) / thayW
+            const y = (b.y + b.height / 2 - (v.videoHeight - thayH) / 2) / thayH
+            const rong = b.width / thayW
+            const truoc = this._truoc
+            this._truoc = { x, y }
+
+            let nhac = null
+            if (rong < 0.28) nhac = 'Lại gần camera hơn'
+            else if (rong > 0.85) nhac = 'Lùi ra xa một chút'
+            else if (Math.abs(x - 0.5) > 0.16 || Math.abs(y - 0.48) > 0.2) nhac = 'Đưa mặt vào giữa khung'
+            else if (truoc && Math.hypot(x - truoc.x, y - truoc.y) > 0.035) nhac = 'Giữ yên…'
+            if (nhac) {
+                this.pha = 'chinh'
+                this.goiY = nhac
+                return false
+            }
+            this.pha = 'giu'
+            this.goiY = this.loai === 'dang_ky' ? 'Giữ yên, đang lấy mẫu…' : 'Giữ yên…'
+            return true
+        },
+
+        /** Tính đặc trưng khuôn mặt từ khung hình hiện tại rồi gửi máy chủ so. */
+        async xacMinh() {
+            const canvas = chupKhung(this.$refs.video)
+            if (!canvas) return
+            this.pha = 'xac_minh'
+            if (this.loai !== 'dang_ky') this.goiY = 'Đang xác minh…'
+            let ds = null
+            try {
+                const kq = await faceapi.detectSingleFace(canvas, tuyChon()).withFaceLandmarks().withFaceDescriptor()
+                ds = kq ? Array.from(kq.descriptor) : null
+            } catch (e) {}
+            if (this.buoc !== 'quet') return
+            if (!ds) {
+                this.pha = 'tim'
+                this._onDinh = 0
+                return
+            }
+            const anh = canvas.toDataURL('image/jpeg', 0.85)
+
+            if (this.loai === 'dang_ky') {
+                this._mau.push({ ds, anh })
+                this.tienDo = this._mau.length / SO_MAU_DANG_KY
+                this.goiY = `Đang lấy mẫu ${this._mau.length}/${SO_MAU_DANG_KY} — giữ yên`
+                this.pha = 'giu'
+                this._onDinh = 0
+                if (this._mau.length < SO_MAU_DANG_KY) return
+                const tb = trungBinh(this._mau.map((m) => m.ds))
+                if (this._mau.some((m) => khoangCach(m.ds, tb) > 0.45)) {
+                    // Các mẫu lệch nhau (có người khác lọt vào khung, quay ngang…) → lấy lại
+                    this._mau = []
+                    this.tienDo = 0
+                    this.pha = 'truot'
+                    this.goiY = 'Mẫu chưa đồng đều — nhìn thẳng, giữ yên, lấy lại từ đầu'
+                    this._choDen = Date.now() + 900
+                    return
+                }
+                const tot = this._mau.reduce((a, m) => (khoangCach(m.ds, tb) < khoangCach(a.ds, tb) ? m : a))
+                this.dacTrung = tb
+                this.anh = tot.anh
+                await this.thanhCong()
+                await this.gui()
+                return
+            }
+
+            this.anh = anh
+            this.dacTrung = ds
+            this._chiKhiKhop = true
+            if (!this.viTri) this.goiY = 'Đang lấy vị trí…'
+            const kq = await this.gui()
+            if (this.buoc !== 'quet') return
+            if (kq?.khong_khop) {
+                this._truot++
+                this.pha = 'truot'
+                this._onDinh = 0
+                this.goiY = 'Chưa khớp với khuôn mặt đã đăng ký — nhìn thẳng, giữ yên…'
+                this._choDen = Date.now() + 700
+            }
+        },
+
+        /** Hiệu ứng "đã nhận ra": vòng xanh + dấu tích + tiếng + rung nhẹ. */
+        async thanhCong() {
+            this.pha = 'khop'
+            this.goiY = this.loai === 'dang_ky' ? 'Đã lấy đủ mẫu' : 'Đã nhận ra bạn'
+            this.tienDo = 1
+            try {
+                window.psvTing?.()
+                navigator.vibrate?.(80)
+            } catch (e) {}
+            await new Promise((x) => setTimeout(x, 650))
+        },
+
+        /** Hết giờ / không tải được bộ nhận diện: dừng camera, giữ lại một ảnh để gửi quản lý nếu cần. */
+        dungQuet(loi = '') {
+            this.anh ??= chupKhung(this.$refs.video)?.toDataURL('image/jpeg', 0.85) ?? null
+            this.tatCamera()
+            this.buoc = 'khong_nhan'
+            this.tieuDeKhongNhan =
+                loi ||
+                (this._truot
+                    ? 'Khuôn mặt chưa khớp với ảnh đã đăng ký.'
+                    : this.loai === 'dang_ky'
+                      ? 'Chưa lấy được mẫu khuôn mặt.'
+                      : 'Chưa thấy rõ khuôn mặt.')
         },
 
         layViTri() {
@@ -138,41 +315,15 @@ export default function chamCong({ thuVien, moHinh }) {
             })
         },
 
-        async chup() {
-            const video = this.$refs.video
-            if (!video.videoWidth) return
-            const rong = Math.min(640, video.videoWidth)
-            const canvas = document.createElement('canvas')
-            canvas.width = rong
-            canvas.height = Math.round(video.videoHeight * (rong / video.videoWidth))
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
-            this.anh = canvas.toDataURL('image/jpeg', 0.85)
-            this.trangThai = 'Đang nhận diện…'
-            this.dacTrung = null
-            if (faceapi) {
-                try {
-                    const kq = await faceapi.detectSingleFace(canvas, tuyChon()).withFaceLandmarks().withFaceDescriptor()
-                    this.dacTrung = kq ? Array.from(kq.descriptor) : null
-                } catch (e) {}
-            }
-            if (this.loai === 'dang_ky' && !this.dacTrung) {
-                this.trangThai = 'Chưa nhận ra khuôn mặt trong ảnh — nhìn thẳng, bỏ khẩu trang, đủ sáng rồi chụp lại.'
-                return
-            }
-            this.tatCamera()
-            await this.gui()
-        },
-
+        /** Gửi máy chủ. Trả về kết quả thô khi khuôn mặt chưa khớp (để quét tiếp). */
         async gui() {
-            this.dangGui = true
+            this.dangGui = this.buoc !== 'quet'
             this.loi = ''
             try {
                 if (this.loai === 'dang_ky') {
-                    const kq = await this.$wire.dangKyKhuonMat(this.dacTrung, this.anh, this.dongY)
-                    this.ketQua(kq)
-                    return
+                    this.ketQua(await this.$wire.dangKyKhuonMat(this.dacTrung, this.anh, this.dongY))
+                    return null
                 }
-                this.trangThai = 'Đang lấy vị trí…'
                 await this.hoiViTri
                 const kq = await this.$wire.chamCong(this.loai, {
                     lat: this.viTri?.lat ?? null,
@@ -181,30 +332,47 @@ export default function chamCong({ thuVien, moHinh }) {
                     anh: this.anh,
                     descriptor: this.dacTrung,
                     ly_do: this.lyDo || null,
+                    chi_khi_khop: this._chiKhiKhop,
                 })
+                if (kq?.khong_khop) return kq
+                if (kq?.ok || kq?.can_ly_do) this.daKhop = this._chiKhiKhop
+                if ((kq?.ok || kq?.can_ly_do) && this.buoc === 'quet') await this.thanhCong()
                 this.ketQua(kq)
+                return kq
             } catch (e) {
+                this.tatCamera()
                 this.buoc = 'cho'
                 this.loi = 'Gửi không được, kiểm tra mạng rồi thử lại.'
+                return null
             } finally {
                 this.dangGui = false
             }
         },
 
         ketQua(kq) {
+            this.tatCamera()
             if (kq?.can_ly_do) {
                 this.buoc = 'ly_do'
                 this.viSao = kq.vi_sao || []
                 return
             }
             if (!kq?.ok) {
-                this.buoc = 'cho'
-                this.loi = kq?.loi || 'Có lỗi, thử lại.'
+                // Quét không khớp quá nhiều lần → vẫn cho gửi ảnh cho quản lý
+                this.buoc = kq?.qua_nhieu ? 'khong_nhan' : 'cho'
+                if (kq?.qua_nhieu) this.tieuDeKhongNhan = kq.loi
+                else this.loi = kq?.loi || 'Có lỗi, thử lại.'
                 return
             }
             this.buoc = 'xong'
             this.thongBao = kq.thong_bao
             this.canhBao = kq.canh_bao || []
+        },
+
+        /** Quét mãi không khớp: chấm bằng ảnh vừa chụp, quản lý xem lại (đánh dấu nghi vấn). */
+        async guiChoQuanLy() {
+            if (!this.anh) return
+            this._chiKhiKhop = false
+            await this.gui()
         },
 
         async guiLyDo() {
@@ -217,24 +385,31 @@ export default function chamCong({ thuVien, moHinh }) {
 
         tatCamera() {
             clearTimeout(this._vong)
-            clearTimeout(this._henGio)
             this.stream?.getTracks().forEach((t) => t.stop())
             this.stream = null
-            this.thayMat = false
         },
 
         datLai() {
             this.tatCamera()
             this.buoc = 'cho'
+            this.pha = ''
             this.loi = ''
+            this.goiY = ''
             this.thongBao = ''
             this.canhBao = []
             this.viSao = []
             this.lyDo = ''
             this.anh = null
             this.dacTrung = null
-            this.choChupKhongMat = false
-            this.trangThai = ''
+            this.daKhop = false
+            this.khongMoHinh = false
+            this.tienDo = 0
+            this._chiKhiKhop = true
+            this._onDinh = 0
+            this._truoc = null
+            this._truot = 0
+            this._choDen = 0
+            this._mau = []
         },
 
         destroy() {

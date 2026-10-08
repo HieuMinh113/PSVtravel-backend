@@ -232,6 +232,54 @@ class ChamCongTest extends TestCase
         $this->assertFalse($this->cham($u, 'ra', ['anh' => 'data:image/jpeg;base64,'.base64_encode('khong phai anh')])['ok']);
     }
 
+    public function test_quet_tu_dong_khop_moi_cham_khong_khop_thi_quet_tiep(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+
+        // Đang quét, mặt người khác → không lưu gì, không lộ khoảng cách
+        $kq = $this->cham($u, 'vao', ['descriptor' => $this->matKhac(), 'chi_khi_khop' => true, 'anh' => null]);
+        $this->assertSame(['ok' => false, 'khong_khop' => true], $kq);
+        $kq = $this->cham($u, 'vao', ['descriptor' => null, 'chi_khi_khop' => true]);
+        $this->assertTrue($kq['khong_khop']);
+        $this->assertSame(0, Attendance::count());
+
+        // Đúng mặt → chấm luôn
+        $kq = $this->cham($u, 'vao', ['chi_khi_khop' => true]);
+        $this->assertTrue($kq['ok']);
+        $this->assertSame([], $kq['canh_bao']);
+        $this->assertTrue(Attendance::sole()->in_face_ok);
+        $this->assertFalse(Attendance::sole()->nghiVan());
+
+        // Khớp nhưng cần lý do (về sớm) → hỏi lý do trước, gửi lại vẫn kiểm tra mặt
+        $this->travelTo(Carbon::parse('2026-10-12 16:00'));
+        $this->assertTrue($this->cham($u, 'ra', ['chi_khi_khop' => true])['can_ly_do']);
+        $this->assertTrue($this->cham($u, 'ra', ['chi_khi_khop' => true, 'ly_do' => 'Đi khám'])['ok']);
+        $this->assertSame('cho_duyet', Attendance::sole()->review_status);
+    }
+
+    public function test_quet_khong_khop_qua_nhieu_lan_thi_tam_khoa_nhung_van_gui_quan_ly_duoc(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->actingAs($u);
+        $trang = Livewire::test(ChamCong::class)->instance();
+        $sai = ['lat' => self::LAT, 'lng' => self::LNG, 'accuracy' => 10, 'anh' => $this->anh(), 'descriptor' => $this->matKhac(), 'chi_khi_khop' => true];
+
+        for ($i = 0; $i < ChamCong::SO_LAN_KHONG_KHOP; $i++) {
+            $this->assertTrue($trang->chamCong('vao', $sai)['khong_khop']);
+        }
+        $kq = $trang->chamCong('vao', $sai);
+        $this->assertTrue($kq['qua_nhieu']);
+        // Đúng mặt cũng phải đợi — chặn dò thử
+        $this->assertTrue($trang->chamCong('vao', [...$sai, 'descriptor' => $this->mat])['qua_nhieu'] ?? false);
+
+        // Nút "Gửi ảnh cho quản lý duyệt" vẫn chấm được, đánh dấu nghi vấn
+        $kq = $trang->chamCong('vao', [...$sai, 'chi_khi_khop' => false]);
+        $this->assertTrue($kq['ok']);
+        $this->assertTrue(Attendance::sole()->nghiVan());
+    }
+
     public function test_thu_7_nua_ngay_chu_nhat_khong_tinh_tre(): void
     {
         $u = $this->nhanVien();

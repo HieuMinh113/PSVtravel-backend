@@ -25,11 +25,12 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
 use Livewire\Attributes\Url;
 
 /**
- * Trang nhân viên tự chấm công: chụp khuôn mặt + lấy vị trí, chấm vào / ra,
+ * Trang nhân viên tự chấm công: quét khuôn mặt + lấy vị trí, khớp là chấm vào / ra,
  * ghi lý do khi trễ / về sớm / ngoài công ty, xin bổ sung công, xem lịch sử
  * của mình. Lần đầu: đồng ý + đăng ký khuôn mặt.
  */
@@ -48,6 +49,9 @@ class ChamCong extends Page implements HasTable
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'cham-cong';
+
+    /** Số lần quét không khớp tối đa trong 10 phút (chặn dò thử khuôn mặt). */
+    public const SO_LAN_KHONG_KHOP = 40;
 
     /** @var array<string, mixed> | null */
     #[Url(as: 'filters')]
@@ -95,17 +99,34 @@ class ChamCong extends Page implements HasTable
             return ['ok' => false, 'loi' => $e->getMessage()];
         }
 
-        return ['ok' => true, 'thong_bao' => 'Đã đăng ký khuôn mặt. Từ giờ bấm "Chấm công vào" / "Chấm công ra" mỗi ngày.', 'canh_bao' => []];
+        return ['ok' => true, 'thong_bao' => 'Đã đăng ký khuôn mặt. Từ giờ bấm "Chấm công vào" / "Chấm công ra" rồi đưa mặt vào khung là xong.', 'canh_bao' => []];
     }
 
-    /** Gọi từ trình duyệt (Alpine): chấm vào / ra. */
+    /**
+     * Gọi từ trình duyệt (Alpine): chấm vào / ra. Lúc quét, trình duyệt gọi
+     * liên tục với chi_khi_khop — chưa khớp thì không vẽ lại trang (đỡ nặng).
+     */
     public function chamCong($loai, $duLieu): array
     {
         if (! in_array($loai, ['vao', 'ra'], true) || ! is_array($duLieu)) {
             return ['ok' => false, 'loi' => 'Yêu cầu không hợp lệ.'];
         }
+        $quet = ! empty($duLieu['chi_khi_khop']);
+        $khoa = 'cham-cong-quet:'.auth()->id();
+        if ($quet && RateLimiter::tooManyAttempts($khoa, self::SO_LAN_KHONG_KHOP)) {
+            $this->skipRender();
 
-        return app(DichVuChamCong::class)->cham(auth()->user(), $loai, $duLieu);
+            return ['ok' => false, 'qua_nhieu' => true, 'loi' => 'Khuôn mặt không khớp quá nhiều lần. Đợi '.max(1, (int) ceil(RateLimiter::availableIn($khoa) / 60))
+                .' phút rồi quét lại, hoặc bấm "Gửi ảnh cho quản lý duyệt".'];
+        }
+
+        $kq = app(DichVuChamCong::class)->cham(auth()->user(), $loai, $duLieu);
+        if (! empty($kq['khong_khop'])) {
+            RateLimiter::hit($khoa, 600);
+            $this->skipRender();
+        }
+
+        return $kq;
     }
 
     protected function getHeaderActions(): array

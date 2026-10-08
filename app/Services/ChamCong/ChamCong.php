@@ -15,14 +15,17 @@ use InvalidArgumentException;
  * Chấm công vào / ra: kiểm tra khuôn mặt (so 128 số đặc trưng trình duyệt gửi
  * lên với khuôn mặt đã đăng ký — so ở MÁY CHỦ, trình duyệt không biết khuôn mặt
  * gốc), vị trí so với công ty, đi trễ / về sớm. Trễ, về sớm, ngoài công ty thì
- * bắt buộc ghi lý do → chờ quản lý duyệt. Khuôn mặt không khớp vẫn cho chấm
- * nhưng đánh dấu nghi vấn.
+ * bắt buộc ghi lý do → chờ quản lý duyệt.
+ *
+ * Trang chấm công quét liên tục và gửi kèm chi_khi_khop: khớp mới chấm. Khi
+ * quét mãi không khớp (khẩu trang, ảnh đăng ký xấu…) nhân viên bấm "Gửi ảnh cho
+ * quản lý" → chấm không cần khớp, đánh dấu nghi vấn để quản lý xem lại.
  */
 class ChamCong
 {
     /**
-     * @param  array{lat?: ?float, lng?: ?float, accuracy?: ?float, anh?: ?string, descriptor?: ?array, ly_do?: ?string}  $d
-     * @return array{ok: bool, can_ly_do?: bool, vi_sao?: list<string>, loi?: string, thong_bao?: string, canh_bao?: list<string>}
+     * @param  array{lat?: ?float, lng?: ?float, accuracy?: ?float, anh?: ?string, descriptor?: ?array, ly_do?: ?string, chi_khi_khop?: bool}  $d
+     * @return array{ok: bool, khong_khop?: bool, can_ly_do?: bool, vi_sao?: list<string>, loi?: string, thong_bao?: string, canh_bao?: list<string>}
      */
     public function cham(User $u, string $loai, array $d, ?Carbon $luc = null): array
     {
@@ -36,23 +39,29 @@ class ChamCong
         if (! $khuonMat) {
             return ['ok' => false, 'loi' => 'Bạn chưa đăng ký khuôn mặt.'];
         }
-        $anh = self::docAnh($d['anh'] ?? null);
-        if (! $anh) {
-            return ['ok' => false, 'loi' => 'Không nhận được ảnh chụp. Cho phép trình duyệt dùng camera rồi thử lại.'];
-        }
-
         $hom = Attendance::cuaNgay($u->id, $luc);
         if ($p === 'in' && $hom->in_at && $hom->in_source === 'cham') {
             return ['ok' => false, 'loi' => 'Hôm nay bạn đã chấm vào lúc '.$hom->in_at->format('H:i').'.'];
         }
 
-        // Vị trí
-        [$viTri, $cach, $doChinhXac] = self::viTri($d['lat'] ?? null, $d['lng'] ?? null, $d['accuracy'] ?? null);
-
         // Khuôn mặt: khoảng cách đặc trưng (null = trình duyệt không thấy mặt)
         $moTa = self::docDacTrung($d['descriptor'] ?? null);
         $khoang = $moTa ? self::soKhuonMat($moTa, $khuonMat->descriptor) : null;
         $khop = $khoang === null ? null : $khoang < Attendance::NGUONG_KHUON_MAT;
+
+        // Quét tự động: chỉ chấm khi khuôn mặt khớp. Chưa khớp thì không lưu gì,
+        // trình duyệt quét tiếp. Không trả khoảng cách — khỏi dò dẫm từng số.
+        if (! empty($d['chi_khi_khop']) && $khop !== true) {
+            return ['ok' => false, 'khong_khop' => true];
+        }
+
+        $anh = self::docAnh($d['anh'] ?? null);
+        if (! $anh) {
+            return ['ok' => false, 'loi' => 'Không nhận được ảnh chụp. Cho phép trình duyệt dùng camera rồi thử lại.'];
+        }
+
+        // Vị trí
+        [$viTri, $cach, $doChinhXac] = self::viTri($d['lat'] ?? null, $d['lng'] ?? null, $d['accuracy'] ?? null);
 
         // Cần lý do? Trễ / về sớm → lý do phải được quản lý duyệt. Đúng giờ mà
         // ngoài công ty / không rõ vị trí → chỉ ghi lý do, KHÔNG cần duyệt.
@@ -127,7 +136,7 @@ class ChamCong
         $moTa = self::docDacTrung($descriptor);
         $anh = self::docAnh($anhDataUrl);
         if (! $moTa || ! $anh) {
-            throw new InvalidArgumentException('Chưa nhận ra khuôn mặt. Nhìn thẳng camera, đủ sáng, bỏ khẩu trang rồi chụp lại.');
+            throw new InvalidArgumentException('Chưa nhận ra khuôn mặt. Nhìn thẳng camera, đủ sáng, bỏ khẩu trang rồi quét lại.');
         }
 
         return AttendanceFace::create([
