@@ -10,9 +10,10 @@ use Illuminate\Database\Seeder;
 // chạy tay khi cần: php artisan db:seed --class=EventSeeder
 class EventSeeder extends Seeder
 {
-    public function run(): void
+    /** Gói sự kiện mẫu — lệnh psv:don-du-lieu-mau dựa vào slug để xoá đúng mấy gói này. */
+    public static function mau(): array
     {
-        $mau = [
+        return [
             [
                 'title' => 'Team Building Bãi Biển 2N1Đ',
                 'slug' => 'team-building-bai-bien-2n1d',
@@ -71,6 +72,11 @@ class EventSeeder extends Seeder
                 'sort_order' => 3,
             ],
         ];
+    }
+
+    public function run(): void
+    {
+        $mau = self::mau();
 
         foreach ($mau as $e) {
             Event::updateOrCreate(['slug' => $e['slug']], $e);

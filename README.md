@@ -101,11 +101,19 @@ Có sẵn để thử các việc nghiệp vụ:
 Xoá sạch để bắt đầu nhập dữ liệu thật:
 
 ```bash
-docker compose exec app php artisan psv:don-du-lieu-mau --force
-docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --force   # xoá luôn đơn đặt tour + hồ sơ visa
+# 1. Xem trước sẽ xoá gì (chưa xoá)
+docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --tai-khoan-mau --xem
+# 2. Xoá hết dữ liệu mẫu
+docker compose exec app php artisan psv:don-du-lieu-mau --don-hang --tai-khoan-mau --force
 ```
 
-Lệnh này giữ nguyên tài khoản, phân quyền, Cài đặt và trang tĩnh.
+- Không có `--don-hang`: giữ đơn đặt tour, thanh toán, hồ sơ visa, chấm công, tin liên hệ.
+- Không có `--tai-khoan-mau`: giữ các tài khoản mẫu (visa1, visa2, dieuhanh, sale, ketoan, nhanvien, khach@example.com).
+- Luôn giữ: **mẫu checklist visa**, tài khoản quản trị, phân quyền, Cài đặt, trang tĩnh, sheet liên minh, nhật ký.
+- Gói sự kiện chỉ xoá đúng 3 gói mẫu của EventSeeder, gói nhập tay giữ nguyên.
+
+Trên máy chủ thật: chạy `./scripts/sao-luu-csdl.sh` sao lưu trước, rồi `--xem` kiểm tra kỹ —
+`--don-hang` xoá CẢ đơn / khoản thu / hồ sơ visa THẬT nếu đã có.
 
 ---
 

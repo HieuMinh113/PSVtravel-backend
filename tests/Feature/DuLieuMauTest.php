@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Attendance;
+use App\Models\AttendanceFace;
+use App\Models\Event;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
+use Database\Seeders\EventSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +16,7 @@ use Modules\Booking\Models\Payment;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use Modules\Visa\Models\VisaCase;
+use Modules\Visa\Models\VisaChecklist;
 use Tests\TestCase;
 
 /**
@@ -62,15 +67,39 @@ class DuLieuMauTest extends TestCase
         $this->get('/admin/khoan-thu')->assertOk();
 
         // Chấm công mẫu: 3 nhân viên × 10 ngày, có trễ chờ duyệt, nghi vấn, quên chấm ra
-        $this->assertSame(3, \App\Models\AttendanceFace::count());
-        $this->assertSame(30, \App\Models\Attendance::count());
-        $this->assertTrue(\App\Models\Attendance::where('review_status', 'cho_duyet')->exists());
-        $this->assertTrue(\App\Models\Attendance::all()->contains(fn ($a) => $a->nghiVan()));
-        $this->assertTrue(\App\Models\Attendance::all()->contains(fn ($a) => $a->late_minutes > 0));
+        $this->assertSame(3, AttendanceFace::count());
+        $this->assertSame(30, Attendance::count());
+        $this->assertTrue(Attendance::where('review_status', 'cho_duyet')->exists());
+        $this->assertTrue(Attendance::all()->contains(fn ($a) => $a->nghiVan()));
+        $this->assertTrue(Attendance::all()->contains(fn ($a) => $a->late_minutes > 0));
 
-        $this->artisan('psv:don-du-lieu-mau', ['--don-hang' => true, '--force' => true])->assertSuccessful();
+        $this->seed(EventSeeder::class);
+        $suKienThat = Event::create(['title' => 'Gói thật', 'slug' => 'goi-that', 'status' => 'published']);
+        $soMauChecklist = VisaChecklist::count();
+        $this->assertGreaterThan(40, $soMauChecklist);
+        $anhChamCong = Attendance::whereNotNull('in_photo')->value('in_photo');
+        $anhMat = AttendanceFace::value('photo');
+        Storage::disk('rieng')->assertExists($anhChamCong);
+
+        // Xem trước: không xoá gì
+        $this->artisan('psv:don-du-lieu-mau', ['--don-hang' => true, '--tai-khoan-mau' => true, '--xem' => true])
+            ->expectsOutputToContain('chưa xoá gì')->assertSuccessful();
+        $this->assertSame(30, Attendance::count());
+
+        // Xoá hết, chỉ giữ cấu hình + mẫu checklist visa + tài khoản quản trị
+        $this->artisan('psv:don-du-lieu-mau', ['--don-hang' => true, '--tai-khoan-mau' => true, '--force' => true])->assertSuccessful();
         $this->assertSame(0, VisaCase::withTrashed()->count());
         $tep->each(fn ($d) => Storage::disk('rieng')->assertMissing($d));
         Storage::disk('rieng')->assertMissing($choDuyet->proof_images[0]);
+        $this->assertSame(0, Attendance::count());
+        $this->assertSame(0, AttendanceFace::count());
+        Storage::disk('rieng')->assertMissing($anhChamCong);
+        Storage::disk('rieng')->assertMissing($anhMat);
+        $this->assertSame(0, Tour::count());
+        $this->assertSame(0, Booking::count());
+        $this->assertSame($soMauChecklist, VisaChecklist::count()); // giữ mẫu checklist
+        $this->assertSame(['goi-that'], Event::pluck('slug')->all());       // chỉ xoá gói mẫu
+        $this->assertSame(['admin@psvtravel.com'], User::orderBy('email')->pluck('email')->all());
+        $this->assertTrue($suKienThat->exists);
     }
 }

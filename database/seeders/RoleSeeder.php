@@ -34,17 +34,21 @@ class RoleSeeder extends Seeder
         // Tài khoản nhân viên quyền hạn chế — dùng để kiểm thử phân quyền
         // (ca AUTH-04, AUTH-05 trong kịch bản kiểm thử): người này chỉ được
         // xử lý đơn và đánh giá, không được sửa tour hay đụng vào Cài đặt.
-        $staff = User::firstOrCreate(
-            ['email' => 'nhanvien@psvtravel.com'],
-            [
-                'name' => 'Nhân viên kinh doanh',
-                'password' => Hash::make('NhanVien@123456'),
-                'email_verified_at' => now(),
-                'locale' => 'vi',
-            ]
-        );
+        // Mật khẩu ai cũng biết → không tạo trên máy chủ thật (đã dọn bằng
+        // psv:don-du-lieu-mau --tai-khoan-mau thì chạy lại seeder không mọc lại).
+        if (! app()->isProduction()) {
+            $staff = User::firstOrCreate(
+                ['email' => 'nhanvien@psvtravel.com'],
+                [
+                    'name' => 'Nhân viên kinh doanh',
+                    'password' => Hash::make('NhanVien@123456'),
+                    'email_verified_at' => now(),
+                    'locale' => 'vi',
+                ]
+            );
 
-        $staff->syncRoles(['staff']);
+            $staff->syncRoles(['staff']);
+        }
 
         // Quyền liên minh cho super_admin/admin + vai trò điều hành. Migration
         // cũng tạo, nhưng trên máy mới cài nó chạy TRƯỚC khi có super_admin.
