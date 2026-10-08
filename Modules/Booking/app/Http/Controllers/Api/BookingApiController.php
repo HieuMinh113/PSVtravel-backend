@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Modules\Booking\Http\Requests\StoreBookingRequest;
 use Modules\Booking\Models\Booking;
+use Modules\Booking\Services\BaoDonWebMoi;
 use Modules\Page\Models\Setting;
 use Modules\Tour\Models\Tour;
 
@@ -76,6 +77,7 @@ class BookingApiController extends Controller
         $booking->save();
 
         $this->guiMail($booking);
+        BaoDonWebMoi::gui($booking);
 
         return response()->json([
             'message' => 'Đặt tour thành công! Chúng tôi sẽ liên hệ xác nhận trong thời gian sớm nhất.',

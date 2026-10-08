@@ -2,8 +2,14 @@
 
 namespace App\Providers\Filament;
 
-use Filament\Http\Middleware\Authenticate;
+use App\Filament\Auth\XacThucApp;
+use App\Filament\Widgets\DonMoiNhatWidget;
+use App\Filament\Widgets\TongQuanWidget;
+use App\Http\Controllers\Admin\NhipThongBaoController;
+use App\Http\Controllers\Admin\TaiMaQrTourController;
+use App\Http\Middleware\BatBuoc2faQuanTri;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -11,17 +17,15 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Http\Controllers\Admin\TaiMaQrTourController;
-use App\Http\Middleware\BatBuoc2faQuanTri;
 use Illuminate\Support\Facades\Route;
-use App\Filament\Auth\XacThucApp;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -68,8 +72,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
-                \App\Filament\Widgets\TongQuanWidget::class,
-                \App\Filament\Widgets\DonMoiNhatWidget::class,
+                TongQuanWidget::class,
+                DonMoiNhatWidget::class,
                 AccountWidget::class,
             ])
             ->middleware([
@@ -96,6 +100,13 @@ class AdminPanelProvider extends PanelProvider
                     ->whereIn('dinhDang', ['png', 'svg'])
                     ->middleware(BatBuoc2faQuanTri::class)
                     ->name('tours.ma-qr');
-            });
+                // Nhịp thông báo: trình duyệt hỏi mỗi 10 giây (tiếng báo, popup,
+                // số trên menu) — xem public/js/psv/thong-bao.js
+                Route::get('psv/nhip', NhipThongBaoController::class)
+                    ->middleware(BatBuoc2faQuanTri::class)
+                    ->name('psv.nhip');
+            })
+            ->renderHook(PanelsRenderHook::BODY_END, fn () => auth()->check() ? view('filament.thong-bao.nhip') : '')
+            ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.thong-bao.nut-tieng'));
     }
 }
