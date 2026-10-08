@@ -155,6 +155,17 @@ class HoaHongVaKhoanThuTest extends TestCase
             ->assertHasTableActionErrors(['proof_images']);
         $this->assertSame(0, Payment::count());
 
+        // Trùng mã giao dịch với khoản đã ghi (đơn khác) → báo lỗi rõ ràng, không sập trang
+        $donKhac = $this->don($nv);
+        Payment::create(['booking_id' => $donKhac->id, 'amount' => 1_000_000, 'method' => 'bank_transfer', 'status' => 'success', 'paid_at' => now(), 'transaction_ref' => 'FT123']);
+        $this->actingAs($nv);
+        $rm()->callTableAction('create', data: [
+            'amount' => 6_000_000, 'method' => 'bank_transfer', 'paid_at' => now(), 'transaction_ref' => 'FT123',
+            'proof_images' => [UploadedFile::fake()->image('bien-lai.jpg')],
+        ])->assertHasTableActionErrors(['transaction_ref']);
+        $this->assertSame(0, $don->payments()->count());
+        Payment::where('transaction_ref', 'FT123')->delete();
+
         // Có ảnh → lưu ở trạng thái chờ duyệt, chưa tính vào đã thu
         $rm()->callTableAction('create', data: [
             'amount' => 6_000_000, 'method' => 'bank_transfer', 'paid_at' => now(),

@@ -82,10 +82,24 @@ class PaymentsRelationManager extends RelationManager
                 ->visible(fn () => KhoanThu::laKeToan())
                 ->helperText('Chỉ khoản "Đã nhận tiền" mới tính vào tổng đã thu'),
 
+            // Mã giao dịch là duy nhất (CSDL có ràng buộc unique) — một lần
+            // chuyển khoản chỉ được ghi một lần. Kiểm tra trước để báo rõ mã đã
+            // nằm ở đơn nào, thay vì để lỗi CSDL làm sập trang.
             TextInput::make('transaction_ref')
                 ->label('Mã giao dịch / số phiếu thu')
                 ->helperText('Để trống nếu thu tiền mặt')
-                ->maxLength(255),
+                ->maxLength(255)
+                ->rules([fn (?Payment $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
+                    $trung = Payment::query()
+                        ->where('transaction_ref', $value)
+                        ->when($record, fn ($q) => $q->whereKeyNot($record->getKey()))
+                        ->with('booking:id,booking_code')
+                        ->first();
+                    if ($trung) {
+                        $fail('Mã giao dịch này đã được ghi nhận ở đơn '.($trung->booking?->booking_code ?? '#'.$trung->booking_id)
+                            .' ('.number_format($trung->amount, 0, ',', '.').'đ, '.$trung->paid_at?->format('d/m/Y').'). Kiểm tra lại, tránh ghi một lần chuyển khoản hai lần.');
+                    }
+                }]),
 
             KhoanThu::oChungTu(),
 
