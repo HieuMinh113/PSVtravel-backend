@@ -221,7 +221,8 @@ Menu **Chấm công**:
 - **Chấm công** — mọi nhân viên. Lần đầu tick đồng ý rồi chụp đăng ký khuôn mặt.
   Mỗi ngày bấm *Chấm công vào* / *Chấm công ra*: máy chụp ảnh, so khuôn mặt
   (chạy trên trình duyệt, không gửi ảnh ra ngoài) và lấy vị trí GPS. Đi trễ, về
-  sớm, ngoài công ty → phải ghi lý do. Quên chấm → *Xin bổ sung công*.
+  sớm, ngoài công ty → phải ghi lý do. Chỉ trễ / về sớm / bổ sung công mới chờ
+  quản lý duyệt; đúng giờ mà ngoài công ty thì chỉ ghi lý do. Quên chấm → *Xin bổ sung công*.
 - **Bảng chấm công / Bảng công tháng / Khuôn mặt nhân viên / Cấu hình chấm công**
   — chỉ quản lý (quyền `ViewAll:Attendance`, mặc định super_admin + admin).
 

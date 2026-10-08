@@ -353,7 +353,8 @@ class DuLieuMauNghiepVuSeeder extends Seeder
                 ];
                 $duLieu = match ($kieu) {
                     1 => [...$chung('in', $d->copy()->setTime(8, 25), 'trong', true, 'Kẹt xe cầu Kênh Tẻ'), ...$chung('out', $ra), 'review_status' => 'cho_duyet'],
-                    2 => [...$chung('in', $vao, 'ngoai', true, 'Đón đoàn khách ở sân bay Tân Sơn Nhất'), ...$chung('out', $ra), 'review_status' => 'chap_nhan', 'reviewed_by' => $this->adminId, 'reviewed_at' => $d->copy()->setTime(9, 0)],
+                    // Đúng giờ nhưng ngoài công ty: có lý do, không cần duyệt
+                    2 => [...$chung('in', $vao, 'ngoai', true, 'Đón đoàn khách ở sân bay Tân Sơn Nhất'), ...$chung('out', $ra)],
                     3 => [...$chung('in', $vao, 'trong', false), ...$chung('out', $ra)],
                     4 => [...$chung('in', $vao), 'out_at' => null], // quên chấm ra
                     5 => ['in_at' => $d->copy()->setTime(8, 0), 'in_source' => 'bo_sung', 'in_reason' => 'Bổ sung công: quên chấm, điện thoại hết pin', ...$chung('out', $ra), 'review_status' => 'cho_duyet'],

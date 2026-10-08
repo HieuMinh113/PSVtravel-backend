@@ -54,15 +54,19 @@ class ChamCong
         $khoang = $moTa ? self::soKhuonMat($moTa, $khuonMat->descriptor) : null;
         $khop = $khoang === null ? null : $khoang < Attendance::NGUONG_KHUON_MAT;
 
-        // Cần lý do?
+        // Cần lý do? Trễ / về sớm → lý do phải được quản lý duyệt. Đúng giờ mà
+        // ngoài công ty / không rõ vị trí → chỉ ghi lý do, KHÔNG cần duyệt.
         $viSao = [];
+        $canDuyet = false;
         $lich = CauHinhChamCong::lichNgay($luc->copy()->startOfDay());
         $choPhep = CauHinhChamCong::phutChoPhep();
         if ($lich && $p === 'in' && $luc->gt($lich[0]->copy()->addMinutes($choPhep))) {
             $viSao[] = 'Đi trễ '.self::phut((int) $lich[0]->diffInMinutes($luc)).' (giờ vào '.$lich[0]->format('H:i').')';
+            $canDuyet = true;
         }
         if ($lich && $p === 'out' && $luc->lt($lich[1]->copy()->subMinutes($choPhep))) {
             $viSao[] = 'Về sớm '.self::phut((int) $luc->diffInMinutes($lich[1])).' (giờ ra '.$lich[1]->format('H:i').')';
+            $canDuyet = true;
         }
         if ($viTri === 'ngoai') {
             $viSao[] = 'Bạn đang cách công ty '.self::met($cach);
@@ -74,7 +78,7 @@ class ChamCong
             return ['ok' => false, 'can_ly_do' => true, 'vi_sao' => $viSao];
         }
 
-        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo) {
+        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo, $canDuyet) {
             $cu = $hom->{"{$p}_photo"};
             $hom->forceFill([
                 "{$p}_at" => $luc,
@@ -89,7 +93,7 @@ class ChamCong
                 "{$p}_face_ok" => $khop,
                 "{$p}_reason" => $lyDo !== '' ? mb_substr($lyDo, 0, 1000) : null,
             ]);
-            if ($lyDo !== '') {
+            if ($canDuyet) {
                 $hom->forceFill(['review_status' => 'cho_duyet', 'reviewed_by' => null, 'reviewed_at' => null]);
             }
             $hom->save();
@@ -105,7 +109,11 @@ class ChamCong
 
         return [
             'ok' => true,
-            'thong_bao' => ($p === 'in' ? 'Đã chấm vào' : 'Đã chấm ra').' lúc '.$luc->format('H:i').($lyDo !== '' ? ' — lý do đã gửi quản lý duyệt.' : '.'),
+            'thong_bao' => ($p === 'in' ? 'Đã chấm vào' : 'Đã chấm ra').' lúc '.$luc->format('H:i').match (true) {
+                $canDuyet => ' — lý do đã gửi quản lý duyệt.',
+                $lyDo !== '' => ' — đã ghi lý do.',
+                default => '.',
+            },
             'canh_bao' => $canhBao,
         ];
     }

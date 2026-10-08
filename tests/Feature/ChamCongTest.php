@@ -181,6 +181,33 @@ class ChamCongTest extends TestCase
         $this->assertSame(['Đi trễ 8 giờ 30 phút (giờ vào 08:00)', 'Không lấy được vị trí'], $kq['vi_sao']);
     }
 
+    public function test_dung_gio_ngoai_cong_ty_ghi_ly_do_nhung_khong_can_duyet(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $xa = ['lat' => self::LAT + 0.02];
+
+        // 07:50 đúng giờ, ở sân bay → vẫn hỏi lý do, nhưng không chờ duyệt
+        $kq = $this->cham($u, 'vao', $xa);
+        $this->assertSame(['Bạn đang cách công ty 2,2 km'], $kq['vi_sao']);
+        $kq = $this->cham($u, 'vao', [...$xa, 'ly_do' => 'Đón đoàn ở sân bay']);
+        $this->assertStringContainsString('đã ghi lý do', $kq['thong_bao']);
+        $a = Attendance::sole();
+        $this->assertSame('Đón đoàn ở sân bay', $a->in_reason);
+        $this->assertSame('ngoai', $a->in_location);
+        $this->assertNull($a->review_status);
+
+        // Ra đúng giờ ở công ty → vẫn không cần duyệt
+        $this->travelTo(Carbon::parse('2026-10-12 17:31'));
+        $this->assertTrue($this->cham($u, 'ra')['ok']);
+        $this->assertNull($a->fresh()->review_status);
+
+        // Ra lại sớm hơn (về sớm) → lúc này mới chờ duyệt
+        $this->travelTo(Carbon::parse('2026-10-12 17:00'));
+        $this->cham($u, 'ra', ['ly_do' => 'Đi khám bệnh']);
+        $this->assertSame('cho_duyet', $a->fresh()->review_status);
+    }
+
     public function test_khuon_mat_khong_khop_van_cham_nhung_nghi_van(): void
     {
         $u = $this->nhanVien();
