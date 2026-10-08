@@ -107,20 +107,25 @@ class HoaHongVaKhoanThuTest extends TestCase
         $don = Booking::where('customer_name', 'Trần Thị B')->sole();
         $this->assertSame([$a->id, $a->id, null], [$don->created_by, $don->assigned_to, $don->confirmed_by]);
 
-        // B bấm xác nhận: B là người xác nhận, hoa hồng vẫn của A (người tạo)
+        // Nhân viên khác (B) không xác nhận / sửa được đơn của A
         $this->actingAs($b);
+        Livewire::test(ListBookings::class)->assertTableActionHidden('confirm', $don);
+
+        // Quản lý bấm xác nhận: là người xác nhận, hoa hồng vẫn của A (người tạo)
+        $ql = $this->quanLy();
+        $this->actingAs($ql);
         Livewire::test(ListBookings::class)->callTableAction('confirm', $don);
         $don->refresh();
-        $this->assertSame([$a->id, $a->id, $b->id], [$don->created_by, $don->assigned_to, $don->confirmed_by]);
+        $this->assertSame([$a->id, $a->id, $ql->id], [$don->created_by, $don->assigned_to, $don->confirmed_by]);
         $this->assertSame('2026-10-07', $don->confirmed_at->toDateString());
 
-        // Nhân viên không đổi được người phụ trách; quản lý thì được
+        // Nhân viên (A, chủ đơn) không đổi được người phụ trách; quản lý thì được
+        $this->actingAs($a);
         Livewire::test(EditBooking::class, ['record' => $don->getRouteKey()])
             ->assertFormFieldIsDisabled('assigned_to')
             ->fillForm(['assigned_to' => $b->id])->call('save');
         $this->assertSame($a->id, $don->fresh()->assigned_to);
 
-        $ql = $this->quanLy();
         $this->actingAs($ql);
         Livewire::test(EditBooking::class, ['record' => $don->getRouteKey()])
             ->assertFormFieldIsEnabled('assigned_to')

@@ -155,7 +155,7 @@ class BookingsTable
                 Action::make('confirm')
                     ->label('Xác nhận')
                     ->color('success')
-                    ->visible(fn (Booking $record): bool => $record->status === 'pending')
+                    ->visible(fn (Booking $record): bool => $record->status === 'pending' && auth()->user()->can('update', $record))
                     ->requiresConfirmation()
                     ->modalHeading('Xác nhận đơn đặt tour')
                     ->modalDescription('Hệ thống sẽ trừ số chỗ của đợt khởi hành đã chọn.')
@@ -228,7 +228,7 @@ class BookingsTable
                     ->label('Hoàn thành')
                     ->color('success')
                     ->icon('heroicon-o-flag')
-                    ->visible(fn (Booking $record): bool => $record->status === 'confirmed')
+                    ->visible(fn (Booking $record): bool => $record->status === 'confirmed' && auth()->user()->can('update', $record))
                     ->requiresConfirmation()
                     ->modalHeading('Đánh dấu đơn đã hoàn thành')
                     ->modalDescription(function (Booking $record): string {
@@ -271,7 +271,7 @@ class BookingsTable
                     ->label('Huỷ đơn')
                     ->color('danger')
                     ->icon('heroicon-o-x-circle')
-                    ->visible(fn (Booking $record): bool => ! in_array($record->status, ['cancelled', 'completed'], true))
+                    ->visible(fn (Booking $record): bool => ! in_array($record->status, ['cancelled', 'completed'], true) && auth()->user()->can('update', $record))
                     ->schema([
                         Textarea::make('cancel_reason')
                             ->label('Lý do huỷ')

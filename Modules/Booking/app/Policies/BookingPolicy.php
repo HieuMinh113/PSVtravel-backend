@@ -33,9 +33,21 @@ class BookingPolicy
         return $authUser->can('Create:Booking');
     }
 
+    /**
+     * Sửa / xác nhận / hoàn thành / huỷ đơn / thêm khoản thu. Nhân viên chỉ được
+     * với đơn của mình (người phụ trách) và đơn khách đặt web chưa ai nhận;
+     * quản lý (ViewAll:Booking) được mọi đơn.
+     */
     public function update(AuthUser $authUser, Booking $booking): bool
     {
-        return $authUser->can('Update:Booking');
+        return $authUser->can('Update:Booking') && self::cuaMinh($authUser, $booking);
+    }
+
+    public static function cuaMinh(AuthUser $authUser, Booking $booking): bool
+    {
+        return $authUser->can('ViewAll:Booking')
+            || $booking->assigned_to === null
+            || (int) $booking->assigned_to === (int) $authUser->getKey();
     }
 
     public function delete(AuthUser $authUser, Booking $booking): bool

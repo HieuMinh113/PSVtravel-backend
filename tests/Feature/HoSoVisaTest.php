@@ -64,7 +64,9 @@ class HoSoVisaTest extends TestCase
         $vaiTro = Role::findByName('visa', 'web');
         $this->assertTrue($vaiTro->hasPermissionTo('Update:VisaCase'));
         $this->assertTrue($vaiTro->hasPermissionTo('Create:VisaChecklist'));
-        $this->assertFalse($vaiTro->hasPermissionTo(Permission::findOrCreate('ViewAny:Tour', 'web')));
+        // Vai trò visa (08/10/2026): xem tour, không sửa
+        $this->assertTrue($vaiTro->hasPermissionTo(Permission::findOrCreate('ViewAny:Tour', 'web')));
+        $this->assertFalse($vaiTro->hasPermissionTo(Permission::findOrCreate('Update:Tour', 'web')));
 
         $this->assertSame(46, VisaChecklist::count());
         $tq = $this->mau('Trung Quốc — Du lịch — Nhân viên');
@@ -242,11 +244,12 @@ class HoSoVisaTest extends TestCase
         $this->get('/admin/visa-cases')->assertForbidden();
         $this->get('/admin/visa-checklists')->assertForbidden();
 
-        // Nhân viên visa vào được hồ sơ visa nhưng không đụng tour
+        // Nhân viên visa vào được hồ sơ visa; tour chỉ xem, không thêm / sửa
         $this->actingAs($this->nhanVienVisa());
         $this->get('/admin/visa-cases')->assertOk();
         $this->get('/admin/visa-checklists')->assertOk();
-        $this->get('/admin/tours')->assertForbidden();
+        $this->get('/admin/tours')->assertOk();
+        $this->get('/admin/tours/create')->assertForbidden();
 
         // super_admin / admin cũng có quyền visa (máy mới cài: RoleSeeder cấp)
         $this->seed(RoleSeeder::class);

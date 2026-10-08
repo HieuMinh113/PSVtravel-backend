@@ -14,6 +14,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Auth;
 use Modules\Booking\Models\Payment;
 
@@ -24,6 +25,17 @@ class PaymentsRelationManager extends RelationManager
     protected static ?string $title = 'Thanh toán';
 
     protected static ?string $modelLabel = 'khoản thu';
+
+    // Thêm khoản thu: kế toán, hoặc người được sửa đơn này (đơn của mình /
+    // đơn chưa ai nhận) — nhân viên khác chỉ xem.
+    protected function getCreateAuthorizationResponse(): Response
+    {
+        $u = auth()->user();
+
+        return $u && ($u->can('Approve:Payment') || $u->can('update', $this->getOwnerRecord()))
+            ? Response::allow()
+            : Response::deny();
+    }
 
     // Kế toán (chỉ xem đơn) vẫn phải thấy và duyệt được khoản thu ở trang xem đơn
     public function isReadOnly(): bool

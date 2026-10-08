@@ -29,7 +29,8 @@ class PaymentPolicy
             return true;
         }
 
-        return $user->can('Update:Booking') && ($payment === null || $payment->status === 'pending');
+        return $user->can('Update:Booking') && ($payment === null || ($payment->status === 'pending'
+            && (! $payment->booking || BookingPolicy::cuaMinh($user, $payment->booking))));
     }
 
     /** Kế toán bấm "Đã nhận tiền" / "Từ chối". */
