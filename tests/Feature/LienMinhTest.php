@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\AllianceDepartures\Pages\ListAllianceDepartures;
+use App\Filament\Resources\AllianceSources\Pages\EditAllianceSource;
 use App\Filament\Resources\AllianceSources\Pages\ListAllianceSources;
+use App\Filament\Resources\Tours\Pages\EditTour;
+use App\Filament\Resources\Tours\RelationManagers\DeparturesRelationManager;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,11 +18,13 @@ use Modules\Alliance\Models\AllianceSource;
 use Modules\Alliance\Models\AllianceTour;
 use Modules\Alliance\Services\DocBangLienMinh;
 use Modules\Alliance\Services\DongBoLienMinh;
+use Modules\Alliance\Services\SoanTinLienMinh;
 use Modules\Alliance\Services\TaiSheetLienMinh;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\Support\MauSheetLienMinh;
 use Tests\TestCase;
@@ -439,14 +444,14 @@ class LienMinhTest extends TestCase
 
         $nv = $this->dieuHanh();
         foreach (['View:Tour', 'ViewAny:Tour', 'Update:Tour', 'ViewAny:TourDeparture', 'Create:TourDeparture'] as $q) {
-            $nv->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($q, 'web'));
+            $nv->givePermissionTo(Permission::findOrCreate($q, 'web'));
         }
         $this->actingAs($nv);
 
         $tour = Tour::create(['slug' => 'seoul-'.uniqid(), 'name' => 'Seoul', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 1]);
         $dot = TourDeparture::create(['tour_id' => $tour->id, 'start_date' => '2026-11-04', 'seats_total' => 30, 'seats_left' => 30]);
 
-        Livewire::test(\App\Filament\Resources\Tours\Pages\EditTour::class, ['record' => $tour->getRouteKey()])
+        Livewire::test(EditTour::class, ['record' => $tour->getRouteKey()])
             ->assertFormFieldExists('alliance_tour_id')
             ->fillForm(['alliance_tour_id' => $lm->id])
             ->call('save')
@@ -455,9 +460,9 @@ class LienMinhTest extends TestCase
         $this->assertSame($lm->id, $tour->fresh()->alliance_tour_id);
         $this->assertSame(22, $dot->fresh()->seats_left, 'Nối xong là cập nhật ngay, không chờ 10 phút');
 
-        Livewire::test(\App\Filament\Resources\Tours\RelationManagers\DeparturesRelationManager::class, [
+        Livewire::test(DeparturesRelationManager::class, [
             'ownerRecord' => $tour->fresh(),
-            'pageClass' => \App\Filament\Resources\Tours\Pages\EditTour::class,
+            'pageClass' => EditTour::class,
         ])
             ->assertSee('Theo sheet: còn 22')
             ->callTableAction('layTuLienMinh');
@@ -519,7 +524,7 @@ class LienMinhTest extends TestCase
         $this->assertTrue(AllianceDeparture::whereDate('departure_date', '2026-10-24')->where('status', 'het_cho')->exists(), 'Ngày tô đỏ = hết chỗ');
 
         $this->actingAs($this->dieuHanh());
-        Livewire::test(\App\Filament\Resources\AllianceSources\Pages\EditAllianceSource::class, ['record' => $nguon->getRouteKey()])
+        Livewire::test(EditAllianceSource::class, ['record' => $nguon->getRouteKey()])
             ->assertOk()
             ->assertFormFieldExists('mau_do')
             ->assertFormFieldExists('tab_bo_qua')
@@ -534,10 +539,115 @@ class LienMinhTest extends TestCase
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $nv = User::factory()->create();
-        $nv->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('ViewAny:Booking', 'web'));
+        $nv->givePermissionTo(Permission::findOrCreate('ViewAny:Booking', 'web'));
         $this->actingAs($nv);
 
         $this->get('/admin/tra-cho-lien-minh')->assertForbidden();
         $this->get('/admin/alliance-sources')->assertForbidden();
+    }
+
+    // ------------------------------------------------------------------
+    // Tin nhắn tình trạng chỗ (gửi sale / khách, không ghi tên đối tác)
+    // ------------------------------------------------------------------
+
+    private function tourThuongHai(): AllianceTour
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 09:00'));
+        $nguon = AllianceSource::create(['name' => 'Kim Liên Travel', 'sheet_url' => self::LINK, 'last_success_at' => now()]);
+        $tour = AllianceTour::create([
+            'alliance_source_id' => $nguon->id, 'key' => 'thuong-hai',
+            'name' => 'Thượng Hải - Ô Trấn - Hàng Châu (No Shop) - Kim Liên Travel',
+            'duration' => '5N5Đ',
+            'airline' => "Sun PhuQuoc Airways (9G)\n9G634 SGN-PVG 23:40-04:40\n9G635 PVG-SGN\n05:40-09:40",
+        ]);
+        $dot = fn (string $ngay, array $them) => AllianceDeparture::create([
+            'alliance_tour_id' => $tour->id, 'alliance_source_id' => $nguon->id, 'departure_date' => $ngay,
+            'status' => 'con_cho', 'price' => 13_990_000, 'commission' => 1_500_000, ...$them,
+        ]);
+        $dot('2026-10-01', ['seats_left' => 9]);                                        // đã qua
+        $dot('2026-10-17', ['seats_left' => 0, 'seats_sold' => 33, 'status' => 'het_cho', 'visa_deadline' => '07/10/2026']);
+        $dot('2026-10-21', ['seats_left' => 0, 'seats_hold' => 6, 'seats_sold' => 22, 'status' => 'het_cho', 'visa_deadline' => '10/10/2026']);
+        $dot('2026-10-24', ['seats_left' => 16, 'seats_sold' => 8]);
+        $dot('2026-10-26', ['seats_left' => 20, 'status' => 'huy']);                   // đoàn huỷ
+        $dot('2026-11-04', ['seats_left' => 14, 'seats_hold' => 5, 'seats_sold' => 5, 'price' => 15_990_000]);
+        $dot('2026-11-07', ['seats_left' => 23, 'seats_sold' => 1, 'price' => 15_990_000]);
+        $dot('2026-12-23', ['seats_left' => 22, 'seats_hold' => 2, 'price' => 15_990_000, 'note' => 'NOEL']);
+        $dot('2026-12-30', ['seats_left' => 20, 'seats_hold' => 4, 'price' => 17_990_000, 'note' => 'TẾT TÂY — Kim Liên Travel giữ']);
+        $dot('2027-01-02', ['status' => 'lien_he', 'price' => null, 'price_text' => 'Liên hệ']);
+
+        return $tour;
+    }
+
+    public function test_soan_tin_nhan_tinh_trang_cho_khong_ghi_ten_doi_tac(): void
+    {
+        $tin = SoanTinLienMinh::tour($this->tourThuongHai());
+
+        $this->assertSame(<<<'TIN'
+THƯỢNG HẢI - Ô TRẤN - HÀNG CHÂU (NO SHOP) UPDATE 8/10/2026
+5N5Đ • Sun PhuQuoc Airways (9G)
+9G634 SGN-PVG 23:40-04:40 / 9G635 PVG-SGN 05:40-09:40
+
+Tháng 10:
+🌳 17/10 - 21/10: NHẬN 0S SURE 33S
+🌳 21/10 - 25/10: NHẬN 0S HOLD 6S SURE 22S
+🌳 24/10 - 28/10: NHẬN 16S SURE 8S
+ĐỒNG GIÁ 13.990
+
+Tháng 11:
+🌳 04/11 - 08/11: NHẬN 14S HOLD 5S SURE 5S
+🌳 07/11 - 11/11: NHẬN 23S SURE 1S
+ĐỒNG GIÁ 15.990
+
+Tháng 12:
+🌳 23/12 - 27/12: NHẬN 22S HOLD 2S (NOEL)
+GIÁ 15.990
+🌳 30/12 - 03/01: NHẬN 20S HOLD 4S (TẾT TÂY giữ)
+GIÁ 17.990
+
+Tháng 1/2027:
+🌳 02/01 - 06/01: LIÊN HỆ
+GIÁ Liên hệ
+
+DEADLINE VISA THÁNG 10
+🌳 Đoàn 17/10: deadline visa 07/10/2026
+🌳 Đoàn 21/10: deadline visa 10/10/2026
+TIN, $tin);
+        $this->assertStringNotContainsStringIgnoringCase('Kim Liên', $tin);
+        $this->assertStringNotContainsString('1.500', $tin); // không lộ hoa hồng
+    }
+
+    public function test_nut_tin_nhan_o_tra_cho_lien_minh(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $tour = $this->tourThuongHai();
+        $this->actingAs($this->dieuHanh());
+        $ngay24 = AllianceDeparture::whereDate('departure_date', '2026-10-24')->sole();
+        $ngay04 = AllianceDeparture::whereDate('departure_date', '2026-11-04')->sole();
+
+        // Từng tour: mọi ngày đi sắp tới
+        Livewire::test(ListAllianceDepartures::class)
+            ->mountTableAction('tinNhanTour', $ngay24)
+            ->assertSet('mountedActions.0.data.tin', fn ($v) => str_contains($v, '17/10 - 21/10') && str_contains($v, '30/12 - 03/01'));
+
+        // Chọn vài ngày: chỉ những ngày đó
+        Livewire::test(ListAllianceDepartures::class)
+            ->mountTableBulkAction('tinNhanDaChon', [$ngay24, $ngay04])
+            ->assertSet('mountedActions.0.data.tin', fn ($v) => str_contains($v, '24/10 - 28/10') && str_contains($v, '04/11 - 08/11')
+                && ! str_contains($v, '17/10') && ! str_contains($v, 'Kim Liên'));
+    }
+
+    public function test_doc_hang_bay_va_so_ngay(): void
+    {
+        $this->assertSame(['VNA', null], SoanTinLienMinh::hangBay('VNA'));
+        $this->assertSame([null, 'VJ862 HCM - INC 02:35 - 09:40 / VJ861 INC - HCM 21:20 - 00:30+1'],
+            SoanTinLienMinh::hangBay("Chuyến đi\nVJ862 HCM - INC 02:35 - 09:40\nChuyến về\nVJ861 INC - HCM\n21:20 - 00:30+1"));
+        $this->assertSame(['Sichuan Airlines + 2 chiều tàu cao tốc 3U', null], SoanTinLienMinh::hangBay("Sichuan Airlines + 2 chiều tàu cao tốc\n3U"));
+        $this->assertSame(5, SoanTinLienMinh::soNgay('5N4Đ'));
+        $this->assertSame(6, SoanTinLienMinh::soNgay('06N05Đ'));
+        $this->assertSame(4, SoanTinLienMinh::soNgay('4 ngày'));
+        $this->assertNull(SoanTinLienMinh::soNgay('THÁNG 2'));
+        $this->assertSame('13.990', SoanTinLienMinh::nghin(13_990_000));
+        // Tên đối tác ngắn chỉ xoá khi đứng riêng
+        $this->assertSame('KAZAN - Tour', SoanTinLienMinh::boTenDoiTac('KAZAN - Tour - AZ', 'AZ'));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AllianceDepartures\Tables;
 
+use App\Filament\Resources\AllianceDepartures\Actions\TinNhanChoAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Icons\Heroicon;
@@ -13,6 +14,8 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 use Modules\Alliance\Models\AllianceDeparture;
 use Modules\Alliance\Models\AllianceSource;
 
@@ -75,7 +78,7 @@ class AllianceDeparturesTable
                     ->tooltip(fn (AllianceDeparture $record) => $record->price_text ? 'Trong sheet ghi: '.$record->price_text : null)
                     // Có giá khuyến mãi: giá chính là giá KM, giá gốc gạch ngang bên dưới
                     ->description(fn (AllianceDeparture $record) => $record->price_original
-                        ? new \Illuminate\Support\HtmlString('<span style="text-decoration:line-through">'.e(self::tien($record->price_original)).'</span> · giá KM')
+                        ? new HtmlString('<span style="text-decoration:line-through">'.e(self::tien($record->price_original)).'</span> · giá KM')
                         : ($record->price_child ? 'Trẻ em '.self::tien($record->price_child) : null))
                     ->color(fn (AllianceDeparture $record) => $record->price_original ? 'danger' : null)
                     ->sortable(),
@@ -171,6 +174,12 @@ class AllianceDeparturesTable
                         false: fn (Builder $query) => $query->whereDoesntHave('tour.psvTours'),
                     ),
             ])
+            ->recordActions([
+                TinNhanChoAction::make(),
+            ])
+            ->toolbarActions([
+                TinNhanChoAction::daChon(),
+            ])
             ->filtersFormColumns(2)
             ->deferFilters(false)
             ->poll('60s')
@@ -184,7 +193,7 @@ class AllianceDeparturesTable
     /** Postgres: LIKE phân biệt hoa thường ("seoul" không ra "SEOUL") → dùng ILIKE. */
     public static function like(): string
     {
-        return \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
 
     private static function tien($so): ?string
