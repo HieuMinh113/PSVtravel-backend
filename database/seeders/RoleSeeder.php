@@ -53,6 +53,8 @@ class RoleSeeder extends Seeder
         $this->call(QuyenVisaSeeder::class);
         // Quyền quản lý đơn tour + vai trò kế toán (duyệt khoản thu)
         $this->call(QuyenDonTourSeeder::class);
+        // Quản lý chấm công (xem / duyệt chấm công của mọi người)
+        $this->call(QuyenChamCongSeeder::class);
 
         // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
         // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này

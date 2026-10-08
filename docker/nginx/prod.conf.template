@@ -119,7 +119,9 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()" always;
+    # Trang Chấm công (/admin/cham-cong) cần camera (chụp khuôn mặt) và vị trí
+    # (GPS) — chỉ cho chính trang này, không cho trang / khung nhúng nơi khác.
+    add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(self), payment=(), usb=()" always;
 
     root /var/www/public;
     index index.php;

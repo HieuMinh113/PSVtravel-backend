@@ -100,6 +100,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         ]));
     }
 
+    /** Khuôn mặt đăng ký chấm công (null = chưa đăng ký). */
+    public function khuonMat(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(AttendanceFace::class);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

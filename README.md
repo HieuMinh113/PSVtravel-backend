@@ -92,6 +92,9 @@ Có sẵn để thử các việc nghiệp vụ:
 - **Đơn đặt tour**: có tỷ lệ cọc; 1 đơn tới hạn nhắn khách hôm nay (nút
   "Nhắc đóng tiền", chuông, lọc "Cần nhắc khách"); 1 đơn đã trả đủ; 1 đơn khách
   đặt từ web chưa xác nhận.
+- **Chấm công**: `sale`, `visa1`, `visa2` có sẵn 10 ngày chấm công (trễ chờ duyệt,
+  ngoài công ty, mặt chưa khớp, quên chấm ra, bổ sung công). Khuôn mặt đăng ký
+  là ảnh mẫu — muốn thử camera thật thì vào *Khuôn mặt nhân viên* → *Cho đăng ký lại*.
 - Tài khoản mẫu **không** được tạo khi `APP_ENV=production`.
 - Chạy lại lệnh nhiều lần không sinh trùng.
 
@@ -210,6 +213,28 @@ Ai thấy gì:
   hồ sơ ở ô *Nhân viên phụ trách*.
 
 ---
+
+## Chấm công (khuôn mặt + vị trí)
+
+Menu **Chấm công**:
+
+- **Chấm công** — mọi nhân viên. Lần đầu tick đồng ý rồi chụp đăng ký khuôn mặt.
+  Mỗi ngày bấm *Chấm công vào* / *Chấm công ra*: máy chụp ảnh, so khuôn mặt
+  (chạy trên trình duyệt, không gửi ảnh ra ngoài) và lấy vị trí GPS. Đi trễ, về
+  sớm, ngoài công ty → phải ghi lý do. Quên chấm → *Xin bổ sung công*.
+- **Bảng chấm công / Bảng công tháng / Khuôn mặt nhân viên / Cấu hình chấm công**
+  — chỉ quản lý (quyền `ViewAll:Attendance`, mặc định super_admin + admin).
+
+Việc cần làm một lần: vào **Cấu hình chấm công**, đứng tại công ty bấm *Dùng vị
+trí hiện tại* → Lưu. Chưa đặt toạ độ thì máy chưa kiểm tra vị trí.
+
+- Camera và GPS chỉ chạy trên **https** (hoặc `http://localhost`). Mở trang
+  quản trị trên điện thoại bằng `https://api.psvtravel.com/admin/cham-cong`.
+- Khuôn mặt không khớp / không thấy mặt vẫn cho chấm nhưng đánh dấu *Nghi vấn*.
+- Ảnh chụp mỗi lần chấm tự xoá sau 3 tháng (lệnh `cham-cong:don-anh`, 2h30 sáng
+  — cần container `scheduler`). Giờ chấm, vị trí, lý do giữ lâu dài.
+- Thư viện nhận diện: `public/vendor/face-api` (MIT, ~8MB, trình duyệt tải một
+  lần rồi lưu cache).
 
 ## Xem mã OTP khi chưa cấu hình mail
 

@@ -11,6 +11,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Page\Models\Setting;
 
 class SettingResource extends Resource
@@ -35,7 +37,7 @@ class SettingResource extends Resource
         return false;
     }
 
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
@@ -48,6 +50,12 @@ class SettingResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return SettingForm::configure($schema);
+    }
+
+    // Cấu hình chấm công sửa ở trang riêng (có kiểm tra giờ, nút lấy vị trí)
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('group', '!=', 'cham_cong');
     }
 
     public static function table(Table $table): Table

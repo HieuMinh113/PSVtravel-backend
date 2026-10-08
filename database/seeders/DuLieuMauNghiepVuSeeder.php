@@ -2,7 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\Attendance;
+use App\Models\AttendanceFace;
 use App\Models\User;
+use App\Services\ChamCong\CauHinhChamCong;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
@@ -41,6 +44,7 @@ class DuLieuMauNghiepVuSeeder extends Seeder
         [$visa1, $visa2, $khach, $sale, $keToan] = $this->taiKhoan();
         $this->donTour($khach, $sale);
         $this->hoSoVisa($visa1, $visa2, $khach);
+        $this->chamCong(array_filter([$sale, $visa1, $visa2]));
 
         // Bật chuông "tới hạn nhắn khách" ngay, khỏi đợi lịch 8h/13h
         Artisan::call('don-tour:nhac-nhan-khach');
@@ -302,6 +306,80 @@ class DuLieuMauNghiepVuSeeder extends Seeder
         }
 
         return $hs;
+    }
+
+    /**
+     * Chấm công mẫu 10 ngày làm việc gần nhất: đúng giờ, trễ có lý do chờ duyệt,
+     * ngoài công ty, khuôn mặt chưa khớp, quên chấm ra, bổ sung công. Khuôn mặt
+     * đăng ký là số ngẫu nhiên + ảnh "MẪU" — muốn thử camera thật thì vào
+     * "Khuôn mặt nhân viên" bấm "Cho đăng ký lại".
+     *
+     * @param  list<User>  $dsNhanVien
+     */
+    private function chamCong(array $dsNhanVien): void
+    {
+        if (! $dsNhanVien || AttendanceFace::whereIn('user_id', collect($dsNhanVien)->pluck('id'))->exists()) {
+            return; // đã có thì thôi, khỏi đè dữ liệu người thử đã chấm
+        }
+        $lat = (float) (CauHinhChamCong::toaDo()[0] ?? 10.7397);
+        $lng = (float) (CauHinhChamCong::toaDo()[1] ?? 106.7303);
+
+        foreach ($dsNhanVien as $stt => $u) {
+            AttendanceFace::create([
+                'user_id' => $u->id,
+                'descriptor' => array_map(fn () => round(mt_rand(-1000, 1000) / 10000, 4), range(1, 128)),
+                'photo' => $this->anhChamCong($u, 'dang-ky', 'ANH DANG KY MAU'),
+                'consented_at' => now()->subDays(20),
+            ]);
+
+            for ($i = 0, $dem = 0; $dem < 10 && $i < 20; $i++) {
+                $d = today()->subDays($i + 1);
+                if ($d->isSunday()) {
+                    continue;
+                }
+                $dem++;
+                $kieu = ($dem + $stt) % 6;
+                $t7 = $d->isSaturday();
+                $vao = $d->copy()->setTime(7, 50 + ($dem % 8));
+                $ra = $d->copy()->setTime($t7 ? 12 : 17, $t7 ? 5 : 35);
+                $a = Attendance::cuaNgay($u->id, $d);
+                $chung = fn (string $p, $luc, string $viTri = 'trong', ?bool $khop = true, ?string $lyDo = null) => [
+                    "{$p}_at" => $luc, "{$p}_source" => 'cham',
+                    "{$p}_lat" => $viTri === 'trong' ? $lat + 0.0002 : $lat + 0.018, "{$p}_lng" => $lng,
+                    "{$p}_accuracy" => 15, "{$p}_distance" => $viTri === 'trong' ? 22 : 2003, "{$p}_location" => $viTri,
+                    "{$p}_photo" => $this->anhChamCong($u, $p.'-'.$d->format('Ymd'), 'ANH CHAM CONG MAU'),
+                    "{$p}_face_distance" => $khop === null ? null : ($khop ? 0.31 : 0.72), "{$p}_face_ok" => $khop,
+                    "{$p}_reason" => $lyDo,
+                ];
+                $duLieu = match ($kieu) {
+                    1 => [...$chung('in', $d->copy()->setTime(8, 25), 'trong', true, 'Kẹt xe cầu Kênh Tẻ'), ...$chung('out', $ra), 'review_status' => 'cho_duyet'],
+                    2 => [...$chung('in', $vao, 'ngoai', true, 'Đón đoàn khách ở sân bay Tân Sơn Nhất'), ...$chung('out', $ra), 'review_status' => 'chap_nhan', 'reviewed_by' => $this->adminId, 'reviewed_at' => $d->copy()->setTime(9, 0)],
+                    3 => [...$chung('in', $vao, 'trong', false), ...$chung('out', $ra)],
+                    4 => [...$chung('in', $vao), 'out_at' => null], // quên chấm ra
+                    5 => ['in_at' => $d->copy()->setTime(8, 0), 'in_source' => 'bo_sung', 'in_reason' => 'Bổ sung công: quên chấm, điện thoại hết pin', ...$chung('out', $ra), 'review_status' => 'cho_duyet'],
+                    default => [...$chung('in', $vao), ...$chung('out', $ra)],
+                };
+                $a->forceFill($duLieu)->save();
+            }
+        }
+    }
+
+    private function anhChamCong(User $u, string $nhan, string $chu): string
+    {
+        $anh = imagecreatetruecolor(360, 480);
+        imagefill($anh, 0, 0, imagecolorallocate($anh, 225, 232, 240));
+        $mau = imagecolorallocate($anh, 60, 80, 110);
+        imagefilledellipse($anh, 180, 200, 170, 220, imagecolorallocate($anh, 205, 180, 160));
+        imagestring($anh, 4, 20, 420, $chu, $mau);
+        imagestring($anh, 3, 20, 445, Str::ascii($u->name), $mau);
+        ob_start();
+        imagejpeg($anh, null, 75);
+        $noiDung = ob_get_clean();
+        imagedestroy($anh);
+        $duong = 'cham-cong/mau/'.$u->id.'-'.$nhan.'.jpg';
+        Storage::disk('rieng')->put($duong, $noiDung);
+
+        return $duong;
     }
 
     /** Ảnh biên lai chuyển khoản giả (ghi rõ MẪU) để thử màn hình kế toán duyệt. */

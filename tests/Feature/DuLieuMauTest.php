@@ -61,6 +61,13 @@ class DuLieuMauTest extends TestCase
         $this->actingAs(User::where('email', 'ketoan@psvtravel.com')->sole())->get('/admin/thong-ke-doanh-so')->assertOk()->assertSee('Kinh doanh — Thu Trang');
         $this->get('/admin/khoan-thu')->assertOk();
 
+        // Chấm công mẫu: 3 nhân viên × 10 ngày, có trễ chờ duyệt, nghi vấn, quên chấm ra
+        $this->assertSame(3, \App\Models\AttendanceFace::count());
+        $this->assertSame(30, \App\Models\Attendance::count());
+        $this->assertTrue(\App\Models\Attendance::where('review_status', 'cho_duyet')->exists());
+        $this->assertTrue(\App\Models\Attendance::all()->contains(fn ($a) => $a->nghiVan()));
+        $this->assertTrue(\App\Models\Attendance::all()->contains(fn ($a) => $a->late_minutes > 0));
+
         $this->artisan('psv:don-du-lieu-mau', ['--don-hang' => true, '--force' => true])->assertSuccessful();
         $this->assertSame(0, VisaCase::withTrashed()->count());
         $tep->each(fn ($d) => Storage::disk('rieng')->assertMissing($d));
