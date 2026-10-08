@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Spatie\Permission\Models\Role;
 
 class CreateNewUser implements CreatesNewUsers
 {
@@ -41,7 +42,7 @@ class CreateNewUser implements CreatesNewUsers
         ]);
 
         // Người tự đăng ký luôn là khách hàng — không bao giờ tự lên được admin/staff
-        $user->assignRole('customer');
+        $user->assignRole(Role::findOrCreate('customer', 'web'));
 
         return $user;
     }

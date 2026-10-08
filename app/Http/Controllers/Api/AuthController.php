@@ -10,9 +10,11 @@ use App\Models\User;
 use App\Services\OtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -23,19 +25,28 @@ class AuthController extends Controller
     {
         $data = $request->validated();
 
-        $user = User::create([
-            'name' => $data['name'],
-            'username' => $data['username'],
-            'email' => $data['email'],
-            'phone' => $data['phone'],
-            'password' => Hash::make($data['password']),
-            // email_verified_at để trống — chưa xác thực OTP thì chưa đăng nhập được
-        ]);
+        // Tạo tài khoản + gán vai trò + gửi mã trong MỘT giao dịch: bước nào
+        // lỗi (không gửi được mail…) thì huỷ cả, khách đăng ký lại được ngay —
+        // không để lại tài khoản dở dang "email đã được đăng ký" mà chưa có mã.
+        $user = DB::transaction(function () use ($data, $request) {
+            $user = User::create([
+                'name' => $data['name'],
+                'username' => $data['username'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'password' => Hash::make($data['password']),
+                // email_verified_at để trống — chưa xác thực OTP thì chưa đăng nhập được
+            ]);
 
-        // Người tự đăng ký luôn là khách hàng, không bao giờ tự lên được admin
-        $user->assignRole('customer');
+            // Người tự đăng ký luôn là khách hàng, không bao giờ tự lên được admin.
+            // findOrCreate: vai trò "customer" không có quyền nào nên dễ bị xoá
+            // nhầm ở trang Vai trò — từng làm MỌI lượt đăng ký lỗi 500.
+            $user->assignRole(Role::findOrCreate('customer', 'web'));
 
-        $this->otp->gui($user->email, OtpService::MUC_DICH_DANG_KY, $request->ip(), $user->name);
+            $this->otp->gui($user->email, OtpService::MUC_DICH_DANG_KY, $request->ip(), $user->name);
+
+            return $user;
+        });
 
         return response()->json([
             'message' => 'Đăng ký thành công! Mã xác thực đã được gửi tới email của bạn.',

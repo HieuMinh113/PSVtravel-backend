@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\OtpMail;
 use App\Models\OtpCode;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
@@ -48,7 +49,7 @@ class OtpService
         // random_int dùng nguồn ngẫu nhiên an toàn cho mật mã (không dùng rand/mt_rand)
         $ma = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        OtpCode::create([
+        $otp = OtpCode::create([
             'email' => $email,
             'purpose' => $purpose,
             'code_hash' => Hash::make($ma),
@@ -57,7 +58,18 @@ class OtpService
             'expires_at' => now()->addMinutes(self::HET_HAN_PHUT),
         ]);
 
-        Mail::to($email)->send(new OtpMail($ma, self::HET_HAN_PHUT, $tenNguoiNhan, $purpose));
+        try {
+            Mail::to($email)->send(new OtpMail($ma, self::HET_HAN_PHUT, $tenNguoiNhan, $purpose));
+        } catch (\Throwable $e) {
+            // Máy chủ mail lỗi / sai cấu hình: báo khách rõ ràng thay vì "Server
+            // Error", và bỏ mã vừa tạo để không tính vào giới hạn số lần gửi.
+            $otp->delete();
+            Log::error('Không gửi được mail mã xác thực', ['email' => $email, 'muc_dich' => $purpose, 'loi' => $e->getMessage()]);
+
+            throw ValidationException::withMessages([
+                'email' => 'Hệ thống chưa gửi được email mã xác thực. Vui lòng thử lại sau ít phút hoặc gọi hotline để được hỗ trợ.',
+            ]);
+        }
     }
 
     /**
