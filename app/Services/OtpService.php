@@ -21,11 +21,15 @@ use Illuminate\Validation\ValidationException;
 class OtpService
 {
     public const MUC_DICH_DANG_KY = 'register';
+
     public const MUC_DICH_QUEN_MK = 'reset_password';
 
     private const HET_HAN_PHUT = 10;      // mã sống 10 phút
+
     private const TOI_DA_NHAP_SAI = 5;    // sai 5 lần là huỷ mã
+
     private const CHO_GUI_LAI_GIAY = 60;  // phải chờ 60 giây mới xin mã mới
+
     private const TRAN_MOI_GIO = 5;       // tối đa 5 mã / giờ / email
 
     /**
@@ -53,7 +57,7 @@ class OtpService
             'expires_at' => now()->addMinutes(self::HET_HAN_PHUT),
         ]);
 
-        Mail::to($email)->send(new OtpMail($ma, self::HET_HAN_PHUT, $tenNguoiNhan));
+        Mail::to($email)->send(new OtpMail($ma, self::HET_HAN_PHUT, $tenNguoiNhan, $purpose));
     }
 
     /**

@@ -14,7 +14,7 @@
                     <tr>
                         <td style="background:linear-gradient(90deg,#0169A9,#0FA98D); padding:24px 28px; color:#ffffff;">
                             <p style="margin:0; font-size:20px; font-weight:700;">PSV Travel</p>
-                            <p style="margin:4px 0 0; font-size:13px; opacity:.85;">Xác thực tài khoản của bạn</p>
+                            <p style="margin:4px 0 0; font-size:13px; opacity:.85;">{{ $mucDich === 'reset_password' ? 'Đặt lại mật khẩu' : 'Xác thực tài khoản của bạn' }}</p>
                         </td>
                     </tr>
 
@@ -24,7 +24,11 @@
                                 Xin chào{{ $tenNguoiNhan ? ' '.$tenNguoiNhan : '' }},
                             </p>
                             <p style="margin:0 0 20px; font-size:14px; line-height:1.7; color:rgba(15,42,66,.75);">
-                                Đây là mã xác thực để hoàn tất đăng ký tài khoản PSV Travel.
+                                @if ($mucDich === 'reset_password')
+                                    Bạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu tài khoản PSV Travel. Đây là mã xác thực.
+                                @else
+                                    Đây là mã xác thực để hoàn tất đăng ký tài khoản PSV Travel.
+                                @endif
                                 Mã có hiệu lực trong <strong>{{ $soPhut }} phút</strong>.
                             </p>
 
@@ -38,7 +42,11 @@
                                 Vui lòng <strong>không chia sẻ mã này</strong> cho bất kỳ ai, kể cả người tự xưng là nhân viên PSV Travel.
                             </p>
                             <p style="margin:0; font-size:13px; line-height:1.7; color:rgba(15,42,66,.65);">
-                                Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email — tài khoản sẽ không được kích hoạt.
+                                @if ($mucDich === 'reset_password')
+                                    Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email — mật khẩu của bạn vẫn giữ nguyên.
+                                @else
+                                    Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email — tài khoản sẽ không được kích hoạt.
+                                @endif
                             </p>
                         </td>
                     </tr>

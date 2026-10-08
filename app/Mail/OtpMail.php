@@ -16,12 +16,18 @@ class OtpMail extends Mailable
         public string $ma,
         public int $soPhut,
         public ?string $tenNguoiNhan = null,
+        public string $mucDich = 'register',
     ) {}
+
+    public function quenMatKhau(): bool
+    {
+        return $this->mucDich === 'reset_password';
+    }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Mã xác thực tài khoản PSV Travel: '.$this->ma,
+            subject: ($this->quenMatKhau() ? 'Mã đặt lại mật khẩu PSV Travel: ' : 'Mã xác thực tài khoản PSV Travel: ').$this->ma,
         );
     }
 

@@ -1,19 +1,19 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AboutImageController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DestinationController;
-use App\Http\Controllers\Api\FaqController;
-use App\Http\Controllers\Api\JobPostingController;
-use App\Http\Controllers\Api\PartnerController;
-use App\Http\Controllers\Api\PromotionController;
-use App\Http\Controllers\Api\SubscriberController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
-use App\Http\Controllers\Api\TeamMemberController;
+use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\JobPostingController;
 use App\Http\Controllers\Api\MyBookingController;
+use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PromotionController;
+use App\Http\Controllers\Api\SubscriberController;
+use App\Http\Controllers\Api\TeamMemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->group(function () {
@@ -22,6 +22,9 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp');
     Route::post('resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:otp');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login-api');
+    // Quên mật khẩu: gửi mã qua email → nhập mã + mật khẩu mới
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:otp');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:otp');
 
     // Bắt buộc đăng nhập
     Route::middleware('auth:sanctum')->group(function () {

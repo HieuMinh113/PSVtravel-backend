@@ -11,6 +11,7 @@ use App\Services\OtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -89,6 +90,70 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Nếu email hợp lệ, mã xác thực mới đã được gửi. Vui lòng kiểm tra hộp thư.',
+        ]);
+    }
+
+    // POST /api/v1/auth/forgot-password — quên mật khẩu: gửi mã 6 số tới email
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate(
+            ['email' => ['required', 'email']],
+            ['email.required' => 'Vui lòng nhập email.', 'email.email' => 'Email không hợp lệ.'],
+        );
+        $email = strtolower(trim($data['email']));
+
+        // Không tiết lộ email có tài khoản hay không — chống dò tài khoản
+        $user = User::where('email', $email)->first();
+        if ($user) {
+            $this->otp->gui($user->email, OtpService::MUC_DICH_QUEN_MK, $request->ip(), $user->name);
+        }
+
+        return response()->json([
+            'message' => 'Nếu email đã đăng ký tài khoản, mã đặt lại mật khẩu đã được gửi tới hộp thư. Mã có hiệu lực 10 phút.',
+            'data' => ['email' => $email],
+        ]);
+    }
+
+    // POST /api/v1/auth/reset-password — nhập mã + mật khẩu mới, đăng nhập luôn
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()->uncompromised()],
+        ], [
+            'code.required' => 'Vui lòng nhập mã xác thực.',
+            'code.size' => 'Mã xác thực gồm 6 chữ số.',
+            'password.required' => 'Vui lòng nhập mật khẩu mới.',
+            'password.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
+        ]);
+        $email = strtolower(trim($data['email']));
+
+        $user = User::where('email', $email)->first();
+        if (! $user) {
+            // Cùng câu báo với mã sai — không cho biết email có tồn tại hay không
+            throw ValidationException::withMessages([
+                'code' => 'Mã xác thực không tồn tại hoặc đã hết hạn. Vui lòng bấm gửi lại mã.',
+            ]);
+        }
+
+        $this->otp->xacThuc($email, OtpService::MUC_DICH_QUEN_MK, $data['code']);
+
+        // Nhận được mã qua email = chứng minh sở hữu email → xác thực luôn nếu chưa
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ])->save();
+
+        // Thu hồi mọi phiên đăng nhập cũ — ai đang chiếm tài khoản sẽ bị đá ra
+        $user->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Đặt lại mật khẩu thành công.',
+            'data' => [
+                'user' => new UserResource($user),
+                'token' => $this->taoToken($user),
+            ],
         ]);
     }
 
