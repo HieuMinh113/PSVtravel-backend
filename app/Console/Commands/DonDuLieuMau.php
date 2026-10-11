@@ -41,6 +41,10 @@ class DonDuLieuMau extends Command
         'reviews',
         'moments',
         'banners',
+        // bản đồ cẩm nang trỏ tới bài viết → xoá trước guides
+        'guide_spots',
+        'guide_cities',
+        'guide_countries',
         'guides',
         'flight_deals',
         'airlines',
