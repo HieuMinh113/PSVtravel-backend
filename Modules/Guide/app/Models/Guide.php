@@ -5,6 +5,7 @@ namespace Modules\Guide\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Tour\Models\Tour;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -33,6 +34,18 @@ class Guide extends Model
     public function tour(): BelongsTo
     {
         return $this->belongsTo(Tour::class);
+    }
+
+    /** Các điểm trên bản đồ cẩm nang mở ra bài này. */
+    public function spots(): HasMany
+    {
+        return $this->hasMany(GuideSpot::class);
+    }
+
+    /** Thành phố trên bản đồ dùng bài này làm bài tổng quan. */
+    public function mapCities(): HasMany
+    {
+        return $this->hasMany(GuideCity::class);
     }
 
     public function scopeDangHienThi($query)

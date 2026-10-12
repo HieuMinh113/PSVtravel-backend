@@ -48,7 +48,8 @@ class SpotsRelationManager extends RelationManager
                 ->relationship('guide', 'title')
                 ->searchable()
                 ->preload()
-                ->helperText('Chưa có bài thì viết ở mục Cẩm nang trước. Để trống: điểm vẫn hiện, chỉ có mô tả ngắn.')
+                ->required()
+                ->helperText('Khách bấm vào điểm là mở thẳng bài này. Chưa có bài thì viết ở mục Cẩm nang trước.')
                 ->columnSpanFull(),
             Textarea::make('summary')
                 ->label('Mô tả ngắn')

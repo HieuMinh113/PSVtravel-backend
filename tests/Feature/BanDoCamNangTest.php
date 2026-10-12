@@ -67,6 +67,14 @@ class BanDoCamNangTest extends TestCase
         $this->assertSame('ben-thuong-hai', $tp['spots'][0]['guide']['slug']);
         $this->assertNull($tp['spots'][1]['guide']); // bài nháp: điểm vẫn hiện, không có nút đọc
         $this->assertSame('Ăn uống', $r->json('data.types.an_uong'));
+
+        // Trang bài biết bài nằm ở đâu trên bản đồ (để mở bản đồ đúng thành phố)
+        $bai = $this->getJson('/api/v1/guides/ben-thuong-hai')->assertOk();
+        $this->assertSame([['id' => GuideSpot::where('name', 'Bến Thượng Hải')->value('id'), 'name' => 'Bến Thượng Hải', 'lat' => 31.24, 'lng' => 121.49,
+            'tp' => 'thuong-hai', 'ten_tp' => 'Thượng Hải', 'nuoc' => 'trung-quoc']], $bai->json('data.map_spots'));
+        $this->assertSame([], $bai->json('data.map_cities'));
+        $tongQuan = $this->getJson('/api/v1/guides/thuong-hai-tu-tuc')->assertOk();
+        $this->assertSame([['tp' => 'thuong-hai', 'ten_tp' => 'Thượng Hải', 'nuoc' => 'trung-quoc']], $tongQuan->json('data.map_cities'));
     }
 
     public function test_du_lieu_mau_va_lenh_don(): void
@@ -74,6 +82,7 @@ class BanDoCamNangTest extends TestCase
         $this->seed(BanDoCamNangMauSeeder::class);
         $this->assertGreaterThanOrEqual(5, GuideCountry::count());
         $this->assertTrue(GuideSpot::where('name', 'Bến Thượng Hải (The Bund)')->whereNotNull('guide_id')->exists());
+        $this->assertSame(0, GuideSpot::whereNull('guide_id')->count()); // điểm nào cũng mở ra một bài
         $this->getJson('/api/v1/guide-map')->assertOk()->assertJsonCount(GuideCountry::count(), 'data.countries');
 
         $this->artisan('psv:don-du-lieu-mau', ['--force' => true])->assertSuccessful();
@@ -116,7 +125,7 @@ class BanDoCamNangTest extends TestCase
         // Toạ độ ngoài phạm vi bị chặn
         Livewire::test(SpotsRelationManager::class, ['ownerRecord' => $sh, 'pageClass' => EditGuideCity::class])
             ->callAction(TestAction::make('create')->table(), data: ['name' => 'Sai', 'type' => 'khac', 'lat' => 120, 'lng' => 500, 'status' => 'published'])
-            ->assertHasFormErrors(['lat', 'lng']);
+            ->assertHasFormErrors(['lat', 'lng', 'guide_id']); // toạ độ ngoài phạm vi, chưa gắn bài
 
         // Không có quyền thì không vào được
         $this->actingAs(User::factory()->create());

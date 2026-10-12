@@ -27,6 +27,24 @@ class GuideDetailResource extends JsonResource
             'meta_description' => $this->excerpt,
             // Tour gắn kèm để hiện ô đặt tour bên bài viết (null nếu admin không gắn).
             'tour' => $this->whenLoaded('tour', fn () => $this->tour ? $this->duLieuTour($this->tour) : null),
+            // Bài nằm ở đâu trên bản đồ cẩm nang — trang bài mở bản đồ đúng thành phố,
+            // đánh dấu điểm "đang đọc". Chỉ tính điểm / thành phố / nước đang hiện.
+            'map_spots' => $this->whenLoaded('spots', fn () => $this->spots
+                ->filter(fn ($d) => $d->status === 'published' && $d->city?->status === 'published' && $d->city->country?->status === 'published')
+                ->sortBy('sort_order')
+                ->map(fn ($d) => [
+                    'id' => $d->id,
+                    'name' => $d->name,
+                    'lat' => $d->lat,
+                    'lng' => $d->lng,
+                    'tp' => $d->city->slug,
+                    'ten_tp' => $d->city->name,
+                    'nuoc' => $d->city->country->slug,
+                ])->values()),
+            'map_cities' => $this->whenLoaded('mapCities', fn () => $this->mapCities
+                ->filter(fn ($t) => $t->status === 'published' && $t->country?->status === 'published')
+                ->map(fn ($t) => ['tp' => $t->slug, 'ten_tp' => $t->name, 'nuoc' => $t->country->slug])
+                ->values()),
         ];
     }
 

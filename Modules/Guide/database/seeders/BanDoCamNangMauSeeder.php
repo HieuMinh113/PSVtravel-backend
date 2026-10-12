@@ -103,7 +103,7 @@ class BanDoCamNangMauSeeder extends Seeder
                 foreach ($dsDiem as $j => [$tenDiem, $loai, $dLat, $dLng, $tomTat, $tieuDeBai]) {
                     GuideSpot::updateOrCreate(['guide_city_id' => $tp->id, 'name' => $tenDiem], [
                         'type' => $loai, 'lat' => $dLat, 'lng' => $dLng, 'summary' => $tomTat,
-                        'guide_id' => ($bai($tieuDeBai) ?? $tp->guide)?->id, 'status' => 'published', 'sort_order' => $j + 1,
+                        'guide_id' => $bai($tieuDeBai ?? 'Cẩm nang '.$tenDiem.' – '.$tenTp)->id, 'status' => 'published', 'sort_order' => $j + 1,
                     ]);
                 }
             }
