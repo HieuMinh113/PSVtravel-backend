@@ -11,11 +11,13 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Modules\Guide\Database\Seeders\BanDoCamNangMauSeeder;
+use Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder;
 use Modules\Guide\Models\Guide;
 use Modules\Guide\Models\GuideCity;
 use Modules\Guide\Models\GuideCountry;
 use Modules\Guide\Models\GuideSpot;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -92,12 +94,12 @@ class BanDoCamNangTest extends TestCase
     public function test_migrate_tu_cap_quyen_ban_do_cho_admin_va_nguoi_sua_cam_nang(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $sieu = \Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
-        $bienTap = \Spatie\Permission\Models\Role::findOrCreate('bien_tap', 'web');
+        $sieu = Role::findOrCreate('super_admin', 'web');
+        $bienTap = Role::findOrCreate('bien_tap', 'web');
         $bienTap->givePermissionTo(Permission::findOrCreate('Update:Guide', 'web'));
-        $sale = \Spatie\Permission\Models\Role::findOrCreate('sale', 'web');
+        $sale = Role::findOrCreate('sale', 'web');
 
-        (new \Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder)->run();
+        (new QuyenBanDoCamNangSeeder)->run();
 
         $this->assertTrue($sieu->fresh()->hasPermissionTo('ViewAny:GuideCountry'));
         $this->assertTrue($sieu->fresh()->hasPermissionTo('Reorder:GuideCity'));
