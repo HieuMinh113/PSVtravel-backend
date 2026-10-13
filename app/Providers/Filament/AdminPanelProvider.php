@@ -8,6 +8,7 @@ use App\Filament\Widgets\TongQuanWidget;
 use App\Http\Controllers\Admin\DocLinkBanDoController;
 use App\Http\Controllers\Admin\NhipThongBaoController;
 use App\Http\Controllers\Admin\TaiMaQrTourController;
+use App\Http\Controllers\Admin\TaiTepUngTuyenController;
 use App\Http\Middleware\BatBuoc2faQuanTri;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
@@ -111,6 +112,11 @@ class AdminPanelProvider extends PanelProvider
                 Route::get('psv/doc-link-ban-do', DocLinkBanDoController::class)
                     ->middleware([BatBuoc2faQuanTri::class, 'throttle:30,1'])
                     ->name('psv.doc-link-ban-do');
+                // Mở CV / portfolio của hồ sơ ứng tuyển (kiểm tra quyền mỗi lần mở)
+                Route::get('ung-tuyen/{hoSo}/{loai}', TaiTepUngTuyenController::class)
+                    ->whereIn('loai', ['cv', 'portfolio'])
+                    ->middleware(BatBuoc2faQuanTri::class)
+                    ->name('ung-tuyen.tep');
             })
             ->renderHook(PanelsRenderHook::BODY_END, fn () => auth()->check() ? view('filament.thong-bao.nhip') : '')
             ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.thong-bao.nut-tieng'));

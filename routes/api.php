@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DestinationController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
 use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\JobApplicationController;
 use App\Http\Controllers\Api\JobPostingController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\PartnerController;
@@ -76,6 +77,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('jobs/{slug}', [JobPostingController::class, 'show']);
     Route::get('partners', [PartnerController::class, 'index']);
 });
+
+// Ứng viên gửi hồ sơ (CV + portfolio PDF) từ trang chi tiết tin tuyển dụng
+Route::post('v1/jobs/{slug}/apply', [JobApplicationController::class, 'store'])
+    ->middleware('throttle:ung-tuyen');
 
 // Khách đăng ký nhận ưu đãi — chống spam bằng giới hạn tần suất của form liên hệ
 Route::post('v1/subscribe', [SubscriberController::class, 'store'])

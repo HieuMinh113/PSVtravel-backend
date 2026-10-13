@@ -44,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Spatie\Activitylog\Models\Activity::class, \App\Policies\ActivityPolicy::class);
         Gate::policy(\Modules\Booking\Models\Payment::class, \Modules\Booking\Policies\PaymentPolicy::class);
         Gate::policy(\App\Models\ContactMessage::class, \App\Policies\ContactMessagePolicy::class);
+        Gate::policy(\App\Models\JobApplication::class, \App\Policies\JobApplicationPolicy::class);
         Gate::policy(\Modules\Alliance\Models\AllianceSource::class, \Modules\Alliance\Policies\AllianceSourcePolicy::class);
         Gate::policy(\Modules\Alliance\Models\AllianceDeparture::class, \Modules\Alliance\Policies\AllianceDeparturePolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
@@ -92,6 +93,11 @@ class AppServiceProvider extends ServiceProvider
         });
         \Illuminate\Support\Facades\RateLimiter::for('visa-tep', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(30)->by($request->ip());
+        });
+
+        // Ứng tuyển trên web (kèm CV / portfolio PDF): 5 hồ sơ/giờ/IP
+        \Illuminate\Support\Facades\RateLimiter::for('ung-tuyen', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perHour(5)->by($request->ip());
         });
 
         // Ghi nhận lượt đọc cẩm nang: 30 lần/phút/IP — đủ cho người đọc thật,

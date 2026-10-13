@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JobPosting extends Model
@@ -20,6 +21,11 @@ class JobPosting extends Model
         'quantity' => 'integer',
         'sort_order' => 'integer',
     ];
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(JobApplication::class);
+    }
 
     public function scopeDangHienThi($query)
     {

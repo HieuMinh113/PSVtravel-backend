@@ -22,6 +22,8 @@ class JobPostingsTable
                 TextColumn::make('department')->label('Phòng ban')->placeholder('—'),
                 TextColumn::make('location')->label('Nơi làm')->placeholder('—'),
                 TextColumn::make('deadline')->label('Hạn nộp')->date('d/m/Y')->placeholder('—')->sortable(),
+                // Số người đã gửi hồ sơ (CV) cho vị trí này từ website
+                TextColumn::make('applications_count')->label('Hồ sơ')->counts('applications')->badge()->color('info')->sortable(),
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
