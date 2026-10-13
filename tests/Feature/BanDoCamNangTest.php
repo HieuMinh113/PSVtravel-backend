@@ -89,6 +89,28 @@ class BanDoCamNangTest extends TestCase
         $this->assertSame(0, GuideCountry::count() + GuideCity::count() + GuideSpot::count());
     }
 
+    public function test_migrate_tu_cap_quyen_ban_do_cho_admin_va_nguoi_sua_cam_nang(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $sieu = \Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
+        $bienTap = \Spatie\Permission\Models\Role::findOrCreate('bien_tap', 'web');
+        $bienTap->givePermissionTo(Permission::findOrCreate('Update:Guide', 'web'));
+        $sale = \Spatie\Permission\Models\Role::findOrCreate('sale', 'web');
+
+        (new \Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder)->run();
+
+        $this->assertTrue($sieu->fresh()->hasPermissionTo('ViewAny:GuideCountry'));
+        $this->assertTrue($sieu->fresh()->hasPermissionTo('Reorder:GuideCity'));
+        $this->assertTrue($bienTap->fresh()->hasPermissionTo('Create:GuideSpot'));
+        $this->assertFalse($sale->fresh()->hasPermissionTo('ViewAny:GuideCountry'));
+
+        // Người sửa được cẩm nang đăng nhập là thấy ngay hai mục trên menu
+        // (super_admin bị bắt bật 2FA trước khi vào nên không dùng để thử ở đây)
+        $this->actingAs(User::factory()->create()->assignRole('bien_tap'));
+        $this->get('/admin')->assertOk()->assertSee('Bản đồ: Quốc gia')->assertSee('Bản đồ: Thành phố &amp; điểm', false);
+        $this->get('/admin/ban-do-quoc-gia/create')->assertOk();
+    }
+
     public function test_quan_tri_them_nuoc_thanh_pho_diem(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));

@@ -61,6 +61,8 @@ class RoleSeeder extends Seeder
         $this->call(QuyenChamCongSeeder::class);
         // Vai trò theo bộ phận: sale, kế toán, marketing, điều hành, visa
         $this->call(VaiTroNhanVienSeeder::class);
+        // Bản đồ cẩm nang: admin + ai sửa được Cẩm nang
+        $this->call(\Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder::class);
 
         // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
         // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này
