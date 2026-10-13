@@ -207,6 +207,19 @@ class TourForm
                             }
                         },
                     ]),
+                TextInput::make('infant_price')
+                    ->label('Giá em bé (dưới 2 tuổi)')
+                    ->helperText('Chỉ hiện cho khách xem trên trang tour. Để trống nếu không có.')
+                    ->numeric()
+                    ->minValue(0)
+                    ->suffix('₫')
+                    ->rules([
+                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                            if ($value !== null && $value !== '' && (int) $value > (int) $get('adult_price')) {
+                                $fail('Giá em bé không được cao hơn giá người lớn.');
+                            }
+                        },
+                    ]),
                 TextInput::make('old_price')
                     ->label('Giá gốc (gạch ngang)')
                     ->helperText('Giá trước khuyến mãi. Phải CAO HƠN giá người lớn thì mới hiện được phần trăm giảm.')

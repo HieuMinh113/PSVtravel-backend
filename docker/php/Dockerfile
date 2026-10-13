@@ -1,5 +1,6 @@
 FROM php:8.4-fpm-alpine
 
+# poppler-utils: lệnh pdftohtml để đọc file chương trình tour dạng PDF (Nhập tour từ file)
 RUN apk add --no-cache \
     postgresql-dev \
     libzip-dev \
@@ -12,6 +13,7 @@ RUN apk add --no-cache \
     libpng-dev \
     oniguruma-dev \
     icu-dev \
+    poppler-utils \
     $PHPIZE_DEPS
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \

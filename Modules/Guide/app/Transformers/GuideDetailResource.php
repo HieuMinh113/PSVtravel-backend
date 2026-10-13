@@ -68,6 +68,7 @@ class GuideDetailResource extends JsonResource
             'departure_from' => $tour->departure_from,
             'adult_price' => $tour->adult_price,
             'child_price' => $tour->child_price,
+            'infant_price' => $tour->infant_price,
             'old_price' => $tour->old_price,
             'cover_image' => $this->anh($tour->cover_image),
             'next_start_date' => $dauTien?->start_date?->format('d/m/Y'),

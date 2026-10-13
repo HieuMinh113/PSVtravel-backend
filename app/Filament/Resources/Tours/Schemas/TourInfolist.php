@@ -53,6 +53,10 @@ class TourInfolist
                     ->label('Giá trẻ em')
                     ->money('VND')
                     ->placeholder('—'),
+                TextEntry::make('infant_price')
+                    ->label('Giá em bé (dưới 2 tuổi)')
+                    ->money('VND')
+                    ->placeholder('—'),
                 TextEntry::make('old_price')
                     ->label('Giá gốc')
                     ->money('VND')

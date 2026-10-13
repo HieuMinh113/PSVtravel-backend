@@ -16,6 +16,7 @@ class ActivityInfolist
         'status' => 'Trạng thái',
         'adult_price' => 'Giá người lớn',
         'child_price' => 'Giá trẻ em',
+        'infant_price' => 'Giá em bé',
         'old_price' => 'Giá gốc',
         'is_featured' => 'Nổi bật',
         'type' => 'Loại tour',

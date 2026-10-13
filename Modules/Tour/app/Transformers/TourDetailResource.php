@@ -25,6 +25,7 @@ class TourDetailResource extends JsonResource
             'visa_deadline_days' => $this->visa_deadline_days,
             'adult_price' => $this->adult_price,
             'child_price' => $this->child_price,
+            'infant_price' => $this->infant_price,
             'old_price' => $this->old_price,
             'tag' => $this->tag,
             'cover_image' => $this->cover_image

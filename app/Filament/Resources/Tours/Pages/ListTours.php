@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tours\Pages;
 
+use App\Filament\Resources\Tours\Actions\NhapTuFileAction;
 use App\Filament\Resources\Tours\TourResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -13,6 +14,7 @@ class ListTours extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            NhapTuFileAction::make(),
             CreateAction::make(),
         ];
     }

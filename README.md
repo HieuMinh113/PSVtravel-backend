@@ -244,6 +244,25 @@ Ai thấy gì:
 
 ---
 
+## Nhập tour từ file Word / PDF
+
+**Tour → Nhập từ file Word/PDF** (ai có quyền tạo tour): tải file chương trình
+tour của đối tác (.docx hoặc .pdf, tối đa 20MB) → xem trước những gì máy đọc
+được → **Nhập tour**. Máy tạo tour **Nháp** (chưa hiện ngoài web) gồm tên, giá
+người lớn / trẻ em / em bé, ngày khởi hành còn đi được (mỗi ngày 24 chỗ, ngày đã
+qua bỏ qua), lịch trình từng ngày kèm bữa ăn và ảnh, điểm nổi bật, bao gồm /
+không bao gồm, điều kiện huỷ, lưu ý, hạn nộp visa — rồi mở trang sửa tour để
+xem lại và đổi sang *Đang bán*.
+
+- Đã có tour **cùng tên** → hỏi: chỉ cập nhật giá + ngày khởi hành (giữ nội
+  dung, ảnh, số chỗ đã sửa) hay tạo thêm tour mới.
+- File Word đọc chính xác hơn PDF. File `.doc` đời cũ: mở bằng Word, "Lưu thành" `.docx`.
+- Đọc PDF cần lệnh `pdftohtml` (gói `poppler-utils`, đã có trong ảnh Docker
+  `app`). Sau khi cập nhật code lần đầu: `docker compose build app && docker compose up -d`.
+- Ảnh lấy từ file đối tác có thể dính logo / bản quyền — xem lại trước khi đăng.
+
+---
+
 ## Chấm công (khuôn mặt + vị trí)
 
 Menu **Chấm công**:
