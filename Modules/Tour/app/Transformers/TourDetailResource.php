@@ -21,6 +21,8 @@ class TourDetailResource extends JsonResource
             'duration_days' => $this->duration_days,
             'duration_nights' => $this->duration_nights,
             'departure_from' => $this->departure_from,
+            // Quy tắc chung "nộp hồ sơ visa trước ngày khởi hành N ngày" (null = không đặt)
+            'visa_deadline_days' => $this->visa_deadline_days,
             'adult_price' => $this->adult_price,
             'child_price' => $this->child_price,
             'old_price' => $this->old_price,
@@ -78,6 +80,9 @@ class TourDetailResource extends JsonResource
                     'start_date_display' => $d->start_date->format('d/m/Y'),
                     'price' => $d->price_override ?? $this->adult_price,
                     'seats_left' => $d->seats_left,
+                    // Hạn nộp hồ sơ visa của đợt (riêng của đợt, không có thì theo quy tắc chung)
+                    'visa_deadline' => $d->hanVisa($this->resource)?->format('Y-m-d'),
+                    'visa_deadline_display' => $d->hanVisa($this->resource)?->format('d/m/Y'),
                 ]),
 
             'categories' => $this->categories->map(fn ($c) => [

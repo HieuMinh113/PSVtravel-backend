@@ -35,7 +35,7 @@ class BookingLookupController extends Controller
 
         $booking = Booking::query()
             ->where('booking_code', $ma)
-            ->with(['tour:id,slug,name,cover_image,type,duration_days', 'departure:id,start_date'])
+            ->with(['tour:id,slug,name,cover_image,type,duration_days,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
             ->first();
 
         // Trả về CÙNG một thông báo cho mọi trường hợp sai — không hé lộ
@@ -59,6 +59,7 @@ class BookingLookupController extends Controller
                     : asset('storage/'.$booking->tour->cover_image))
                 : null,
             'start_date' => $booking->departure?->start_date?->format('d/m/Y'),
+            'visa_deadline' => $booking->hanNopVisa()?->format('d/m/Y'),
             // Đợt khởi hành chỉ lưu ngày đi; ngày về suy ra từ số ngày của tour
             // (tour 3 ngày khởi hành 01/09 thì về ngày 03/09).
             'end_date' => $this->ngayVe($booking),

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Bookings\Schemas;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Modules\Booking\Models\Booking;
+use Modules\Tour\Models\TourDeparture;
 
 class BookingInfolist
 {
@@ -21,6 +22,14 @@ class BookingInfolist
                     ->label('Đợt khởi hành')
                     ->date('d/m/Y')
                     ->placeholder('—'),
+                TextEntry::make('han_nop_visa')
+                    ->label('Hạn nộp hồ sơ visa')
+                    ->state(fn (Booking $record) => $record->hanNopVisa())
+                    ->date('d/m/Y')
+                    ->color(fn (Booking $record): ?string => ($n = TourDeparture::conNgay($record->hanNopVisa())) !== null && $n <= 7 ? 'danger' : null)
+                    ->helperText(fn (Booking $record): ?string => ($n = TourDeparture::conNgay($record->hanNopVisa())) === null
+                        ? null : ($n < 0 ? 'Đã qua hạn' : "Còn {$n} ngày"))
+                    ->visible(fn (Booking $record): bool => (bool) $record->hanNopVisa()),
                 TextEntry::make('user.name')
                     ->label('Tài khoản khách')
                     ->placeholder('Khách vãng lai'),

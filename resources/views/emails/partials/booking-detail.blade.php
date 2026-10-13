@@ -37,6 +37,7 @@
                style="border-top:1px solid #eaf2f7; margin-top:8px;">
             {!! $dong('Ngày khởi hành', $ngayDi?->format('d/m/Y')) !!}
             {!! $dong('Ngày về (dự kiến)', $ngayVe?->format('d/m/Y')) !!}
+            {!! $dong('Hạn nộp hồ sơ visa', $booking->hanNopVisa()?->format('d/m/Y')) !!}
             {!! $dong('Số khách', $booking->adults.' người lớn'.($booking->children > 0 ? ', '.$booking->children.' trẻ em' : '')) !!}
             {!! $dong('Người liên hệ', $booking->customer_name.' — '.$booking->customer_phone) !!}
             @if ($booking->choBaoGiaTreEm())

@@ -34,6 +34,11 @@ class TourInfolist
                 TextEntry::make('departure_from')
                     ->label('Khởi hành từ')
                     ->placeholder('—'),
+                TextEntry::make('visa_deadline_days')
+                    ->label('Hạn nộp hồ sơ visa')
+                    ->formatStateUsing(fn ($state): string => 'Trước ngày khởi hành '.$state.' ngày')
+                    ->placeholder('Không đặt')
+                    ->visible(fn ($record): bool => $record?->type === 'abroad'),
                 TextEntry::make('duration_days')
                     ->label('Số ngày')
                     ->numeric(),

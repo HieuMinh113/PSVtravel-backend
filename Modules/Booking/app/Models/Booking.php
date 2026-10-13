@@ -242,6 +242,28 @@ class Booking extends Model
         return $this->belongsTo(TourDeparture::class, 'tour_departure_id');
     }
 
+    /**
+     * Hạn nộp hồ sơ visa của đợt khách đã đặt (xem TourDeparture::hanVisa).
+     * Nhiều chỗ chỉ nạp vài cột của tour / đợt (id, start_date…) — thiếu cột
+     * hạn visa thì nạp lại cho đủ, kẻo hạn có mà mail / phiếu không ghi.
+     */
+    public function hanNopVisa(): ?Carbon
+    {
+        $dot = $this->departure;
+        if (! $dot) {
+            return null;
+        }
+        if (! array_key_exists('visa_deadline', $dot->getAttributes())) {
+            $dot = TourDeparture::find($dot->getKey());
+        }
+        $tour = $this->tour;
+        if ($tour && ! array_key_exists('visa_deadline_days', $tour->getAttributes())) {
+            $tour = Tour::withTrashed()->find($tour->getKey());
+        }
+
+        return $dot?->hanVisa($tour);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

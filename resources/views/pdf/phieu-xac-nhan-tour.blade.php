@@ -65,6 +65,9 @@
 <table class="bang">
     <tr><td class="nhan">Tour</td><td class="dam">{{ $don->tour?->name ?? '—' }}</td></tr>
     <tr><td class="nhan">Ngày khởi hành</td><td>{{ $don->departure?->start_date?->format('d/m/Y') ?? 'Nhân viên sẽ xác nhận' }}</td></tr>
+    @if ($hanVisa = $don->hanNopVisa())
+        <tr><td class="nhan">Hạn nộp hồ sơ visa</td><td>{{ $hanVisa->format('d/m/Y') }}</td></tr>
+    @endif
     @if ($ngayVe)<tr><td class="nhan">Ngày về (dự kiến)</td><td>{{ $ngayVe->format('d/m/Y') }}</td></tr>@endif
     <tr><td class="nhan">Số khách</td><td>{{ $don->adults }} người lớn{{ $don->children > 0 ? ', '.$don->children.' trẻ em' : '' }}</td></tr>
 </table>

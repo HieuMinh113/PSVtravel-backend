@@ -147,6 +147,19 @@ class TourForm
                 TextInput::make('departure_from')
                     ->label('Khởi hành từ')
                     ->maxLength(255),
+                // Hạn nộp hồ sơ visa — quy tắc chung cho mọi ngày khởi hành.
+                // Ngày nào đối tác chốt hạn riêng thì đặt trong "Lịch khởi hành".
+                TextInput::make('visa_deadline_days')
+                    ->label('Hạn nộp hồ sơ visa')
+                    ->prefix('Trước ngày khởi hành')
+                    ->suffix('ngày')
+                    ->numeric()
+                    ->integer()
+                    ->minValue(1)
+                    ->maxValue(180)
+                    ->placeholder('VD: 30')
+                    ->helperText('Áp dụng cho mọi ngày khởi hành; ngày nào có hạn riêng thì đặt ở bảng "Lịch khởi hành" bên dưới. Để trống nếu tour không cần visa. Khách thấy hạn này trên trang tour, trong email và phiếu xác nhận.')
+                    ->visible(fn (Get $get): bool => $get('type') === 'abroad'),
 
                 TextInput::make('duration_days')
                     ->label('Số ngày')

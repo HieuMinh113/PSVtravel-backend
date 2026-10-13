@@ -58,6 +58,19 @@ class DeparturesRelationManager extends RelationManager
                         };
                     },
                 ]),
+            // Hạn nộp visa riêng của đợt này (đối tác chốt ngày cụ thể). Trống =
+            // theo quy tắc chung của tour "trước ngày khởi hành N ngày".
+            DatePicker::make('visa_deadline')
+                ->label('Hạn nộp hồ sơ visa (riêng đợt này)')
+                ->native(false)
+                ->displayFormat('d/m/Y')
+                ->placeholder(fn (): string => $this->quyTacVisa() ? 'Theo quy tắc chung' : 'Không đặt')
+                ->helperText(fn (): string => $this->quyTacVisa()
+                    ? 'Để trống = '.$this->quyTacVisa().' (đặt ở thông tin tour).'
+                    : 'Tour chưa đặt quy tắc chung — để trống là đợt này không hiện hạn visa.')
+                ->before('start_date')
+                ->validationMessages(['before' => 'Hạn nộp visa phải trước ngày khởi hành.'])
+                ->visible(fn (?TourDeparture $record): bool => $this->getOwnerRecord()->type === 'abroad' || filled($record?->visa_deadline)),
             TextInput::make('price_override')
                 ->label('Giá riêng đợt này')
                 ->helperText('Để trống nếu dùng giá mặc định của tour')
@@ -95,6 +108,14 @@ class DeparturesRelationManager extends RelationManager
         ]);
     }
 
+    /** "trước ngày khởi hành 30 ngày" — quy tắc chung của tour, null nếu chưa đặt */
+    private function quyTacVisa(): ?string
+    {
+        $n = (int) $this->getOwnerRecord()->visa_deadline_days;
+
+        return $n > 0 ? "trước ngày khởi hành {$n} ngày" : null;
+    }
+
     /** @var array<string,string>|null ngày => "Theo sheet: ..." (nạp 1 lần cho cả bảng) */
     private ?array $ngayLienMinh = null;
 
@@ -118,6 +139,26 @@ class DeparturesRelationManager extends RelationManager
                     ->label('Ngày khởi hành')
                     ->date('d/m/Y')
                     ->sortable(),
+                // Hạn thực tế khách thấy: hạn riêng của đợt, không có thì theo quy tắc chung
+                TextColumn::make('han_visa')
+                    ->label('Hạn nộp visa')
+                    ->state(fn (TourDeparture $record) => $record->hanVisa($this->getOwnerRecord()))
+                    ->date('d/m/Y')
+                    ->placeholder('—')
+                    ->description(fn (TourDeparture $record): ?string => match (true) {
+                        filled($record->visa_deadline) => 'Hạn riêng',
+                        (bool) $this->quyTacVisa() => 'Theo quy tắc chung',
+                        default => null,
+                    })
+                    ->color(fn (TourDeparture $record): ?string => match (true) {
+                        ($n = TourDeparture::conNgay($record->hanVisa($this->getOwnerRecord()))) === null => null,
+                        $n < 0 => 'danger',
+                        $n <= 7 => 'warning',
+                        default => null,
+                    })
+                    ->tooltip(fn (TourDeparture $record): ?string => ($n = TourDeparture::conNgay($record->hanVisa($this->getOwnerRecord()))) === null
+                        ? null : ($n < 0 ? 'Đã qua hạn nộp visa' : "Còn {$n} ngày"))
+                    ->visible(fn (): bool => $this->getOwnerRecord()->type === 'abroad'),
                 TextColumn::make('price_override')
                     ->label('Giá riêng')
                     ->money('VND')

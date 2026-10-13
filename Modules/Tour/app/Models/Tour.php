@@ -36,7 +36,7 @@ class Tour extends Model
 
     protected $fillable = [
         'slug', 'name', 'seo_title', 'type', 'region', 'country',
-        'duration_days', 'duration_nights', 'departure_from',
+        'duration_days', 'duration_nights', 'departure_from', 'visa_deadline_days',
         'adult_price', 'child_price', 'old_price',
         'tag', 'cover_image', 'video_url',
         'highlights', 'included', 'excluded',
@@ -56,6 +56,7 @@ class Tour extends Model
         'old_price'    => 'integer',
         'rating'       => 'decimal:1',
         'review_count' => 'integer',
+        'visa_deadline_days' => 'integer',
         'is_featured'  => 'boolean',
         'sort_order'   => 'integer',
     ];
@@ -134,7 +135,7 @@ class Tour extends Model
         return LogOptions::defaults()
             ->logOnly([
                 'name', 'slug', 'status', 'adult_price', 'child_price',
-                'old_price', 'is_featured', 'type',
+                'old_price', 'is_featured', 'type', 'visa_deadline_days',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()

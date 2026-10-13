@@ -17,7 +17,7 @@ class MyBookingController extends Controller
 
         $bookings = Booking::query()
             ->where('user_id', $userId) // chỉ đơn của chính mình
-            ->with(['tour:id,slug,name,cover_image,type', 'departure:id,start_date'])
+            ->with(['tour:id,slug,name,cover_image,type,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
             ->latest('id')
             ->paginate(min((int) $request->query('per_page', 10), 30));
 
@@ -41,6 +41,7 @@ class MyBookingController extends Controller
                         : asset('storage/'.$b->tour->cover_image))
                     : null,
                 'start_date' => $b->departure?->start_date?->format('d/m/Y'),
+                'visa_deadline' => $b->hanNopVisa()?->format('d/m/Y'),
                 'adults' => $b->adults,
                 'children' => $b->children,
                 'total_price' => $b->total_price,
