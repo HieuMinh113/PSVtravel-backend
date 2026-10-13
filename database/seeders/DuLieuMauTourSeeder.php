@@ -18,6 +18,11 @@ use Modules\Tour\Models\TourItinerary;
  * đợt hết chỗ), lịch trình từng ngày, ảnh, đánh giá; cùng các danh mục và
  * điểm đến nối vào danh mục. Gọi từ DemoSeeder. Chạy lại không sinh trùng.
  *
+ * Hạn nộp hồ sơ visa (tour nước ngoài): 'han_visa' = quy tắc "trước ngày
+ * khởi hành N ngày"; phần tử thứ 4 của một đợt = hạn RIÊNG của đợt đó (số
+ * ngày tính từ hôm nay). Số liệu chọn để thấy đủ: hạn còn xa, còn ≤ 7 ngày
+ * (cam), đã qua (đỏ), hạn riêng; Singapore / Bali không đặt hạn (miễn visa).
+ *
  * Giá, lịch trình là số liệu MẪU — không phải bảng giá thật của công ty.
  */
 class DuLieuMauTourSeeder extends Seeder
@@ -61,6 +66,7 @@ class DuLieuMauTourSeeder extends Seeder
                 'duration_days' => $t['ngay'],
                 'duration_nights' => $t['ngay'] - 1,
                 'departure_from' => $t['tu'] ?? 'Hồ Chí Minh',
+                'visa_deadline_days' => $t['han_visa'] ?? null,
                 'adult_price' => $t['gia'],
                 'child_price' => (int) round($t['gia'] * 0.75 / 10_000) * 10_000,
                 'old_price' => $t['gia_cu'] ?? null,
@@ -80,11 +86,13 @@ class DuLieuMauTourSeeder extends Seeder
             $tour->categories()->syncWithoutDetaching([$danhMuc[$t['danh_muc']]->id]);
 
             // Đợt khởi hành: tính từ hôm nay; đợt có chỗ = 0 hiện "Hết chỗ"
-            foreach ($t['dot'] as [$sauNgay, $tong, $con]) {
+            foreach ($t['dot'] as $d) {
+                [$sauNgay, $tong, $con] = $d;
+                $hanRieng = isset($d[3]) ? today()->addDays($d[3])->toDateString() : null;
                 $ngay = today()->addDays($sauNgay)->toDateString();
                 $dot = TourDeparture::where('tour_id', $tour->id)->whereDate('start_date', $ngay)->first()
                     ?? new TourDeparture(['tour_id' => $tour->id, 'start_date' => $ngay]);
-                $dot->fill(['seats_total' => $tong, 'seats_left' => $con, 'status' => $con > 0 ? 'open' : 'full'])->save();
+                $dot->fill(['seats_total' => $tong, 'seats_left' => $con, 'status' => $con > 0 ? 'open' : 'full', 'visa_deadline' => $hanRieng])->save();
             }
 
             foreach ($t['lich'] as $i => $tieuDe) {
@@ -200,6 +208,7 @@ class DuLieuMauTourSeeder extends Seeder
                 'mo_ta' => 'Xứ sở kim chi mùa lá đỏ, mua sắm Myeongdong, trải nghiệm văn hoá Hàn.',
                 'lich' => ['HCM - Incheon', 'Đảo Nami - Seoul', 'Cung Gyeongbok - Myeongdong', 'Everland', 'Seoul - HCM'],
                 'dot' => [[18, 25, 6], [32, 25, 25], [46, 25, 25]],
+                'han_visa' => 25, // đợt 1 đã qua hạn, đợt 2 còn 7 ngày, đợt 3 còn 21 ngày
                 'danh_gia' => [['Kiều Bảo Ngọc', 5, 'Nami đẹp như phim, HDV vui tính.'], ['Mạc Văn Tú', 4, 'Hơi lạnh nhưng rất đáng đi.']],
             ],
             [
@@ -209,7 +218,8 @@ class DuLieuMauTourSeeder extends Seeder
                 'diem_nhan' => ['Núi Phú Sĩ - làng cổ Oshino Hakkai', 'Chùa Vàng Kinkakuji', 'Tàu cao tốc Shinkansen'],
                 'mo_ta' => 'Cung đường vàng Nhật Bản từ Tokyo hiện đại đến Kyoto cổ kính.',
                 'lich' => ['HCM - Tokyo', 'Tokyo - Asakusa - Ginza', 'Phú Sĩ - Oshino Hakkai', 'Shinkansen - Kyoto', 'Osaka - Lâu đài Osaka', 'Osaka - HCM'],
-                'dot' => [[30, 20, 12], [60, 20, 20]],
+                'dot' => [[30, 20, 12], [60, 20, 20, 40]],
+                'han_visa' => 45, // đợt 1 đã qua hạn; đợt 2 có hạn RIÊNG (còn 40 ngày)
             ],
             [
                 'slug' => 'trung-quoc-truong-gia-gioi-phuong-hoang-6n5d', 'ten' => 'Trung Quốc: Trương Gia Giới - Phượng Hoàng cổ trấn 6 ngày 5 đêm',
@@ -219,6 +229,7 @@ class DuLieuMauTourSeeder extends Seeder
                 'mo_ta' => 'Núi non kỳ vĩ như phim Avatar và cổ trấn bên dòng Đà Giang.',
                 'lich' => ['HCM - Trương Gia Giới', 'Thiên Môn Sơn', 'Viên Gia Giới - Thiên Tử Sơn', 'Đại Hiệp Cốc - Phượng Hoàng', 'Phượng Hoàng cổ trấn', 'Trương Gia Giới - HCM'],
                 'dot' => [[21, 25, 17], [35, 25, 25]],
+                'han_visa' => 15, // đợt 1 còn 6 ngày, đợt 2 còn 20 ngày
             ],
             [
                 'slug' => 'singapore-malaysia-5n4d', 'ten' => 'Singapore - Malaysia 5 ngày 4 đêm',
@@ -246,7 +257,8 @@ class DuLieuMauTourSeeder extends Seeder
                 'diem_nhan' => ['Tháp Eiffel - du thuyền sông Seine', 'Đỉnh Titlis tuyết phủ', 'Đấu trường Colosseum'],
                 'mo_ta' => 'Ba quốc gia Tây Âu kinh điển: Paris lãng mạn, Thụy Sĩ thơ mộng, Ý cổ kính.',
                 'lich' => ['HCM - Paris', 'Paris - Eiffel - Louvre', 'Paris - Dijon', 'Lucerne - đỉnh Titlis', 'Zurich - Milan', 'Milan - Venice', 'Venice - Florence', 'Florence - Rome', 'Rome - Vatican', 'Rome - HCM'],
-                'dot' => [[45, 20, 8], [75, 20, 20]],
+                'dot' => [[45, 20, 8], [75, 20, 20, 30]],
+                'han_visa' => 40, // đợt 1 còn 5 ngày; đợt 2 có hạn RIÊNG (còn 30 ngày)
             ],
         ];
     }

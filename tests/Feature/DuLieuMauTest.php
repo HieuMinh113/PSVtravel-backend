@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Attendance;
 use App\Models\AttendanceFace;
 use App\Models\Event;
+use App\Models\JobApplication;
+use App\Models\JobPosting;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\EventSeeder;
@@ -73,6 +75,28 @@ class DuLieuMauTest extends TestCase
         $this->assertTrue(Attendance::all()->contains(fn ($a) => $a->nghiVan()));
         $this->assertTrue(Attendance::all()->contains(fn ($a) => $a->late_minutes > 0));
 
+        // Hạn nộp visa: đủ trường hợp còn xa / còn ≤ 7 ngày / đã qua / hạn riêng; tour miễn visa không có hạn
+        $han = TourDeparture::with('tour')->get()->map(fn ($d) => TourDeparture::conNgay($d->hanVisa()))->filter(fn ($n) => $n !== null);
+        $this->assertTrue($han->contains(fn ($n) => $n < 0));
+        $this->assertTrue($han->contains(fn ($n) => $n >= 0 && $n <= 7));
+        $this->assertTrue($han->contains(fn ($n) => $n > 7));
+        $this->assertTrue(TourDeparture::whereNotNull('visa_deadline')->exists());
+        $this->assertNull(Tour::where('country', 'Singapore')->value('visa_deadline_days'));
+        $donHan = Booking::where('customer_email', 'khach@example.com')->whereHas('tour', fn ($q) => $q->where('country', 'Hàn Quốc'))->sole();
+        $this->assertSame(7, TourDeparture::conNgay($donHan->hanNopVisa()));
+        $this->actingAs(User::where('email', 'khach@example.com')->sole(), 'sanctum')
+            ->getJson('/api/v1/auth/bookings')->assertOk()->assertJsonFragment(['visa_deadline' => today()->addDays(7)->format('d/m/Y')]);
+
+        // Tuyển dụng: 3 tin hiện ngoài web (1 tin hết hạn bị ẩn), 5 hồ sơ có CV PDF thật
+        $this->getJson('/api/v1/jobs')->assertOk()->assertJsonCount(3, 'data');
+        $this->assertSame(5, JobApplication::count());
+        $this->assertSame(2, JobApplication::where('status', 'moi')->count());
+        $cv = JobApplication::all()->flatMap(fn ($h) => array_filter([$h->cv_path, $h->portfolio_path]));
+        $this->assertCount(6, $cv);
+        $cv->each(fn ($d) => $this->assertStringStartsWith('%PDF-', Storage::disk('rieng')->get($d)));
+        $this->assertTrue($admin->notifications()->where('data->title', 'like', 'Hồ sơ ứng tuyển mới%')->exists());
+        $tinThat = JobPosting::create(['title' => 'Tin thật', 'slug' => 'tin-that', 'status' => 'published']);
+
         $this->seed(EventSeeder::class);
         $suKienThat = Event::create(['title' => 'Gói thật', 'slug' => 'goi-that', 'status' => 'published']);
         $soMauChecklist = VisaChecklist::count();
@@ -101,5 +125,8 @@ class DuLieuMauTest extends TestCase
         $this->assertSame(['goi-that'], Event::pluck('slug')->all());       // chỉ xoá gói mẫu
         $this->assertSame(['admin@psvtravel.com'], User::orderBy('email')->pluck('email')->all());
         $this->assertTrue($suKienThat->exists);
+        $this->assertSame(['tin-that'], JobPosting::withTrashed()->pluck('slug')->all()); // chỉ xoá tin mẫu
+        $this->assertSame(0, JobApplication::count());
+        $cv->each(fn ($d) => Storage::disk('rieng')->assertMissing($d));
     }
 }

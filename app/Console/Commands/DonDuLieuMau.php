@@ -5,7 +5,10 @@ namespace App\Console\Commands;
 use App\Models\Attendance;
 use App\Models\AttendanceFace;
 use App\Models\Event;
+use App\Models\JobApplication;
+use App\Models\JobPosting;
 use App\Models\User;
+use Database\Seeders\DuLieuMauTuyenDungSeeder;
 use Database\Seeders\EventSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +29,7 @@ use Modules\Visa\Models\VisaCase;
 class DonDuLieuMau extends Command
 {
     protected $signature = 'psv:don-du-lieu-mau
-                            {--don-hang : Xoá luôn đơn đặt tour, thanh toán, hồ sơ visa, chấm công, tin nhắn liên hệ, thông báo}
+                            {--don-hang : Xoá luôn đơn đặt tour, thanh toán, hồ sơ visa, hồ sơ ứng tuyển (kèm CV), chấm công, tin nhắn liên hệ, thông báo}
                             {--tai-khoan-mau : Xoá luôn các tài khoản mẫu (visa1, visa2, dieuhanh, sale, ketoan, nhanvien, khach@example.com)}
                             {--xem : Chỉ liệt kê sẽ xoá gì, không xoá}
                             {--force : Không hỏi xác nhận (dùng cho script tự động)}';
@@ -58,6 +61,7 @@ class DonDuLieuMau extends Command
     // Tách riêng: đây là dữ liệu KINH DOANH do khách / nhân viên thật tạo ra,
     // xoá nhầm là mất lịch sử không lấy lại được
     private const BANG_DON_HANG = [
+        'job_applications',
         'visa_cases',
         'payments',
         'bookings',
@@ -97,13 +101,16 @@ class DonDuLieuMau extends Command
         }
         $soSuKien = Schema::hasTable('events') ? Event::whereIn('slug', $suKienMau)->count() : 0;
         $this->line(sprintf('  %-20s %6d gói (chỉ các gói mẫu của EventSeeder)', 'events', $soSuKien));
+        $tinMau = array_column(DuLieuMauTuyenDungSeeder::mau(), 'slug');
+        $soTinMau = Schema::hasTable('job_postings') ? JobPosting::withTrashed()->whereIn('slug', $tinMau)->count() : 0;
+        $this->line(sprintf('  %-20s %6d tin (chỉ các tin tuyển dụng mẫu)', 'job_postings', $soTinMau));
         if ($this->option('tai-khoan-mau')) {
             $this->line('  Tài khoản mẫu: '.($taiKhoan->isEmpty() ? 'không có' : $taiKhoan->map(fn ($u) => "{$u->email} ({$u->name})")->implode(', ')));
         }
         $this->newLine();
         $this->info('Giữ nguyên: mẫu checklist visa, tài khoản quản trị, phân quyền, cài đặt, trang tĩnh, sheet liên minh, nhật ký.');
         if (! $this->option('don-hang')) {
-            $this->line('Đơn đặt tour, thanh toán, hồ sơ visa, chấm công và tin nhắn liên hệ được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
+            $this->line('Đơn đặt tour, thanh toán, hồ sơ visa, hồ sơ ứng tuyển, chấm công và tin nhắn liên hệ được GIỮ LẠI. Muốn xoá luôn thì thêm --don-hang');
         }
         if (! $this->option('tai-khoan-mau')) {
             $this->line('Tài khoản mẫu được GIỮ LẠI. Muốn xoá luôn thì thêm --tai-khoan-mau');
@@ -142,7 +149,7 @@ class DonDuLieuMau extends Command
         $tong = 0;
         $tepXoa = [];
 
-        DB::transaction(function () use ($bang, $suKienMau, $taiKhoan, &$tong, &$tepXoa) {
+        DB::transaction(function () use ($bang, $suKienMau, $tinMau, $taiKhoan, &$tong, &$tepXoa) {
             foreach ($bang as $ten) {
                 $so = DB::table($ten)->count();
                 // Bảng có file trên ổ đĩa — gom đường dẫn để xoá file sau khi xoá dòng
@@ -162,6 +169,13 @@ class DonDuLieuMau extends Command
                 $so = Event::whereIn('slug', $suKienMau)->delete();
                 $tong += $so;
                 $this->line("  đã xoá {$so} gói sự kiện mẫu");
+            }
+
+            // Chỉ tin tuyển dụng MẪU — tin công ty tự đăng giữ nguyên
+            if (Schema::hasTable('job_postings')) {
+                $so = JobPosting::withTrashed()->whereIn('slug', $tinMau)->forceDelete();
+                $tong += $so;
+                $this->line("  đã xoá {$so} tin tuyển dụng mẫu");
             }
 
             foreach ($taiKhoan as $u) {
@@ -208,6 +222,9 @@ class DonDuLieuMau extends Command
                 ->map(fn ($d) => [Attendance::DIA, $d])->values()->all(),
             'attendance_faces' => AttendanceFace::whereNotNull('photo')->pluck('photo')
                 ->map(fn ($d) => [Attendance::DIA, $d])->values()->all(),
+            'job_applications' => JobApplication::query()->get(['cv_path', 'portfolio_path'])
+                ->flatMap(fn ($h) => [$h->cv_path, $h->portfolio_path])->filter()
+                ->map(fn ($d) => [JobApplication::DIA, $d])->values()->all(),
             default => [],
         };
     }

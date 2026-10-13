@@ -95,8 +95,30 @@ Có sẵn để thử các việc nghiệp vụ:
 - **Chấm công**: `sale`, `visa1`, `visa2` có sẵn 10 ngày chấm công (trễ chờ duyệt,
   ngoài công ty, mặt chưa khớp, quên chấm ra, bổ sung công). Khuôn mặt đăng ký
   là ảnh mẫu — muốn thử camera thật thì vào *Khuôn mặt nhân viên* → *Cho đăng ký lại*.
+- **Hạn nộp hồ sơ visa** (tour nước ngoài, tính từ ngày chạy lệnh):
+  - *Hàn Quốc* — quy tắc "trước khởi hành 25 ngày": đợt 1 **đã qua hạn** (đỏ),
+    đợt 2 **còn 7 ngày** (cam), đợt 3 còn 21 ngày.
+  - *Nhật Bản* — 45 ngày; đợt 2 có **hạn riêng**.
+  - *Trung Quốc* — 15 ngày (đợt 1 còn 6 ngày).
+  - *Châu Âu* — 40 ngày; đợt 2 có hạn riêng.
+  - *Singapore*, *Bali*, *Thái Lan* — không đặt hạn (miễn visa).
+  - `khach@example.com` có đơn tour Hàn Quốc ở đợt còn 7 ngày: xem hạn ở
+    *Tài khoản*, *Tra cứu đơn*, trang xem đơn trong admin, phiếu xác nhận PDF.
+- **Tuyển dụng**: 4 tin (tin *Hướng dẫn viên tour hè* đã hết hạn nên **không**
+  hiện ngoài web) và 5 hồ sơ ứng tuyển tên giả, đủ trạng thái:
+  - 2 hồ sơ mới, có chuông báo cho admin;
+  - 1 hồ sơ có portfolio PDF + link;
+  - 1 hồ sơ hẹn phỏng vấn, 1 hồ sơ chưa phù hợp.
+
+  CV / portfolio là file PDF mẫu ghi "CV MAU - DU LIEU GIA".
+- **Bản đồ cẩm nang**: Trung Quốc (Thượng Hải, Bắc Kinh), Nhật, Hàn, Singapore,
+  Việt Nam (Đà Nẵng); mỗi điểm mở ra một bài cẩm nang mẫu.
 - Tài khoản mẫu **không** được tạo khi `APP_ENV=production`.
 - Chạy lại lệnh nhiều lần không sinh trùng.
+- Xoá dữ liệu mẫu trước khi chạy thật: `php artisan psv:don-du-lieu-mau --xem`
+  để xem trước, rồi chạy lại không có `--xem`. Lệnh này chỉ xoá các tin tuyển
+  dụng **mẫu**, tin công ty tự đăng được giữ nguyên. Thêm `--don-hang` để xoá
+  luôn đơn tour, hồ sơ visa và hồ sơ ứng tuyển, kèm file CV.
 
 Xoá sạch để bắt đầu nhập dữ liệu thật:
 

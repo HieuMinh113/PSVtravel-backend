@@ -172,6 +172,23 @@ class DuLieuMauNghiepVuSeeder extends Seeder
                 'note' => 'Đặt từ website (dữ liệu mẫu).',
             ]);
         }
+
+        // Tour Hàn Quốc, đợt còn 7 ngày là hết hạn nộp hồ sơ visa — thử hạn visa
+        // ở trang xem đơn (admin), trang Tài khoản, Tra cứu đơn, email, phiếu PDF
+        $tourHan = Tour::where('slug', 'han-quoc-seoul-nami-everland-5n4d')->first();
+        $dotHan = $tourHan?->departures()->whereDate('start_date', today()->addDays(32))->first();
+        if ($tourHan && $dotHan) {
+            $don(['customer_email' => $khach?->email ?? 'khach5@example.com', 'tour_id' => $tourHan->id], [
+                'tour_departure_id' => $dotHan->id, 'user_id' => $khach?->id,
+                'customer_name' => $khach?->name ?? 'Đỗ Hải Yến (mẫu)', 'customer_phone' => $khach?->phone ?? '0900000005',
+                'adults' => 2, 'children' => 0,
+                'unit_price_adult' => $tourHan->adult_price, 'unit_price_child' => 0,
+                'total_price' => 2 * $tourHan->adult_price,
+                'status' => 'confirmed', 'payment_status' => 'unpaid',
+                'deposit_percent' => 30, 'created_by' => $saleId,
+                'note' => 'Đơn mẫu: còn 7 ngày là hết hạn nộp hồ sơ visa.',
+            ]);
+        }
     }
 
     private function hoSoVisa(?User $visa1, ?User $visa2, ?User $khach): void

@@ -11,6 +11,7 @@ use Modules\Booking\Models\Payment;
 use Modules\Category\Models\Category;
 use Modules\Flight\Models\Airline;
 use Modules\Flight\Models\FlightDeal;
+use Modules\Guide\Database\Seeders\BanDoCamNangMauSeeder;
 use Modules\Guide\Models\Guide;
 use Modules\Moment\Models\Moment;
 use Modules\Review\Models\Review;
@@ -318,7 +319,11 @@ class DemoSeeder extends Seeder
         $this->call(DuLieuMauTourSeeder::class);
         // Tài khoản theo vai trò, đơn tour có cọc + hạn nhắn khách, hồ sơ visa
         $this->call(DuLieuMauNghiepVuSeeder::class);
+        // Tin tuyển dụng + hồ sơ ứng tuyển có CV / portfolio PDF mẫu
+        $this->call(DuLieuMauTuyenDungSeeder::class);
+        // Bản đồ cẩm nang: quả địa cầu → nước → thành phố → điểm (tự bỏ qua trên production)
+        $this->call(BanDoCamNangMauSeeder::class);
 
-        $this->command->info('Đã tạo xong dữ liệu mẫu: 14 tour + đơn/đánh giá/banner/cẩm nang/khoảnh khắc/vé/visa + hồ sơ visa.');
+        $this->command?->info('Đã tạo xong dữ liệu mẫu: 14 tour (có hạn nộp visa) + đơn/đánh giá/banner/cẩm nang/bản đồ/khoảnh khắc/vé/visa + hồ sơ visa + tuyển dụng.');
     }
 }
