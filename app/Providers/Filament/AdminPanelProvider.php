@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Auth\XacThucApp;
 use App\Filament\Widgets\DonMoiNhatWidget;
 use App\Filament\Widgets\TongQuanWidget;
+use App\Http\Controllers\Admin\DocLinkBanDoController;
 use App\Http\Controllers\Admin\NhipThongBaoController;
 use App\Http\Controllers\Admin\TaiMaQrTourController;
 use App\Http\Middleware\BatBuoc2faQuanTri;
@@ -105,6 +106,11 @@ class AdminPanelProvider extends PanelProvider
                 Route::get('psv/nhip', NhipThongBaoController::class)
                     ->middleware(BatBuoc2faQuanTri::class)
                     ->name('psv.nhip');
+                // Ô chọn vị trí (Bản đồ cẩm nang): đọc toạ độ từ link Google
+                // Maps rút gọn — xem public/js/psv/chon-vi-tri.js
+                Route::get('psv/doc-link-ban-do', DocLinkBanDoController::class)
+                    ->middleware([BatBuoc2faQuanTri::class, 'throttle:30,1'])
+                    ->name('psv.doc-link-ban-do');
             })
             ->renderHook(PanelsRenderHook::BODY_END, fn () => auth()->check() ? view('filament.thong-bao.nhip') : '')
             ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.thong-bao.nut-tieng'));

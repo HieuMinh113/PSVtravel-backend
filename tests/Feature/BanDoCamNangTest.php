@@ -6,9 +6,12 @@ use App\Filament\Resources\GuideCities\Pages\EditGuideCity;
 use App\Filament\Resources\GuideCities\RelationManagers\SpotsRelationManager;
 use App\Filament\Resources\GuideCountries\Pages\CreateGuideCountry;
 use App\Models\User;
+use App\Services\LinkGoogleMaps;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as YeuCau;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Modules\Guide\Database\Seeders\BanDoCamNangMauSeeder;
 use Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder;
@@ -154,5 +157,86 @@ class BanDoCamNangTest extends TestCase
         // Không có quyền thì không vào được
         $this->actingAs(User::factory()->create());
         $this->get('/admin/ban-do-quoc-gia')->assertForbidden();
+    }
+
+    private function nguoiSuaBanDo(): User
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $u = User::factory()->create();
+        $u->givePermissionTo(Permission::findOrCreate('Update:GuideSpot', 'web'));
+
+        return $u;
+    }
+
+    public function test_dan_link_rut_gon_google_maps_tu_ra_toa_do(): void
+    {
+        // Link chia sẻ trên điện thoại: maps.app.goo.gl → maps.google.com/?q=Tên&ftid=… (KHÔNG có toạ độ)
+        // → www.google.com/maps?… → trang có ảnh xem trước ghi toạ độ địa điểm
+        Http::fake([
+            'maps.app.goo.gl/*' => Http::response('', 302, ['Location' => 'https://maps.google.com/?q=C%E1%BA%A7u+R%E1%BB%93ng,+%C4%90%C3%A0+N%E1%BA%B5ng&ftid=0x314219:0x7a2&entry=gps']),
+            'maps.google.com/*' => Http::response('', 302, ['Location' => 'https://www.google.com/maps?q=C%E1%BA%A7u+R%E1%BB%93ng&ftid=0x314219:0x7a2']),
+            'www.google.com/*' => Http::response('<html><head><meta content="https://maps.google.com/maps/api/staticmap?center=16.0612%2C108.2269&amp;zoom=17&amp;size=900x900&amp;markers=16.0610759%2C108.2272185&amp;sensor=false" property="og:image"></head></html>'),
+        ]);
+        $this->actingAs($this->nguoiSuaBanDo());
+
+        $this->getJson('/admin/psv/doc-link-ban-do?url='.urlencode('https://maps.app.goo.gl/noyF5TGzXSwqPLf49'))
+            ->assertOk()
+            ->assertExactJson(['lat' => 16.0610759, 'lng' => 108.2272185, 'zoom' => null, 'ten' => 'Cầu Rồng']);
+        Http::assertSentCount(3);
+        Http::assertSent(fn (YeuCau $r) => $r->url() === 'https://www.google.com/maps?q=C%E1%BA%A7u+R%E1%BB%93ng&ftid=0x314219:0x7a2');
+    }
+
+    public function test_link_rut_gon_chuyen_toi_link_day_du_thi_doc_ngay(): void
+    {
+        Http::fake([
+            'maps.app.goo.gl/*' => Http::response('', 302, ['Location' => 'https://www.google.com/maps/place/B%C3%A0+N%C3%A0+Hills/@15.99,107.99,15z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d15.9951!4d107.9966!16s?entry=ttu']),
+        ]);
+        $this->actingAs($this->nguoiSuaBanDo());
+
+        $this->getJson('/admin/psv/doc-link-ban-do?url='.urlencode('https://maps.app.goo.gl/abc'))
+            ->assertOk()
+            ->assertJson(['lat' => 15.9951, 'lng' => 107.9966, 'ten' => 'Bà Nà Hills']);
+        Http::assertSentCount(1); // không cần tải trang Google
+    }
+
+    public function test_doc_link_chi_di_toi_ten_mien_google_va_can_quyen(): void
+    {
+        Http::fake([
+            'maps.app.goo.gl/*' => Http::response('', 302, ['Location' => 'http://169.254.169.254/latest/meta-data']),
+            '*' => Http::response('16.1, 108.1'),
+        ]);
+        $this->actingAs($this->nguoiSuaBanDo());
+
+        // Link không phải Google: từ chối, không gửi đi đâu
+        foreach (['http://maps.app.goo.gl/x', 'https://evil.example/maps/@1,2', 'https://google.com.evil.example/maps', 'https://user@www.google.com/maps', 'https://goo.gl/abc', 'https://www.google.com:8443/maps'] as $url) {
+            $this->getJson('/admin/psv/doc-link-ban-do?url='.urlencode($url))->assertStatus(422);
+        }
+        Http::assertNothingSent();
+
+        // Chuyển hướng ra ngoài Google: dừng lại, không đi theo
+        $this->getJson('/admin/psv/doc-link-ban-do?url='.urlencode('https://maps.app.goo.gl/x'))->assertStatus(422)->assertJsonStructure(['message']);
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn (YeuCau $r) => str_contains($r->url(), '169.254'));
+
+        // Không có quyền sửa bản đồ thì không dùng được
+        $this->actingAs(User::factory()->create());
+        $this->getJson('/admin/psv/doc-link-ban-do?url='.urlencode('https://maps.app.goo.gl/x'))->assertForbidden();
+    }
+
+    public function test_doc_toa_do_trong_link_va_trang_google_maps(): void
+    {
+        $this->assertSame(['lat' => 16.061, 'lng' => 108.2272, 'zoom' => null],
+            LinkGoogleMaps::toaDoTrongLink('https://www.google.com/maps/place/X/@16.06,108.22,17z/data=!4m6!3m5!8m2!3d16.0610!4d108.2272'));
+        $this->assertSame(['lat' => 16.0544, 'lng' => 108.2022, 'zoom' => 17.0],
+            LinkGoogleMaps::toaDoTrongLink('https://www.google.com/maps/@16.0544,108.2022,17z'));
+        $this->assertSame(16.0544, LinkGoogleMaps::toaDoTrongLink('https://maps.google.com/?q=16.0544%2C108.2022')['lat']);
+        $this->assertSame(108.2022, LinkGoogleMaps::toaDoTrongLink('https://www.google.com/maps/search/16.0544,+108.2022?entry=tts')['lng']);
+        $this->assertNull(LinkGoogleMaps::toaDoTrongLink('https://maps.google.com/?q=C%E1%BA%A7u+R%E1%BB%93ng&ftid=0x1:0x2'));
+        $this->assertNull(LinkGoogleMaps::toaDoTrongLink('https://www.google.com/maps/@95,200,3z'));
+
+        // Trang không có ảnh xem trước: lấy tâm trong APP_INITIALIZATION_STATE (kinh độ đứng trước)
+        $this->assertSame(['lat' => 31.2397, 'lng' => 121.4998, 'zoom' => null],
+            LinkGoogleMaps::toaDoTrongTrang('<script>window.APP_INITIALIZATION_STATE=[[[1500.2,121.4998,31.2397],[0,0,0],[1024,768],13.1]]</script>'));
+        $this->assertNull(LinkGoogleMaps::toaDoTrongTrang('<html>không có gì</html>'));
     }
 }

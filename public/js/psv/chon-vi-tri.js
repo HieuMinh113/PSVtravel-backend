@@ -7,13 +7,20 @@
  *  3. Dán link Google Maps hoặc toạ độ "31.2304, 121.4737"
  *  4. Gõ thẳng vào ô Vĩ độ / Kinh độ
  *
+ * Link rút gọn (maps.app.goo.gl — nút Chia sẻ của Google Maps) không chứa
+ * toạ độ: gửi lên máy chủ đọc giùm (route filament.admin.psv.doc-link-ban-do).
+ *
  * Nền bản đồ: OpenFreeMap (miễn phí, không cần khoá). Không tải được thì
  * dùng nền đơn giản (đất liền Natural Earth) — vẫn bấm chọn được.
  *
+ * Thư viện MapLibre nạp động trong init(): trình duyệt không vẽ được bản đồ
+ * (tắt WebGL, chặn tệp…) thì tìm kiếm / dán link / gõ toạ độ vẫn chạy.
+ * Tệp để đuôi .js (không phải .mjs gốc): nginx mặc định không biết .mjs, trả
+ * sai kiểu tệp và trình duyệt từ chối nạp module — bản đồ trắng trơn.
+ *
  * Nạp bằng x-load: <div x-load x-load-src="…/chon-vi-tri.js" x-data="chonViTri({...})">
  */
-import * as maplibregl from '/vendor/maplibre-6.11.2/maplibre-gl.mjs'
-
+const THU_VIEN = '/vendor/maplibre-6.11.2/maplibre-gl.js'
 const NEN_CHI_TIET = 'https://tiles.openfreemap.org/styles/liberty'
 
 let cssDaNap = false
@@ -49,34 +56,50 @@ const lamTron = (v) => Math.round(Number(v) * 1e7) / 1e7
 const hopLe = (lat, lng) =>
     Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
 
+/** Link của Google Maps (kể cả link rút gọn) — máy chủ đọc được khi trình duyệt không tự đọc ra toạ độ. */
+export const laLinkGoogle = (chu) =>
+    /^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.|maps\.)?google\.[a-z.]{2,6}\/maps|maps\.google\.[a-z.]{2,6})/i.test((chu || '').trim())
+
+/** 16°03'15.8"N 108°13'20.5"E → [16.0543…, 108.2223…] */
+const docDoPhutGiay = (s) => {
+    const m = s.match(/(\d+(?:\.\d+)?)°\s*(?:(\d+(?:\.\d+)?)['′]\s*)?(?:(\d+(?:\.\d+)?)["″]\s*)?([NS])[\s,]+(\d+(?:\.\d+)?)°\s*(?:(\d+(?:\.\d+)?)['′]\s*)?(?:(\d+(?:\.\d+)?)["″]\s*)?([EW])/i)
+    if (!m) return null
+    const doi = (d, p, g, h) => (+d + (+p || 0) / 60 + (+g || 0) / 3600) * (/[SW]/i.test(h) ? -1 : 1)
+    return [doi(m[1], m[2], m[3], m[4]), doi(m[5], m[6], m[7], m[8])]
+}
+
 /**
  * Đọc toạ độ từ link Google Maps / Apple Maps / OpenStreetMap hoặc chữ "lat, lng".
  * @returns {{lat:number,lng:number,zoom?:number}|{loi:string}|null}
  */
 export const docToaDo = (chu) => {
-    const s = (chu || '').trim()
+    let s = (chu || '').trim()
     if (!s) return null
-    if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(s)) {
-        return { loi: 'Đây là link rút gọn. Mở link trên trình duyệt, đợi bản đồ hiện ra rồi copy link đầy đủ trên thanh địa chỉ và dán lại.' }
-    }
+    try {
+        s = decodeURIComponent(s)
+    } catch (e) {}
     const mau = [
         /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/, // vị trí chính xác của địa điểm đã ghim
+        /\/maps\/(?:search|place)\/(-?\d+\.\d+),\s*\+?(-?\d+\.\d+)/, // /maps/search/16.05,+108.2
         /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?)z)?/, // tâm khung nhìn
-        /[?&#](?:q|query|ll|destination|center|mlat)=(-?\d+(?:\.\d+)?)(?:,|%2C|\s|&mlon=)\s*(-?\d+(?:\.\d+)?)/i,
+        /[?&#](?:q|query|ll|destination|daddr|center|mlat)=(-?\d+(?:\.\d+)?)(?:,|\s|\+|&mlon=)+(-?\d+(?:\.\d+)?)/i,
         /#map=(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/, // openstreetmap.org/#map=z/lat/lng
         /^\(?\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*\)?$/,
     ]
     for (const [i, m] of mau.map((re, i) => [i, s.match(re)])) {
         if (!m) continue
-        const [lat, lng, zoom] = i === 3 ? [+m[2], +m[3], +m[1]] : [+m[1], +m[2], m[3] ? +m[3] : undefined]
+        const [lat, lng, zoom] = i === 4 ? [+m[2], +m[3], +m[1]] : [+m[1], +m[2], m[3] ? +m[3] : undefined]
         if (hopLe(lat, lng)) return { lat, lng, zoom }
     }
-    return { loi: 'Không đọc được toạ độ. Dán link Google Maps đầy đủ hoặc gõ dạng "31.2304, 121.4737".' }
+    const dms = docDoPhutGiay(s)
+    if (dms && hopLe(dms[0], dms[1])) return { lat: dms[0], lng: dms[1] }
+    return { loi: 'Không đọc được toạ độ. Dán link Google Maps hoặc gõ dạng "31.2304, 121.4737".' }
 }
 
-export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac = [] }) {
+export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac = [], docLink = null }) {
     let map = null
     let ghim = null
+    let maplibregl = null
 
     return {
         lat,
@@ -89,13 +112,46 @@ export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac 
         thongBao: '',
         loi: '',
         nenDuPhong: false,
+        khongCoBanDo: false,
+        dangDocLink: false,
         zoomHienTai: null,
 
         async init() {
+            // Gõ tay vào ô Vĩ độ / Kinh độ → ghim chạy theo
+            const theoO = () => {
+                const a = +this.lat
+                const b = +this.lng
+                if (!map || !hopLe(a, b)) return
+                const p = ghim.getLngLat?.()
+                if (p && Math.abs(p.lat - a) < 1e-7 && Math.abs(p.lng - b) < 1e-7) return
+                ghim.setLngLat([b, a]).addTo(map)
+                map.easeTo({ center: [b, a], duration: 400 })
+            }
+            this.$watch('lat', theoO)
+            this.$watch('lng', theoO)
+
+            try {
+                maplibregl = await import(THU_VIEN)
+            } catch (e) {
+                console.error('Không nạp được thư viện bản đồ', e)
+                this.khongCoBanDo = true
+                return
+            }
             napCss()
             const kieu = await kieuChiTiet()
             this.nenDuPhong = !kieu
             const coSan = hopLe(+this.lat, +this.lng)
+            try {
+                this.veBanDo(kieu, coSan)
+            } catch (e) {
+                // Thường là trình duyệt tắt WebGL / tăng tốc phần cứng
+                console.error('Không vẽ được bản đồ', e)
+                map = null
+                this.khongCoBanDo = true
+            }
+        },
+
+        veBanDo(kieu, coSan) {
             map = new maplibregl.Map({
                 container: this.$refs.khung,
                 style: kieu || kieuDuPhong(),
@@ -144,29 +200,18 @@ export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac 
                     paint: { 'circle-radius': 6, 'circle-color': '#0169a9', 'circle-opacity': 0.55, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
                 })
             })
-
-            // Gõ tay vào ô Vĩ độ / Kinh độ → ghim chạy theo
-            const theoO = () => {
-                const a = +this.lat
-                const b = +this.lng
-                if (!hopLe(a, b)) return
-                const p = ghim.getLngLat?.()
-                if (p && Math.abs(p.lat - a) < 1e-7 && Math.abs(p.lng - b) < 1e-7) return
-                ghim.setLngLat([b, a]).addTo(map)
-                map.easeTo({ center: [b, a], duration: 400 })
-            }
-            this.$watch('lat', theoO)
-            this.$watch('lng', theoO)
         },
 
         datViTri(a, b, bay = true, z = null) {
             if (!hopLe(a, b)) return
             this.lat = lamTron(a)
             this.lng = lamTron(b)
-            ghim.setLngLat([this.lng, this.lat]).addTo(map)
-            if (bay) map.flyTo({ center: [this.lng, this.lat], zoom: z ?? Math.max(map.getZoom(), 14), duration: 900 })
+            if (map) {
+                ghim.setLngLat([this.lng, this.lat]).addTo(map)
+                if (bay) map.flyTo({ center: [this.lng, this.lat], zoom: z ?? Math.max(map.getZoom(), 14), duration: 900 })
+            }
             this.loi = ''
-            this.thongBao = `Đã đặt ghim: ${this.lat}, ${this.lng}`
+            this.thongBao = `Đã đặt ghim: ${this.lat}, ${this.lng} — ô Vĩ độ / Kinh độ đã tự điền.`
         },
 
         async tim() {
@@ -176,15 +221,13 @@ export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac 
             this.loi = ''
             this.ketQua = []
             try {
-                const tamNhin = map.getBounds()
                 const url = new URL('https://nominatim.openstreetmap.org/search')
-                url.search = new URLSearchParams({
-                    q,
-                    format: 'jsonv2',
-                    limit: '6',
-                    'accept-language': 'vi,en',
-                    viewbox: [tamNhin.getWest(), tamNhin.getNorth(), tamNhin.getEast(), tamNhin.getSouth()].join(','),
-                })
+                const thamSo = { q, format: 'jsonv2', limit: '6', 'accept-language': 'vi,en' }
+                if (map) {
+                    const t = map.getBounds() // ưu tiên kết quả gần khung đang xem
+                    thamSo.viewbox = [t.getWest(), t.getNorth(), t.getEast(), t.getSouth()].join(',')
+                }
+                url.search = new URLSearchParams(thamSo)
                 const r = await fetch(url, { signal: AbortSignal.timeout(8000) })
                 if (!r.ok) throw new Error()
                 this.ketQua = (await r.json()).map((k) => ({ ten: k.display_name, lat: +k.lat, lng: +k.lon }))
@@ -201,18 +244,47 @@ export default function chonViTri({ lat, lng, zoom = null, tam = null, diemKhac 
             this.datViTri(k.lat, k.lng, true, 16)
         },
 
-        docDan() {
-            const kq = docToaDo(this.dan)
-            if (!kq) return
-            if (kq.loi) {
+        async docDan() {
+            const chu = this.dan.trim()
+            const kq = docToaDo(chu)
+            if (!kq || this.dangDocLink) return
+            if (!kq.loi) {
+                this.datViTri(kq.lat, kq.lng, true, kq.zoom ?? 16)
+                this.dan = ''
+                return
+            }
+            if (!docLink || !laLinkGoogle(chu)) {
                 this.loi = kq.loi
                 return
             }
-            this.datViTri(kq.lat, kq.lng, true, kq.zoom ?? 16)
-            this.dan = ''
+
+            // Link rút gọn maps.app.goo.gl (hoặc link không ghi toạ độ): máy chủ đọc giùm
+            this.dangDocLink = true
+            this.loi = ''
+            this.thongBao = ''
+            try {
+                const r = await fetch(`${docLink}?${new URLSearchParams({ url: chu })}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                    signal: AbortSignal.timeout(30000),
+                })
+                const d = await r.json().catch(() => ({}))
+                if (!r.ok || !hopLe(+d.lat, +d.lng)) {
+                    this.loi = d.message || 'Không đọc được link này. Mở link, bấm chuột phải đúng chỗ trên Google Maps → bấm dòng số toạ độ đầu tiên (tự copy) rồi dán vào đây.'
+                    return
+                }
+                this.datViTri(+d.lat, +d.lng, true, d.zoom ? Math.max(+d.zoom, 14) : 16)
+                if (d.ten) this.thongBao = `Đã đặt ghim theo link: ${d.ten} (${this.lat}, ${this.lng}) — kiểm tra lại ghim trên bản đồ.`
+                this.dan = ''
+            } catch (e) {
+                this.loi = 'Không đọc được link lúc này (mạng chậm). Thử lại, hoặc bấm chuột phải đúng chỗ trên Google Maps → bấm dòng số toạ độ để copy rồi dán vào đây.'
+            } finally {
+                this.dangDocLink = false
+            }
         },
 
         layZoom() {
+            if (!map) return
             this.zoom = Math.round(map.getZoom() * 10) / 10
             const c = map.getCenter()
             this.datViTri(c.lat, c.lng, false)

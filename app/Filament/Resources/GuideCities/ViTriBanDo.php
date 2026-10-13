@@ -38,6 +38,7 @@ class ViTriBanDo
                     ->columnSpanFull(),
                 TextInput::make('lat')
                     ->label('Vĩ độ (lat)')
+                    ->helperText('Tự điền khi đặt ghim hoặc dán link')
                     ->numeric()
                     ->required()
                     ->minValue(-90)
@@ -45,6 +46,7 @@ class ViTriBanDo
                     ->step('any'),
                 TextInput::make('lng')
                     ->label('Kinh độ (lng)')
+                    ->helperText('Tự điền khi đặt ghim hoặc dán link')
                     ->numeric()
                     ->required()
                     ->minValue(-180)
