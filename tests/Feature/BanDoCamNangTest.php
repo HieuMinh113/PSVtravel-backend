@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Filament\Resources\GuideCities\Pages\EditGuideCity;
 use App\Filament\Resources\GuideCities\RelationManagers\SpotsRelationManager;
 use App\Filament\Resources\GuideCountries\Pages\CreateGuideCountry;
+use App\Filament\Resources\GuideCountries\Pages\EditGuideCountry;
+use App\Filament\Resources\GuideCountries\Pages\ListGuideCountries;
 use App\Models\User;
 use App\Services\LinkGoogleMaps;
 use Filament\Actions\Testing\TestAction;
@@ -238,5 +240,51 @@ class BanDoCamNangTest extends TestCase
         $this->assertSame(['lat' => 31.2397, 'lng' => 121.4998, 'zoom' => null],
             LinkGoogleMaps::toaDoTrongTrang('<script>window.APP_INITIALIZATION_STATE=[[[1500.2,121.4998,31.2397],[0,0,0],[1024,768],13.1]]</script>'));
         $this->assertNull(LinkGoogleMaps::toaDoTrongTrang('<html>không có gì</html>'));
+    }
+
+    public function test_chon_mau_to_nuoc_tren_ban_do(): void
+    {
+        $tq = GuideCountry::create(['code' => 'CHN', 'name' => 'Trung Quốc', 'slug' => 'trung-quoc']);
+        $nb = GuideCountry::create(['code' => 'JPN', 'name' => 'Nhật Bản', 'slug' => 'nhat-ban', 'color' => '#f43f5e']);
+        $vn = GuideCountry::create(['code' => 'VNM', 'name' => 'Việt Nam', 'slug' => 'viet-nam', 'color' => 'đỏ']); // dữ liệu hỏng → mặc định
+        foreach ([$tq, $nb, $vn] as $i => $n) {
+            GuideCity::create(['guide_country_id' => $n->id, 'name' => 'TP '.$i, 'slug' => 'tp-'.$i, 'lat' => 10 + $i, 'lng' => 100 + $i]);
+        }
+
+        $mau = collect($this->getJson('/api/v1/guide-map')->assertOk()->json('data.countries'))->pluck('color', 'slug');
+        $this->assertSame('#76DA51', $mau['trung-quoc']); // chưa chọn → xanh lá mặc định
+        $this->assertSame('#F43F5E', $mau['nhat-ban']);
+        $this->assertSame('#76DA51', $mau['viet-nam']);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $nv = User::factory()->create();
+        foreach (['ViewAny', 'View', 'Update'] as $q) {
+            $nv->givePermissionTo(Permission::findOrCreate("{$q}:GuideCountry", 'web'));
+        }
+        $this->actingAs($nv);
+
+        Livewire::test(EditGuideCountry::class, ['record' => $tq->getRouteKey()])
+            ->assertFormFieldExists('color')
+            ->fillForm(['color' => 'cam'])
+            ->call('save')
+            ->assertHasFormErrors(['color' => 'regex']);
+        Livewire::test(EditGuideCountry::class, ['record' => $tq->getRouteKey()])
+            ->fillForm(['color' => '#EA580C'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame('#EA580C', $tq->fresh()->color);
+
+        // Chọn nhiều nước → đổi cùng một màu
+        Livewire::test(ListGuideCountries::class)
+            ->selectTableRecords([$tq, $nb])
+            ->callAction(TestAction::make('doiMau')->table()->bulk(), data: ['color' => '#2563eb'])
+            ->assertHasNoFormErrors();
+        $this->assertSame('#2563EB', $tq->fresh()->color);
+        $this->assertSame('#2563EB', $nb->fresh()->color);
+        $this->assertSame('đỏ', $vn->fresh()->color); // nước không chọn giữ nguyên
+
+        // Không có quyền sửa thì không thấy nút đổi màu
+        $this->actingAs(User::factory()->create()->givePermissionTo(Permission::findOrCreate('ViewAny:GuideCountry', 'web')));
+        Livewire::test(ListGuideCountries::class)->assertActionHidden(TestAction::make('doiMau')->table()->bulk());
     }
 }

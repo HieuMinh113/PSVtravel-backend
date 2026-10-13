@@ -61,6 +61,7 @@ class GuideMapApiController extends Controller
             'code' => $n->code,
             'name' => $n->name,
             'slug' => $n->slug,
+            'color' => $n->mau(), // màu tô trên quả địa cầu (admin chọn, mặc định xanh lá)
             'intro' => $n->intro,
             'cover_image' => self::anh($n->cover_image),
             'label' => $ranhGioi['nhan'],

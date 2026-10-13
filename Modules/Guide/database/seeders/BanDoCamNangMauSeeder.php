@@ -70,6 +70,9 @@ class BanDoCamNangMauSeeder extends Seeder
         ]],
     ];
 
+    // Vài nước tô màu khác để thấy chức năng chọn màu; còn lại để mặc định (xanh lá)
+    private const MAU = ['JPN' => '#F43F5E', 'KOR' => '#3B82F6'];
+
     public function run(): void
     {
         if (app()->isProduction()) {
@@ -91,7 +94,7 @@ class BanDoCamNangMauSeeder extends Seeder
         $thuTuNuoc = 0;
         foreach (self::DU_LIEU as $code => [$tenNuoc, $gioiThieu, $dsTp]) {
             $nuoc = GuideCountry::updateOrCreate(['code' => $code], [
-                'name' => $tenNuoc, 'slug' => Str::slug($tenNuoc), 'intro' => $gioiThieu,
+                'name' => $tenNuoc, 'slug' => Str::slug($tenNuoc), 'intro' => $gioiThieu, 'color' => self::MAU[$code] ?? null,
                 'status' => 'published', 'sort_order' => ++$thuTuNuoc,
             ]);
             foreach ($dsTp as $i => [$tenTp, $lat, $lng, $zoom, $moTa, $baiTongQuan, $dsDiem]) {

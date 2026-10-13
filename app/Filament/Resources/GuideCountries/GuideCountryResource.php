@@ -9,19 +9,24 @@ use App\Filament\Resources\GuideCountries\Pages\ListGuideCountries;
 use App\Services\TepTaiLen;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\ColorColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Modules\Guide\Models\GuideCountry;
 
@@ -80,6 +85,7 @@ class GuideCountryResource extends Resource
                 ->alphaDash()
                 ->unique(ignoreRecord: true)
                 ->maxLength(100),
+            self::oMau(),
             Select::make('status')
                 ->label('Trạng thái')
                 ->options(['published' => 'Đang hiển thị', 'hidden' => 'Đã ẩn'])
@@ -100,12 +106,30 @@ class GuideCountryResource extends Resource
         ]);
     }
 
+    /** Ô chọn màu tô nước trên quả địa cầu — dùng cho form nước và nút "Đổi màu" hàng loạt */
+    public static function oMau(): ColorPicker
+    {
+        return ColorPicker::make('color')
+            ->label('Màu tô trên bản đồ')
+            ->hex()
+            ->default(GuideCountry::MAU_MAC_DINH)
+            ->placeholder(GuideCountry::MAU_MAC_DINH)
+            ->regex(GuideCountry::MAU_HOP_LE)
+            ->validationMessages(['regex' => 'Chọn màu trong bảng màu hoặc gõ mã dạng #RRGGBB (VD: #E11D48).'])
+            ->helperText('Màu tô nước này trên quả địa cầu ở trang Cẩm nang (viền tự đậm hơn). Để trống = xanh lá PSV. Nên chọn màu tươi, không quá nhạt.');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->modifyQueryUsing(fn ($query) => $query->withCount(['cities', 'spots']))
             ->columns([
                 TextColumn::make('name')->label('Nước')->searchable()->weight('bold'),
+                ColorColumn::make('color')
+                    ->label('Màu')
+                    ->state(fn (GuideCountry $record): string => $record->mau())
+                    ->copyable()
+                    ->copyMessage('Đã chép mã màu'),
                 TextColumn::make('code')->label('Mã')->badge()->color('gray'),
                 TextColumn::make('cities_count')->label('Thành phố')->numeric(),
                 TextColumn::make('spots_count')->label('Điểm')->numeric(),
@@ -127,6 +151,21 @@ class GuideCountryResource extends Resource
                 EditAction::make(),
                 DeleteAction::make()
                     ->modalDescription('Xoá nước sẽ xoá luôn các thành phố và điểm của nước này trên bản đồ (bài cẩm nang vẫn giữ nguyên).'),
+            ])
+            // Chọn nhiều nước → đổi cùng một màu (VD: đổi hết sang màu cam)
+            ->toolbarActions([
+                BulkAction::make('doiMau')
+                    ->label('Đổi màu')
+                    ->icon(Heroicon::OutlinedSwatch)
+                    ->authorize(fn (): bool => auth()->user()?->can('Update:GuideCountry') ?? false)
+                    ->modalHeading('Đổi màu các nước đã chọn')
+                    ->modalWidth('md')
+                    ->schema([self::oMau()->required()])
+                    ->action(function (Collection $records, array $data): void {
+                        $records->each(fn (GuideCountry $n) => $n->update(['color' => strtoupper($data['color'])]));
+                        Notification::make()->success()->title('Đã đổi màu '.$records->count().' nước')->send();
+                    })
+                    ->deselectRecordsAfterCompletion(),
             ])
             ->emptyStateHeading('Chưa có nước nào trên bản đồ')
             ->emptyStateDescription('Thêm nước (VD: Trung Quốc), rồi thêm thành phố (Thượng Hải) và các điểm trong thành phố.');

@@ -13,7 +13,21 @@ use Illuminate\Support\Str;
  */
 class GuideCountry extends Model
 {
-    protected $fillable = ['code', 'name', 'slug', 'intro', 'cover_image', 'status', 'sort_order'];
+    protected $fillable = ['code', 'name', 'slug', 'color', 'intro', 'cover_image', 'status', 'sort_order'];
+
+    /** Màu tô mặc định của nước trên quả địa cầu — xanh lá logo PSV */
+    public const MAU_MAC_DINH = '#76DA51';
+
+    /** Mã màu hợp lệ: #RRGGBB */
+    public const MAU_HOP_LE = '/^#[0-9A-Fa-f]{6}$/';
+
+    /** Màu khách thấy trên bản đồ: màu đã chọn, chưa chọn (hoặc sai dạng) thì màu mặc định. */
+    public function mau(): string
+    {
+        return is_string($this->color) && preg_match(self::MAU_HOP_LE, $this->color)
+            ? strtoupper($this->color)
+            : self::MAU_MAC_DINH;
+    }
 
     protected $casts = ['sort_order' => 'integer'];
 
