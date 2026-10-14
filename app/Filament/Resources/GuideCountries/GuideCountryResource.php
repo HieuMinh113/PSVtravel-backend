@@ -90,6 +90,7 @@ class GuideCountryResource extends Resource
                 ->label('Trạng thái')
                 ->options(['published' => 'Đang hiển thị', 'hidden' => 'Đã ẩn'])
                 ->default('published')
+                ->helperText('Nước chỉ hiện ngoài website khi có ít nhất 1 thành phố đang hiển thị (thêm ở nút "Thành phố").')
                 ->required(),
             Textarea::make('intro')
                 ->label('Giới thiệu ngắn')
@@ -122,7 +123,10 @@ class GuideCountryResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->withCount(['cities', 'spots']))
+            ->modifyQueryUsing(fn ($query) => $query->withCount([
+                'cities', 'spots',
+                'cities as so_thanh_pho_hien' => fn ($q) => $q->where('status', 'published'),
+            ]))
             ->columns([
                 TextColumn::make('name')->label('Nước')->searchable()->weight('bold'),
                 ColorColumn::make('color')
@@ -133,11 +137,24 @@ class GuideCountryResource extends Resource
                 TextColumn::make('code')->label('Mã')->badge()->color('gray'),
                 TextColumn::make('cities_count')->label('Thành phố')->numeric(),
                 TextColumn::make('spots_count')->label('Điểm')->numeric(),
+                // Website chỉ hiện nước có thành phố đang hiển thị (bấm vào nước trống
+                // thì khách chẳng thấy gì) — báo rõ để khỏi tưởng bị lỗi
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => $state === 'published' ? 'Đang hiển thị' : 'Đã ẩn')
-                    ->color(fn (string $state): string => $state === 'published' ? 'success' : 'gray'),
+                    ->formatStateUsing(fn (string $state, GuideCountry $record): string => match (true) {
+                        $state !== 'published' => 'Đã ẩn',
+                        ! $record->so_thanh_pho_hien => 'Chưa lên web — cần thêm thành phố',
+                        default => 'Đang hiển thị',
+                    })
+                    ->color(fn (string $state, GuideCountry $record): string => match (true) {
+                        $state !== 'published' => 'gray',
+                        ! $record->so_thanh_pho_hien => 'warning',
+                        default => 'success',
+                    })
+                    ->tooltip(fn (string $state, GuideCountry $record): ?string => $state === 'published' && ! $record->so_thanh_pho_hien
+                        ? 'Nước chỉ hiện trên quả địa cầu ngoài web khi có ít nhất 1 thành phố đang hiển thị. Bấm "Thành phố" để thêm.'
+                        : null),
                 TextColumn::make('sort_order')->label('Thứ tự')->numeric()->sortable(),
             ])
             ->defaultSort('sort_order')

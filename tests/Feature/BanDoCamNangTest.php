@@ -287,4 +287,24 @@ class BanDoCamNangTest extends TestCase
         $this->actingAs(User::factory()->create()->givePermissionTo(Permission::findOrCreate('ViewAny:GuideCountry', 'web')));
         Livewire::test(ListGuideCountries::class)->assertActionHidden(TestAction::make('doiMau')->table()->bulk());
     }
+
+    public function test_nuoc_chua_co_thanh_pho_khong_len_web_va_admin_bao_ro(): void
+    {
+        $vn = GuideCountry::create(['code' => 'VNM', 'name' => 'Việt Nam', 'slug' => 'viet-nam']);
+        $nb = GuideCountry::create(['code' => 'JPN', 'name' => 'Nhật Bản', 'slug' => 'nhat-ban']);
+        GuideCity::create(['guide_country_id' => $vn->id, 'name' => 'Hà Nội', 'slug' => 'ha-noi', 'lat' => 21, 'lng' => 105.8]);
+        GuideCity::create(['guide_country_id' => $nb->id, 'name' => 'Tokyo', 'slug' => 'tokyo', 'lat' => 35.7, 'lng' => 139.7, 'status' => 'hidden']);
+
+        $this->assertSame(['viet-nam'], collect($this->getJson('/api/v1/guide-map')->json('data.countries'))->pluck('slug')->all());
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs(User::factory()->create()->givePermissionTo(Permission::findOrCreate('ViewAny:GuideCountry', 'web')));
+        Livewire::test(ListGuideCountries::class)
+            ->assertTableColumnFormattedStateSet('status', 'Đang hiển thị', $vn)
+            ->assertTableColumnFormattedStateSet('status', 'Chưa lên web — cần thêm thành phố', $nb);
+
+        // Thêm thành phố (đang hiển thị) → nước lên web
+        GuideCity::where('slug', 'tokyo')->update(['status' => 'published']);
+        $this->assertContains('nhat-ban', collect($this->getJson('/api/v1/guide-map')->json('data.countries'))->pluck('slug')->all());
+    }
 }
