@@ -163,6 +163,68 @@ class NhapTourTuFileTest extends TestCase
         $this->assertSame(20, $kq['han_visa_ngay']);
     }
 
+    /**
+     * Kiểu file của đối tác khác (bản PDF xuất từ Google Docs / Word): tiêu đề ngày
+     * là hàng bảng "NGÀY 1 | HÀ NỘI – SEOUL | (Ăn tối)" không có dấu hai chấm, có
+     * thêm bảng "lịch trình rút gọn" ở đầu, bảng giá theo tháng có năm ghi ở hàng
+     * sau, ô ngày bị cắt sang ô bên cạnh, câu phụ thu dính vào hàng giá, bảng hai
+     * cột "BAO GỒM | KHÔNG BAO GỒM".
+     */
+    public function test_doc_kieu_bang_cua_doi_tac_khac(): void
+    {
+        $dong = fn (string $chu, bool $dam = false, bool $gach = false) => ['loai' => 'chu', 'chu' => $chu, 'dam' => $dam, 'gach' => $gach, 'o' => null];
+        $hang = fn (array $o, bool $dam = false) => ['loai' => 'chu', 'chu' => implode(' | ', $o), 'dam' => $dam, 'gach' => false, 'o' => $o];
+
+        $kq = (new PhanTichChuongTrinh)->phanTich([
+            $dong('Thời gian 3 Ngày 2 Đêm | Vietnam Airlines', dam: true),
+            $dong('LỊCH TRÌNH RÚT GỌN:', dam: true),
+            $hang(['Ngày 1', 'HÀ NỘI - SEOUL', 'Ăn tối'], dam: true),
+            $hang(['Ngày 2', 'SEOUL – NAMI', 'Ăn sáng, trưa, tối'], dam: true),
+            $hang(['Ngày 3', 'SEOUL – HÀ NỘI', 'Ăn sáng'], dam: true),
+            $dong('LỊCH TRÌNH CHI TIẾT:', dam: true),
+            $hang(['NGÀY 1', 'HÀ NỘI - SEOUL (Ăn tối)'], dam: true),
+            $dong('6h30: Xe đón đoàn tại Hà Nội đưa ra sân bay Nội Bài.'),
+            $hang(['NGÀY 2', 'SEOUL – NAMI', '(Ăn sáng, trưa, tối)'], dam: true),
+            $dong('Sáng: Tham quan đảo Nami.'),
+            $hang(['NGÀY 03', 'SEOUL – HÀ NỘI', '(Ăn sáng)'], dam: true),
+            $dong('Đoàn ra sân bay về Hà Nội. Kết thúc chương trình.'),
+            // dòng "quy định trẻ em" ở xa bảng giá — không được lẫn vào tiêu đề bảng giá
+            $dong('QUY ĐỊNH TRẺ EM:', dam: true),
+            $dong('Dưới 02 tuổi: ngủ chung giường với người lớn.', gach: true),
+            $hang(['NGÀY KHỞI HÀNH (Giá dành cho đoàn từ 10 khách người lớn) GIÁ TOUR (Từ 2 – 10 tuổi) TRẺ EM GIÁ PHÒNG ĐƠN', '']),
+            $hang(['Tháng 9: 06, 12', '', '23.690.000', '22.690.000', '4.500.000']),
+            $hang(['Tháng 11: 01, 13', 'Phụ thu phòng đơn (nếu có): 5.990.000 VNĐ/ 01 hành trình', '23.990.000', '22.990.000', '4.500.000']),
+            $hang(['Tháng 3/2027: 17, 24,', '31', '24.990.000', '23.990.000', '4.500.000']),
+            $hang(['DỊCH VỤ BAO GỒM', 'DỊCH VỤ CHƯA BAO GỒM'], dam: true),
+            $hang(['- Vé máy bay theo chương trình', '- Chi phí làm hộ chiếu']),
+            $hang(['- Khách sạn 4 sao (2', '- Tiền TIP cho lái xe và HDV']),
+            $hang(['người / phòng)', '5USD/1 người/1 ngày']),
+            $dong('Bảo hiểm du lịch với mức đền bù 10,000USD.', gach: true),
+            $dong('GHI CHÚ:', dam: true),
+            $dong('Hộ chiếu còn hạn trên 6 tháng.', gach: true),
+        ], 'L.HN-SS_ma_noi_bo.pdf');
+
+        // Lịch trình chi tiết (không lấy bảng rút gọn), tiêu đề ngày không có dấu hai chấm
+        $this->assertSame(['Hà Nội - Seoul', 'Seoul – Nami', 'Seoul – Hà Nội'], array_column($kq['lich_trinh'], 'tieu_de'));
+        $this->assertSame(['Ăn tối', 'Ăn sáng, trưa, tối', 'Ăn sáng'], array_column($kq['lich_trinh'], 'bua'));
+        $this->assertStringContainsString('Nội Bài', $kq['lich_trinh'][0]['noi_dung']);
+
+        // Không có dòng tên tour: ghép từ các chặng, không lấy tên file có mã nội bộ
+        $this->assertSame('Seoul – Nami 3N2Đ', $kq['ten']);
+
+        // "Tháng 9…11" đứng trước "Tháng 3/2027" là năm 2026; ô "31" bị cắt sang ô bên cạnh
+        $this->assertSame(['06/09/2026', '12/09/2026'], $kq['dot_bo_qua']);
+        $this->assertSame(['2026-11-01', '2026-11-13', '2027-03-17', '2027-03-24', '2027-03-31'], array_column($kq['dot'], 'ngay'));
+        // Câu phụ thu 5.990.000 dính vào hàng giá không thành giá người lớn
+        $this->assertSame(['nguoi_lon' => 23_990_000, 'tre_em' => 22_990_000], $kq['dot'][0]['gia']);
+        $this->assertSame([23_990_000, 22_990_000], [$kq['gia_nguoi_lon'], $kq['gia_tre_em']]);
+
+        // Bảng hai cột: mỗi cột về đúng phần, dòng bị xuống hàng nối vào mục trước
+        $this->assertSame(['Vé máy bay theo chương trình', 'Khách sạn 4 sao (2 người / phòng)', 'Bảo hiểm du lịch với mức đền bù 10,000USD.'], $kq['bao_gom']);
+        $this->assertSame(['Chi phí làm hộ chiếu', 'Tiền TIP cho lái xe và HDV 5USD/1 người/1 ngày'], $kq['khong_bao_gom']);
+        $this->assertContains('Ghi chú', array_column($kq['luu_y'], 'title'));
+    }
+
     public function test_chuan_hoa_chu_gia_va_ky_hieu(): void
     {
         $this->assertSame('xem show ở Tây Hồ', PhanTichChuongTrinh::chuan("xem\u{00A0}ѕhoᴡ  ở Tây\u{200B} Hồ"));
@@ -279,8 +341,11 @@ class NhapTourTuFileTest extends TestCase
         }
 
         // PDF tối giản: tiêu đề, 2 ngày (dòng ngày 1 bị ngắt xuống dòng), bảng giá 3 cột
+        // Dòng tên tour bị cắt thành hai mẩu khác phông nằm sát nhau ("HA N" + "OI - SAPA"),
+        // như file Word dùng hai phông cho chữ Latin / chữ có dấu — phải ghép lại liền
+        // (bề rộng "HA N" phông Helvetica-Bold cỡ 11 = (722+722+278+722)/1000 × 11)
         $dong = [
-            ['F2', 60, 800, 'HA NOI - SAPA'],
+            ['F2', 60, 800, 'HA N'], ['F1', 60 + 2.444 * 11, 800, 'OI - SAPA'],
             ['F2', 60, 770, 'NGAY 1: HA NOI - SAPA'],
             ['F1', 60, 752, 'Sang: Xe don doan tai Ha Noi, di chuyen'],
             ['F1', 60, 738, 'len Sapa qua cao toc.'],

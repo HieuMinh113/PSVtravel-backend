@@ -61,12 +61,15 @@ class DocPdf
                 $rong = (float) $n->getAttribute('width');
                 $cao = (float) $n->getAttribute('height');
                 if ($n->tagName === 'text') {
-                    $chu = trim(html_entity_decode(strip_tags($dom->saveXML($n)), ENT_QUOTES | ENT_HTML5));
+                    $tho = html_entity_decode(strip_tags($dom->saveXML($n)), ENT_QUOTES | ENT_HTML5);
+                    $chu = trim($tho);
                     if ($chu === '') {
                         continue;
                     }
                     $dam = $n->getElementsByTagName('b')->length > 0;
-                    $phanTu[] = ['loai' => 'chu', 'trang' => $so, 'top' => $top, 'left' => $left, 'rong' => $rong, 'cao' => $cao, 'chu' => $chu, 'dam' => $dam];
+                    $phanTu[] = ['loai' => 'chu', 'trang' => $so, 'top' => $top, 'left' => $left, 'rong' => $rong, 'cao' => $cao, 'chu' => $chu, 'dam' => $dam,
+                        // dấu cách ở mép mẩu chữ — để biết hai mẩu sát nhau là một chữ bị cắt hay hai chữ
+                        'cach_dau' => (bool) preg_match('/^\s/u', $tho), 'cach_cuoi' => (bool) preg_match('/\s$/u', $tho)];
                 } elseif ($n->tagName === 'image') {
                     if ($rong <= 24 && $cao <= 24) {
                         $anhNho[$so][] = $top + $cao / 2; // gạch đầu dòng dạng ảnh
@@ -100,7 +103,7 @@ class DocPdf
 
         // Thứ tự đọc: trang → từ trên xuống → trái sang phải
         usort($phanTu, fn ($a, $b) => [$a['trang'], $a['top'], $a['left']] <=> [$b['trang'], $b['top'], $b['left']]);
-        $phanTu = $this->bangGia($phanTu);
+        $phanTu = $this->bangGia($this->ghepChuBiCat($phanTu));
 
         // Gom các mẩu chữ cùng một hàng (lệch nhau vài điểm) thành một dòng
         $dong = [];
@@ -164,7 +167,8 @@ class DocPdf
                 }
                 $phai = $m['left'] + $m['rong'];
             }
-            $dam = count(array_filter($d['manh'], fn ($m) => $m['dam'])) * 2 >= count($d['manh']);
+            $dam = array_sum(array_map(fn ($m) => $m['so_dam'] ?? (int) $m['dam'], $d['manh'])) * 2
+                >= array_sum(array_map(fn ($m) => $m['so_manh'] ?? 1, $d['manh']));
             $giua = $d['top'] + $d['cao'] / 2;
             $gach = $gachKyHieu || collect($anhNho[$d['trang']] ?? [])->contains(fn ($y) => abs($y - $giua) <= max(6, $d['cao']));
             $muc[] = [
@@ -218,6 +222,76 @@ class DocPdf
         return array_map(fn ($m) => array_diff_key($m, array_flip(['top', 'cao', 'left', 'phai'])), $ra);
     }
 
+    /**
+     * Word xuất PDF với hai phông (một phông cho chữ Latin, một cho chữ có dấu
+     * tiếng Việt) thì một chữ bị cắt thành nhiều mẩu nằm sát nhau: "CH" +
+     * "ƯƠNG TR" + "ÌNH", "03/" + "06" (hai màu). Ghép lại thành một mẩu, KHÔNG
+     * chèn dấu cách — nếu không sẽ ra "CH ƯƠNG TR ÌNH", từ khoá "BAO GỒM",
+     * "HỦY", "NGƯỜI LỚN" không còn nhận ra được.
+     * Hai mẩu được ghép khi: cùng hàng (chồng nhau theo chiều dọc), mẩu sau bắt
+     * đầu ngay chỗ mẩu trước kết thúc (hở ≤ 1,5 điểm) và không mẩu nào có dấu
+     * cách ở chỗ nối.
+     *
+     * @param  list<array>  $phanTu  đã sắp theo thứ tự đọc
+     * @return list<array>
+     */
+    private function ghepChuBiCat(array $phanTu): array
+    {
+        $ra = [];
+        foreach ($phanTu as $p) {
+            if ($p['loai'] === 'chu') {
+                // tìm trong vài mẩu vừa xếp: mẩu cùng hàng có thể lệch top 1–2 điểm nên
+                // không liền nhau, và mẩu bên phải có khi được xếp trước mẩu bên trái
+                for ($k = count($ra) - 1; $k >= max(0, count($ra) - 40); $k--) {
+                    $q = $ra[$k];
+                    // cùng hàng: hai khung chồng nhau theo chiều dọc ≥ 60% (phông chữ có dấu
+                    // thường cao hơn, lệch top 2–3 điểm nhưng cùng đường chân chữ)
+                    $chongDoc = min($q['top'] + $q['cao'], $p['top'] + $p['cao']) - max($q['top'], $p['top']);
+                    if ($q['loai'] !== 'chu' || $q['trang'] !== $p['trang'] || $chongDoc < 0.6 * min($q['cao'], $p['cao']) || abs($q['cao'] - $p['cao']) > 4) {
+                        continue;
+                    }
+                    $sau = $p['left'] - ($q['left'] + $q['rong']); // p nằm ngay sau q
+                    $truoc = $q['left'] - ($p['left'] + $p['rong']); // p nằm ngay trước q
+                    if ($sau >= -2 && $sau <= 1.5 && ! $q['cach_cuoi'] && ! $p['cach_dau']) {
+                        [$trai, $phai] = [$q, $p];
+                    } elseif ($truoc >= -2 && $truoc <= 1.5 && ! $p['cach_cuoi'] && ! $q['cach_dau']) {
+                        [$trai, $phai] = [$p, $q];
+                    } else {
+                        continue;
+                    }
+                    // giữ toạ độ / cỡ chữ của mẩu bên trái để việc nối dòng phía sau không đổi
+                    $ra[$k] = array_merge($trai, [
+                        'chu' => $trai['chu'].$phai['chu'],
+                        'rong' => $phai['left'] + $phai['rong'] - $trai['left'],
+                        'cach_cuoi' => $phai['cach_cuoi'],
+                        // dòng in đậm hay không vẫn tính theo số mẩu GỐC (như trước khi ghép)
+                        'so_manh' => ($p['so_manh'] ?? 1) + ($q['so_manh'] ?? 1),
+                        'so_dam' => ($p['so_dam'] ?? (int) $p['dam']) + ($q['so_dam'] ?? (int) $q['dam']),
+                        'dam' => $p['dam'] && $q['dam'],
+                    ]);
+
+                    continue 2;
+                }
+            }
+            $ra[] = $p;
+        }
+
+        return $ra;
+    }
+
+    /** Mẩu chữ là ô ngày khởi hành: "03/06", "05, 19/08", "Tháng 10: 17, 21" */
+    private static function laNgayBang(string $s): bool
+    {
+        return (bool) preg_match('/^\s*(?:tháng\s*\d|\d{1,2}\s*\/\s*\d{1,2}|\d{1,2}(?:\s*[,&]\s*\d{1,2})+)/iu', $s);
+    }
+
+    /** Tiêu đề phần sau bảng giá, hoặc dòng đầu danh sách đánh số */
+    private static function laTieuDePhan(string $s): bool
+    {
+        return (bool) preg_match('/BAO GOM|LUU Y|GHI CHU|DIEU KIEN|CHINH SACH|\bHUY\b|THU TUC|HO SO|QUY DINH/', strtoupper(Str::ascii($s)))
+            || (bool) preg_match('/^\s*\d{1,2}\.\s+\p{L}/u', $s);
+    }
+
     private static function hoaHet(string $s): bool
     {
         $chu = preg_replace('/[^\p{L}]/u', '', $s);
@@ -263,8 +337,8 @@ class DocPdf
         // Các hàng giá: mẩu có số tiền, gom theo trang + độ cao
         $hang = [];
         foreach ($phanTu as $i => $p) {
-            // "3.200.000/khách/trọn tour" là phụ thu trong câu, không phải ô bảng giá
-            if ($p['loai'] !== 'chu' || ! self::tien($p['chu']) || preg_match('/\d{3}\s*(?:vn[dđ]|đ)?\s*\/\s*\p{L}/iu', $p['chu'])) {
+            // "3.200.000/khách/trọn tour", "5.990.000 VNĐ/ 01 hành trình" là phụ thu trong câu, không phải ô bảng giá
+            if ($p['loai'] !== 'chu' || ! self::tien($p['chu']) || preg_match('/\d{3}\s*(?:vn[dđ]|đ)?\s*\/\s*[\p{L}\d]/iu', $p['chu'])) {
                 continue;
             }
             foreach ($hang as $k => $h) {
@@ -314,8 +388,13 @@ class DocPdf
                 continue;
             }
             $tuTren = $tieuDe ? min(array_column($tieuDe, 'top')) : $dau['top'] - 3;
+            // Vùng tiêu đề kết thúc ở đáy các chữ tiêu đề, không kéo tới hàng giá đầu
+            // tiên: ô giá gộp nhiều hàng ngày ("03/06, 03/07, 05/08 — 26.490.000")
+            // thì số tiền nằm giữa nhóm, các ngày phía trên nó là thân bảng.
+            $denDuoi = $tieuDe ? max(array_map(fn ($p) => $p['top'] + $p['cao'], $tieuDe)) : $dau['top'] - 2;
             foreach ($phanTu as $i => $p) {
-                if ($p['loai'] === 'chu' && $p['trang'] === $dau['trang'] && $p['top'] >= $tuTren && $p['top'] < $dau['top'] - 2) {
+                if ($p['loai'] === 'chu' && $p['trang'] === $dau['trang'] && $p['top'] >= $tuTren
+                    && $p['top'] < min($dau['top'] - 2, $denDuoi + 2) && ! self::laNgayBang($p['chu'])) {
                     $tieuDe[$i] = $p; // mọi chữ trong vùng tiêu đề bảng
                 }
             }
@@ -336,6 +415,18 @@ class DocPdf
                     min($vung[$h['trang']][0] ?? INF, $h['trang'] === $dau['trang'] ? $tuTren : $h['top'] - $khoang),
                     max($vung[$h['trang']][1] ?? -INF, $h['top'] + $khoang),
                 ];
+            }
+            // Thân bảng dừng trước tiêu đề phần kế tiếp nằm ngay dưới bảng ("GIÁ TOUR
+            // BAO GỒM :", "1. Vé máy bay…") — không thì dòng đó bị hút vào ô của
+            // hàng giá cuối cùng và mất tiêu đề phần
+            foreach ($vung as $trang => [$tren, $duoi]) {
+                $hangCuoi = max(array_map(fn ($h) => $h['trang'] === $trang ? $h['top'] : -INF, $ds));
+                foreach ($phanTu as $p) {
+                    if ($p['loai'] === 'chu' && $p['trang'] === $trang && $p['top'] > $hangCuoi + 2 && $p['top'] <= $duoi
+                        && ! self::tien($p['chu']) && self::laTieuDePhan($p['chu'])) {
+                        $vung[$trang][1] = min($vung[$trang][1], $p['top'] - 1);
+                    }
+                }
             }
             $than = [];
             foreach ($phanTu as $i => $p) {
