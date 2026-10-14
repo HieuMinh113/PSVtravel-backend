@@ -31,7 +31,7 @@ docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
 
 # 6. Tạo vai trò + tài khoản quản trị
-docker compose exec app php artisan db:seed --class=Database\\Seeders\\RoleSeeder
+docker compose exec app php artisan db:seed --class=RoleSeeder
 
 # 7. Tạo trang tĩnh và các mục Cài đặt
 docker compose exec app php artisan db:seed --class="Modules\Page\Database\Seeders\PageDatabaseSeeder"
@@ -65,7 +65,7 @@ giờ (đọc sheet liên minh 5 phút/lần...). Xem nó chạy: `docker compos
 Muốn có sẵn tour, banner, đánh giá... để tester có cái mà bấm:
 
 ```bash
-docker compose exec app php artisan db:seed --class=Database\\Seeders\\DemoSeeder
+docker compose exec app php artisan db:seed --class=DemoSeeder
 ```
 
 Đây là **dữ liệu giả**, chỉ dùng trên máy dev và staging. Ảnh lấy từ picsum.photos nên cần có mạng.
