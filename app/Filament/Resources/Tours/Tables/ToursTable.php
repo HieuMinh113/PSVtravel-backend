@@ -14,6 +14,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Modules\Category\Models\Category;
 
 class ToursTable
 {
@@ -78,6 +80,28 @@ class ToursTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                // Lọc theo danh mục (chọn nhiều được) — chia nhóm Trong nước / Nước
+                // ngoài; "Chưa gán danh mục" để tìm tour chưa hiện ở mục nào ngoài web
+                SelectFilter::make('danh_muc')
+                    ->label('Danh mục')
+                    ->multiple()
+                    ->searchable()
+                    ->options(fn (): array => ['Khác' => ['khong' => 'Chưa gán danh mục']]
+                        + Category::query()->orderBy('type')->orderBy('sort_order')->orderBy('name')->get()
+                            ->groupBy(fn (Category $c): string => $c->type === 'abroad' ? 'Nước ngoài' : 'Trong nước')
+                            ->map(fn ($nhom) => $nhom->pluck('name', 'id')->all())
+                            ->all())
+                    ->query(function (Builder $query, array $data): Builder {
+                        $chon = array_map('strval', $data['values'] ?? []);
+                        if (! $chon) {
+                            return $query;
+                        }
+                        $ids = array_values(array_diff($chon, ['khong']));
+
+                        return $query->where(fn (Builder $q) => $q
+                            ->when($ids, fn (Builder $q) => $q->orWhereHas('categories', fn (Builder $c) => $c->whereIn('categories.id', $ids)))
+                            ->when(in_array('khong', $chon, true), fn (Builder $q) => $q->orWhereDoesntHave('categories')));
+                    }),
                 SelectFilter::make('status')
                     ->label('Trạng thái')
                     ->options([

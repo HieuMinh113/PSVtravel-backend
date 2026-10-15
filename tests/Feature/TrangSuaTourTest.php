@@ -72,4 +72,29 @@ class TrangSuaTourTest extends TestCase
             ->assertCanSeeTableRecords([$co])
             ->assertCanNotSeeTableRecords([$khong]);
     }
+
+    public function test_loc_danh_sach_tour_theo_danh_muc(): void
+    {
+        $mt = Category::create(['type' => 'domestic', 'name' => 'Miền Trung', 'slug' => 'mien-trung', 'status' => 'published']);
+        $tl = Category::create(['type' => 'abroad', 'name' => 'Thái Lan', 'slug' => 'thai-lan', 'status' => 'published']);
+        $nhaTrang = Tour::create(['slug' => 'nha-trang', 'name' => 'Nha Trang', 'type' => 'domestic', 'status' => 'published', 'adult_price' => 1]);
+        $nhaTrang->categories()->attach($mt->id);
+        $bangkok = Tour::create(['slug' => 'bangkok', 'name' => 'Bangkok', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 1]);
+        $bangkok->categories()->attach($tl->id);
+        $chuaCo = Tour::create(['slug' => 'cat-tien', 'name' => 'Cát Tiên', 'type' => 'domestic', 'status' => 'published', 'adult_price' => 1]);
+
+        $trang = Livewire::test(ListTours::class)->assertTableFilterExists('danh_muc');
+
+        $trang->filterTable('danh_muc', [$mt->id])
+            ->assertCanSeeTableRecords([$nhaTrang])
+            ->assertCanNotSeeTableRecords([$bangkok, $chuaCo]);
+
+        $trang->filterTable('danh_muc', [$mt->id, $tl->id])
+            ->assertCanSeeTableRecords([$nhaTrang, $bangkok])
+            ->assertCanNotSeeTableRecords([$chuaCo]);
+
+        $trang->filterTable('danh_muc', ['khong'])
+            ->assertCanSeeTableRecords([$chuaCo])
+            ->assertCanNotSeeTableRecords([$nhaTrang, $bangkok]);
+    }
 }
