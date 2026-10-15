@@ -235,7 +235,7 @@ class PhanTichChuongTrinh
             $this->canhBao[] = 'Không nhận ra nước đến — chọn loại tour / quốc gia trong form.';
         }
 
-        return [
+        return self::sachUtf8([
             'ten' => $ten['ten'] ? trim($ten['ten'].($soNgay ? " {$soNgay}N{$soDem}Đ" : '')) : null,
             'mo_ta' => $gioiThieu ? implode("\n\n", $gioiThieu) : $khauHieu,
             'so_ngay' => $soNgay,
@@ -252,14 +252,35 @@ class PhanTichChuongTrinh
             'gia_nguoi_lon' => $giaNguoiLon ?? collect($this->giaCu ?? [])->min(),
             'gia_tre_em' => $giaTreEm,
             'gia_em_be' => $giaEmBe,
-            'bao_gom' => collect($phan['bao_gom'])->flatMap(fn ($p) => $p['dong'])->map(fn ($x) => ltrim($x, '• '))->values()->all(),
-            'khong_bao_gom' => collect($phan['khong_bao_gom'])->flatMap(fn ($p) => $p['dong'])->map(fn ($x) => ltrim($x, '• '))->values()->all(),
+            // (không dùng ltrim($x, '• '): ltrim cắt theo TỪNG BYTE nên "✓", "“", "–" ở đầu
+            // mục bị cắt mất nửa ký tự → chuỗi hỏng UTF-8, lưu tour báo lỗi "Malformed UTF-8")
+            'bao_gom' => collect($phan['bao_gom'])->flatMap(fn ($p) => $p['dong'])->map(fn ($x) => preg_replace('/^[•\s]+/u', '', $x))->values()->all(),
+            'khong_bao_gom' => collect($phan['khong_bao_gom'])->flatMap(fn ($p) => $p['dong'])->map(fn ($x) => preg_replace('/^[•\s]+/u', '', $x))->values()->all(),
             'huy' => implode("\n", collect($phan['huy'])->flatMap(fn ($p) => $p['dong'])->all()) ?: null,
             'luu_y' => $luuY,
             'han_visa_ngay' => $hanVisa,
             'anh' => $anh,
             'canh_bao' => $this->canhBao,
-        ];
+        ]);
+    }
+
+    /**
+     * Chốt chặn cuối: mọi chuỗi chữ trả ra đều là UTF-8 hợp lệ (byte hỏng thay
+     * bằng "?") — một ký tự lạ trong file không được làm hỏng cả lần nhập tour.
+     * Bỏ qua dữ liệu ảnh (nhị phân).
+     */
+    private static function sachUtf8(mixed $v, ?string $khoa = null): mixed
+    {
+        if (is_string($v)) {
+            return $khoa === 'du_lieu' || mb_check_encoding($v, 'UTF-8') ? $v : mb_scrub($v, 'UTF-8');
+        }
+        if (is_array($v)) {
+            foreach ($v as $k => $x) {
+                $v[$k] = self::sachUtf8($x, is_string($k) ? $k : $khoa);
+            }
+        }
+
+        return $v;
     }
 
     // ===================================================================
@@ -332,7 +353,7 @@ class PhanTichChuongTrinh
 
         $thuong = preg_replace('/\btp\.\s*(?=\p{L})/u', 'TP. ', $thuong);
 
-        return preg_replace_callback('/(^|[\s(\/–\-])(\p{L})/u', fn ($k) => $k[1].mb_strtoupper($k[2]),
+        return preg_replace_callback('/(^|[\s(\/–\-“"‘\'])(\p{L})/u', fn ($k) => $k[1].mb_strtoupper($k[2]),
             preg_replace_callback('/\b(tp|hcm|mb|vn|usa|uae)\b/u', fn ($k) => mb_strtoupper($k[1]), $thuong));
     }
 
@@ -413,7 +434,7 @@ class PhanTichChuongTrinh
             $bua = $this->buaNgoac($b[1]);
             $tieuDe = trim(mb_substr($tieuDe, 0, mb_strrpos($tieuDe, '(')));
         }
-        $tieuDe = trim($tieuDe, " \t|:–-");
+        $tieuDe = preg_replace('/^[\s|:–\-]+|[\s|:–\-]+$/u', '', $tieuDe); // trim() cắt theo byte, hỏng chữ "ồ", "“"…
         if ($tieuDe === '' && ! $m['o']) {
             return null;
         }
@@ -649,6 +670,9 @@ class PhanTichChuongTrinh
                 continue;
             }
             $chu = ($m['gach'] ? '• ' : '').($m['o'] ? implode(' ', array_filter($m['o'])) : $m['chu']);
+            if ($m['o'] && preg_match(self::GACH, $chu)) {
+                $chu = '• '.trim(preg_replace(self::GACH, '', $chu)); // hàng bảng bắt đầu bằng "✓", "➢"…
+            }
             if ($hienTai) {
                 $kq['thuoc'][$i] = true;
                 $dong = &$kq[$hienTai][count($kq[$hienTai]) - 1]['dong'];

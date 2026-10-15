@@ -61,7 +61,9 @@ class DocPdf
                 $rong = (float) $n->getAttribute('width');
                 $cao = (float) $n->getAttribute('height');
                 if ($n->tagName === 'text') {
-                    $tho = html_entity_decode(strip_tags($dom->saveXML($n)), ENT_QUOTES | ENT_HTML5);
+                    // mb_scrub: phông lạ có thể cho ra byte không phải UTF-8 — các hàm preg_*
+                    // gặp chuỗi hỏng sẽ trả null, mất chữ hoặc làm hỏng cả tour
+                    $tho = mb_scrub(html_entity_decode(strip_tags($dom->saveXML($n)), ENT_QUOTES | ENT_HTML5), 'UTF-8');
                     $chu = trim($tho);
                     if ($chu === '') {
                         continue;

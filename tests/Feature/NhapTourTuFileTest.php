@@ -225,6 +225,31 @@ class NhapTourTuFileTest extends TestCase
         $this->assertContains('Ghi chú', array_column($kq['luu_y'], 'title'));
     }
 
+    /**
+     * Mục bắt đầu bằng ký hiệu nhiều byte ("✓", "“", "–"): trước đây ltrim()/trim() cắt
+     * theo byte làm hỏng UTF-8 → lưu tour báo "Malformed UTF-8 characters" (production).
+     */
+    public function test_ky_hieu_dau_muc_khong_lam_hong_chu(): void
+    {
+        $dong = fn (string $chu, bool $dam = false) => ['loai' => 'chu', 'chu' => $chu, 'dam' => $dam, 'gach' => false, 'o' => null];
+        $kq = (new PhanTichChuongTrinh)->phanTich([
+            $dong('HÀ NỘI – BẮC KINH', dam: true),
+            $dong('NGÀY 1: HÀ NỘI – THAM QUAN TÂY HỒ', dam: true), $dong('Sáng: tham quan.'),
+            $dong('NGÀY 2: “VẠN LÝ” – HÀ NỘI', dam: true), $dong('Về Hà Nội.'),
+            $dong('GIÁ TOUR BAO GỒM:', dam: true),
+            ['loai' => 'chu', 'chu' => '✓ Vé máy bay khứ hồi', 'dam' => false, 'gach' => false, 'o' => ['✓ Vé máy bay khứ hồi', '']],
+            $dong('“Quà tặng” nón du lịch'),
+            $dong('–Bảo hiểm du lịch'),
+        ], 'x.pdf');
+
+        $this->assertNotFalse(json_encode(array_diff_key($kq, ['anh' => 1])));
+        $this->assertSame(['Vé máy bay khứ hồi', '“Quà tặng” nón du lịch', '–Bảo hiểm du lịch'], $kq['bao_gom']);
+        $this->assertSame(['Hà Nội – Tham Quan Tây Hồ', '“Vạn Lý” – Hà Nội'], array_column($kq['lich_trinh'], 'tieu_de'));
+
+        [$tour] = app(NhapTourTuFile::class)->tao($kq);
+        $this->assertSame($kq['bao_gom'], $tour->refresh()->included);
+    }
+
     public function test_chuan_hoa_chu_gia_va_ky_hieu(): void
     {
         $this->assertSame('xem show ở Tây Hồ', PhanTichChuongTrinh::chuan("xem\u{00A0}ѕhoᴡ  ở Tây\u{200B} Hồ"));
