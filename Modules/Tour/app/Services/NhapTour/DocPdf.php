@@ -211,6 +211,8 @@ class DocPdf
                 && ! preg_match('/[.!?:;]["”»)]?$/u', $truoc['chu'])
                 && ! preg_match(PhanTichChuongTrinh::MOC_DONG, $m['chu'])) {
                 $ra[array_key_last($ra)]['chu'] .= ' '.$m['chu'];
+                // giữ các dòng gốc: tên tour in to trên trang bìa xuống 2–3 dòng cũng bị nối
+                $ra[array_key_last($ra)]['cac_dong'] = [...($truoc['cac_dong'] ?? [$truoc['chu']]), $m['chu']];
                 $ra[array_key_last($ra)]['top'] = $m['top'];
                 $ra[array_key_last($ra)]['cao'] = $m['cao'];
                 $ra[array_key_last($ra)]['left'] = min($m['left'], $truoc['left']);
@@ -311,6 +313,36 @@ class DocPdf
         return $nho > 0 ? $x * $y / $nho : 0;
     }
 
+    /**
+     * Số tiền nằm giữa một câu chữ ("…phụ thu phòng đơn: 4.500.000 VNĐ", "Phòng đơn
+     * (khi có nhu cầu…): 4.500.000 VNĐ. Lễ 02/09 áp dụng cho ngày khởi hành 30/08
+     * 5.500.000VNĐ") chứ không phải ô bảng giá: cùng mẩu có cả câu dài, hoặc ngay
+     * bên trái, cùng dòng, có chữ sát liền (cách một dấu cách). Ô bảng giá luôn
+     * cách ô bên trái một khoảng rộng.
+     */
+    private static function trongCau(array $p, array $phanTu, int $i): bool
+    {
+        // cả câu nằm chung một mẩu với số tiền: bỏ số tiền, đơn vị đi vẫn còn nhiều chữ
+        $con = preg_replace(['/(?<![\d.,])\d{1,3}(?:[.,]\d{3}){1,3}(?!\d)/', '/\b(vn[dđ]|đồng|đ)\b/iu'], '', $p['chu']);
+        if (preg_match_all('/\p{L}/u', $con) >= 20) {
+            return true;
+        }
+        for ($k = max(0, $i - 40); $k <= min(count($phanTu) - 1, $i + 40); $k++) {
+            $q = $phanTu[$k];
+            if ($k === $i || $q['loai'] !== 'chu' || $q['trang'] !== $p['trang']) {
+                continue;
+            }
+            $chongDoc = min($q['top'] + $q['cao'], $p['top'] + $p['cao']) - max($q['top'], $p['top']);
+            $ho = $p['left'] - ($q['left'] + $q['rong']);
+            if ($chongDoc >= 0.6 * min($q['cao'], $p['cao']) && $ho >= -2 && $ho <= 6
+                && ! self::tien($q['chu']) && preg_match_all('/\p{L}/u', $q['chu']) >= 3) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private const TIEN = '/(?<![\d.,])(\d{1,3}(?:[.,]\d{3}){2,3})(?![\d])/';
 
     /** @return list<string> các số tiền ≥ 500.000 trong mẩu chữ */
@@ -340,7 +372,8 @@ class DocPdf
         $hang = [];
         foreach ($phanTu as $i => $p) {
             // "3.200.000/khách/trọn tour", "5.990.000 VNĐ/ 01 hành trình" là phụ thu trong câu, không phải ô bảng giá
-            if ($p['loai'] !== 'chu' || ! self::tien($p['chu']) || preg_match('/\d{3}\s*(?:vn[dđ]|đ)?\s*\/\s*[\p{L}\d]/iu', $p['chu'])) {
+            if ($p['loai'] !== 'chu' || ! self::tien($p['chu']) || preg_match('/\d{3}\s*(?:vn[dđ]|đ)?\s*\/\s*[\p{L}\d]/iu', $p['chu'])
+                || self::trongCau($p, $phanTu, $i)) {
                 continue;
             }
             foreach ($hang as $k => $h) {
@@ -357,14 +390,18 @@ class DocPdf
             return $phanTu;
         }
 
-        // Chia thành từng bảng: các hàng liền nhau (cùng trang cách ≤ 150, hoặc sang đầu trang sau)
+        // Chia thành từng bảng: các hàng liền nhau (cùng trang cách ≤ 150, hoặc sang đầu trang sau).
+        // Sang trang sau mà phía trên hàng đó đã có tiêu đề phần / mục đánh số ("GIÁ TOUR BAO
+        // GỒM", "1. Vé máy bay…") thì không còn là bảng giá vắt trang nữa.
+        $coTieuDePhanTren = fn (array $h) => collect($phanTu)->contains(fn ($p) => $p['loai'] === 'chu' && $p['trang'] === $h['trang']
+            && $p['top'] < $h['top'] - 2 && ! self::tien($p['chu']) && self::laTieuDePhan($p['chu']));
         $bang = [];
         foreach ($hang as $h) {
             $cuoi = $bang ? $bang[count($bang) - 1] : null;
             $truoc = $cuoi ? $cuoi[count($cuoi) - 1] : null;
             $cungKhuon = count($h['tien']) === count($truoc['tien'] ?? []) || abs($h['x0'] - ($truoc['x0'] ?? -99)) <= 10;
             if ($truoc && $cungKhuon && (($h['trang'] === $truoc['trang'] && $h['top'] - $truoc['top'] <= 150)
-                || ($h['trang'] === $truoc['trang'] + 1 && $h['top'] < 300))) {
+                || ($h['trang'] === $truoc['trang'] + 1 && $h['top'] < 300 && ! $coTieuDePhanTren($h)))) {
                 $bang[count($bang) - 1][] = $h;
             } else {
                 $bang[] = [$h];
@@ -438,6 +475,16 @@ class DocPdf
                 }
             }
 
+            // Bảng có cột "THÁNG" riêng (HIGO): ô ngày chỉ ghi số ngày ("25, 30", "21"),
+            // tháng nằm ở cột bên cạnh ("10") → ghép thành "Tháng 10: 25, 30"
+            $giuaThang = null;
+            foreach ($tieuDe as $p) {
+                if (preg_match('/^THANG$/', trim(strtoupper(Str::ascii($p['chu']))))) {
+                    $giuaThang = $p['left'] + $p['rong'] / 2;
+                }
+            }
+            $thangHang = [];
+
             // Gắn mẩu chữ (không phải tiền) vào hàng
             $nhan = array_filter($than, fn ($p) => ! self::tien($p['chu']) && preg_match('/^\s*tháng\s*\d/iu', $p['chu']));
             $oNgay = array_fill(0, count($ds), []);
@@ -448,6 +495,10 @@ class DocPdf
                     continue; // ô tiền — lấy riêng bên dưới
                 }
                 $laNgay = $p['left'] < $x0 - 3 && preg_match('/\d{1,2}\s*\/\s*\d{1,2}|tháng\s*\d|^\s*(?:lễ\s*:?\s*)?\d{1,2}(?:\s*,\s*\d{1,2})+\s*,?\s*$/iu', $p['chu']);
+                $giua = $p['left'] + $p['rong'] / 2;
+                $soTron = $giuaThang !== null && $p['left'] < $x0 - 3 && preg_match('/^\s*\d{1,2}(?:\s*[,;&]\s*\d{1,2})*\s*,?\s*$/u', $p['chu']);
+                $laThang = $soTron && abs($giua - $giuaThang) <= 30 && (int) $p['chu'] >= 1 && (int) $p['chu'] <= 12;
+                $laNgay = $laNgay || ($soTron && ! $laThang && $giua < $giuaThang - 30);
                 if ($laNgay && $nhan && count($nhan) === count($ds)) {
                     if (isset($nhan[$i])) {
                         $nhom++;
@@ -464,10 +515,27 @@ class DocPdf
                     }
                 }
                 $gan ??= 0;
+                if ($laThang) {
+                    $thangHang[$gan] = (int) $p['chu'];
+
+                    continue;
+                }
                 if ($laNgay) {
                     $oNgay[$gan][] = $p['chu'];
                 } else {
                     $oKhac[$gan][] = $p['chu'];
+                }
+            }
+
+            if ($thangHang) {
+                // Ô tháng gộp nhiều hàng chỉ ghi chữ ở hàng giữa → hàng không có tháng
+                // lấy tháng của hàng trên (hàng đầu thì lấy của hàng dưới gần nhất)
+                $thang = $thangHang[min(array_keys($thangHang))];
+                foreach ($ds as $k => $h) {
+                    $thang = $thangHang[$k] ?? $thang;
+                    if ($oNgay[$k] && ! preg_grep('/\/|tháng/iu', $oNgay[$k])) {
+                        $oNgay[$k] = ["Tháng {$thang}: ".implode(', ', array_map('trim', $oNgay[$k]))];
+                    }
                 }
             }
 
@@ -494,10 +562,27 @@ class DocPdf
                 $daDung[$i] = true;
             }
             if ($tieuDe) {
-                uasort($tieuDe, fn ($a, $b) => [$a['left'], $a['top']] <=> [$b['left'], $b['top']]);
+                // Gom mẩu cùng dòng, sát nhau thành cụm trước ("TRẺ" + "EM" — phông khác nhau nên
+                // bị tách, xếp theo cột thì "EM" chạy ra sau "(từ 2 đến dưới 11 tuổi)" và mất
+                // chữ "TRẺ EM"), rồi mới xếp các cụm theo cột (trái → phải, trên → dưới)
+                $tieuDe = collect($tieuDe)->sortBy([['top', 'asc'], ['left', 'asc']])->all();
+                $cum = [];
+                foreach ($tieuDe as $p) {
+                    foreach ($cum as $c => $x) {
+                        $ho = $p['left'] - $x['phai'];
+                        if (abs($x['top'] - $p['top']) <= 3 && $ho >= -2 && $ho <= 8) {
+                            $cum[$c]['chu'] .= ' '.$p['chu'];
+                            $cum[$c]['phai'] = $p['left'] + $p['rong'];
+
+                            continue 2;
+                        }
+                    }
+                    $cum[] = ['left' => $p['left'], 'top' => $p['top'], 'phai' => $p['left'] + $p['rong'], 'chu' => $p['chu']];
+                }
+                usort($cum, fn ($a, $b) => [$a['left'], $a['top']] <=> [$b['left'], $b['top']]);
                 $i0 = array_key_first($tieuDe);
                 $them[$i0] = ['loai' => 'hang', 'trang' => $dau['trang'], 'top' => $tuTren, 'cao' => 10, 'left' => 0,
-                    'o' => [implode(' ', array_column($tieuDe, 'chu')), '']];
+                    'o' => [implode(' ', array_column($cum, 'chu')), '']];
                 foreach (array_keys($tieuDe) as $i) {
                     $daDung[$i] = true;
                 }

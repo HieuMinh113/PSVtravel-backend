@@ -228,6 +228,34 @@ class LienMinhTest extends TestCase
         $this->assertSame('THÀNH ĐÔ – TRÙNG KHÁNH – CỬU TRẠI CÂU', $d['2026-10-12']['ten_tour']);
     }
 
+    public function test_doc_kieu_higo_tua_bang_hai_doan_va_gia_gach_ngang(): void
+    {
+        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::higo())['dong']);
+        $ngay = fn (string $ngay, string $co) => $d->first(fn ($x) => $x['ngay_di'] === $ngay && str_contains($x['ten_tour'], $co));
+        $this->assertCount(8, $d);
+
+        // Tên = tuyến ở dòng tựa trên bảng + biến thể ở cột "TOUR LỄ + NOTED"; số ngày lấy từ tựa
+        $kim = $ngay('2026-10-07', 'KIM PHẬT SƠN');
+        $this->assertSame('QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ – CHƯƠNG TRÌNH KIM PHẬT SƠN', $kim['ten_tour']);
+        $this->assertSame('5N4Đ', $kim['thoi_gian']);
+        $this->assertStringContainsString('BBQ', $kim['muc']);
+        // Giá cũ gạch ngang trong ô giá → giá mới là giá chính; "SƠ SINH" là giá em bé
+        $this->assertSame([14990000, 15990000, 14990000, 7990000, 600000], [$kim['gia'], $kim['gia_niem_yet'], $kim['gia_tre_em'], $kim['gia_em_be'], $kim['hoa_hong']]);
+        // Cột "SỐ CHỖ" ghi chữ: Full → hết chỗ, "Còn nhận" → còn chỗ (không rõ số)
+        $this->assertSame('het_cho', $kim['trang_thai']);
+        $this->assertSame(['con_cho', null], [$ngay('2026-12-02', 'KIM PHẬT SƠN')['trang_thai'], $ngay('2026-12-02', 'KIM PHẬT SƠN')['con_cho']]);
+        $this->assertSame('https://docs.google.com/document/d/higo-kim-phat-son', $kim['link_chuong_trinh']);
+
+        // Hai đoàn cùng ngày: đoàn 1 Full, đoàn 2 Còn nhận → ngày đó còn nhận, ghi chú từng đoàn
+        $la = $ngay('2026-11-04', 'LÁ VÀNG + KIM');
+        $this->assertSame(['con_cho', null], [$la['trang_thai'], $la['con_cho']]);
+        $this->assertSame('ĐOÀN 1: hết chỗ · ĐOÀN 2: còn chỗ (ĐẨY GẤP)', $la['ghi_chu']);
+        $this->assertSame('het_cho', $ngay('2026-10-21', 'LÁ VÀNG + KIM')['trang_thai']);
+        // Cùng ngày 18/11 nhưng khác chương trình → hai tour riêng
+        $this->assertSame('het_cho', $ngay('2026-11-18', 'LÁ VÀNG + KIM')['trang_thai']);
+        $this->assertSame([16690000, 'con_cho'], [$ngay('2026-11-18', 'YẾN TIỆC')['gia'], $ngay('2026-11-18', 'YẾN TIỆC')['trang_thai']]);
+    }
+
     public function test_nhan_dien_link_google(): void
     {
         $this->assertSame('1q_Q1nTPiXerS8aoK5I8zl8dIPh9U7YdzYZ20SXoZCbg', TaiSheetLienMinh::maFile('https://docs.google.com/spreadsheets/d/1q_Q1nTPiXerS8aoK5I8zl8dIPh9U7YdzYZ20SXoZCbg/edit?gid=244595541#gid=244595541'));
@@ -432,6 +460,38 @@ class LienMinhTest extends TestCase
             ->assertCountTableRecords(2);
 
         Livewire::test(ListAllianceSources::class)->assertOk()->assertSee('V1 Travel');
+    }
+
+    /** HIGO ghi "Còn nhận" không kèm số chỗ: tra chỗ hiện "Còn nhận", lọc theo số khách vẫn thấy, mở lại đoàn thì báo. */
+    public function test_sheet_higo_con_nhan_khong_ghi_so_cho(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $nguoi = $this->dieuHanh();
+        $nguon = AllianceSource::create(['name' => 'HIGO', 'sheet_url' => self::LINK]);
+        $this->traVe(MauSheetLienMinh::higo());
+        app(DongBoLienMinh::class)->dongBo($nguon);
+        $this->actingAs($nguoi);
+
+        $conNhan = AllianceDeparture::whereDate('departure_date', '2026-12-02')->firstOrFail();
+        $full = AllianceDeparture::whereDate('departure_date', '2026-10-21')->firstOrFail();
+        $this->assertSame(['con_cho', null], [$conNhan->status, $conNhan->seats_left]);
+        Livewire::test(ListAllianceDepartures::class)
+            ->assertSee('Còn nhận')
+            ->filterTable('so_khach', ['khach' => 4])
+            ->assertCanSeeTableRecords([$conNhan])
+            ->assertCanNotSeeTableRecords([$full]);
+
+        // Đối tác mở lại đoàn 2 ngày 21/10 → báo "nhận khách trở lại"
+        $f = MauSheetLienMinh::higo();
+        $sach = IOFactory::load($f);
+        $sach->getSheet(0)->setCellValue('I8', 'Còn nhận');
+        (new Xlsx($sach))->save($f);
+        $this->traVe($f);
+        $kq = app(DongBoLienMinh::class)->dongBo($nguon->fresh());
+
+        $this->assertSame(1, $kq['bao_dong']);
+        $this->assertStringContainsString('21/10: <strong>nhận khách trở lại</strong>', $nguoi->notifications()->latest()->first()->data['body']);
+        $this->assertSame('ĐOÀN 1: hết chỗ · ĐOÀN 2: còn chỗ', $full->fresh()->note);
     }
 
     public function test_noi_tour_trong_form_cap_nhat_so_cho_ngay_va_nut_lay_ngay_di(): void

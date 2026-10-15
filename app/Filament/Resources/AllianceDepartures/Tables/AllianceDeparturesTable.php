@@ -58,11 +58,12 @@ class AllianceDeparturesTable
                 TextColumn::make('status')
                     ->label('Chỗ')
                     ->badge()
+                    // sheet ghi "Còn nhận" mà không ghi số chỗ (HIGO) → "Còn nhận"
                     ->formatStateUsing(fn (string $state, AllianceDeparture $record) => $state === 'con_cho'
-                        ? "Còn {$record->seats_left}"
+                        ? ($record->seats_left !== null ? "Còn {$record->seats_left}" : 'Còn nhận')
                         : (AllianceDeparture::TRANG_THAI[$state] ?? $state))
                     ->color(fn (string $state, AllianceDeparture $record) => match ($state) {
-                        'con_cho' => $record->seats_left <= $nguong ? 'warning' : 'success',
+                        'con_cho' => $record->seats_left !== null && $record->seats_left <= $nguong ? 'warning' : 'success',
                         'het_cho', 'huy' => 'danger',
                         'tam_ngung' => 'warning',
                         default => 'gray',
@@ -150,7 +151,8 @@ class AllianceDeparturesTable
                     ])
                     ->query(fn (Builder $query, array $data) => $query->when(
                         (int) ($data['khach'] ?? 0) > 0,
-                        fn ($w) => $w->where('status', 'con_cho')->where('seats_left', '>=', (int) $data['khach']),
+                        // kể cả ngày "Còn nhận" không ghi số chỗ — hỏi lại đối tác khi chốt
+                        fn ($w) => $w->where('status', 'con_cho')->where(fn ($c) => $c->where('seats_left', '>=', (int) $data['khach'])->orWhereNull('seats_left')),
                     ))
                     ->indicateUsing(fn (array $data) => (int) ($data['khach'] ?? 0) > 0 ? 'Còn ≥ '.(int) $data['khach'].' chỗ' : null),
                 SelectFilter::make('status')

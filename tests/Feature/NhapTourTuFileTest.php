@@ -81,9 +81,9 @@ class NhapTourTuFileTest extends TestCase
         return (string) ob_get_clean();
     }
 
-    private function docx(): string
+    private function docx(?string $than = null): string
     {
-        $than = implode('', [
+        $than ??= implode('', [
             $this->p('THƯỢNG HẢI – HÀNG CHÂU', dam: true),
             $this->p('Thời gian: 3 ngày 2 đêm', dam: true),
             $this->p('Tour NO SHOPPING, không ghé điểm mua sắm', gach: true),
@@ -413,6 +413,22 @@ class NhapTourTuFileTest extends TestCase
         foreach ($dong as [$phong, $x, $y, $chu]) {
             $noiDung .= "BT /{$phong} 11 Tf {$x} {$y} Td ({$chu}) Tj ET\n";
         }
+        $tep = $this->pdf($noiDung);
+
+        $this->assertNotEmpty((new DocPdf)->doc($tep));
+        $kq = app(NhapTourTuFile::class)->doc($tep, 'ha-noi-sapa-2n1d.pdf');
+
+        $this->assertSame('Ha Noi – Sapa 2N1Đ', $kq['ten']);
+        $this->assertSame(['2026-11-15', '2026-11-22'], array_column($kq['dot'], 'ngay'));
+        $this->assertSame([5_990_000, 4_490_000], [$kq['gia_nguoi_lon'], $kq['gia_tre_em']]);
+        $this->assertCount(2, $kq['lich_trinh']);
+        $this->assertStringContainsString('di chuyen len Sapa qua cao toc.', $kq['lich_trinh'][0]['noi_dung']); // dòng bị ngắt được nối lại
+        $this->assertStringNotContainsString('KHOI HANH', $kq['lich_trinh'][1]['noi_dung']);
+    }
+
+    /** PDF một trang, phông Helvetica (F1) / Helvetica-Bold (F2), từ lệnh vẽ chữ cho sẵn. */
+    private function pdf(string $noiDung): string
+    {
         $doiTuong = [
             '<< /Type /Catalog /Pages 2 0 R >>',
             '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -433,14 +449,100 @@ class NhapTourTuFileTest extends TestCase
         $tep = tempnam(sys_get_temp_dir(), 'tour').'.pdf';
         file_put_contents($tep, $pdf);
 
-        $this->assertNotEmpty((new DocPdf)->doc($tep));
-        $kq = app(NhapTourTuFile::class)->doc($tep, 'ha-noi-sapa-2n1d.pdf');
+        return $tep;
+    }
 
-        $this->assertSame('Ha Noi – Sapa 2N1Đ', $kq['ten']);
-        $this->assertSame(['2026-11-15', '2026-11-22'], array_column($kq['dot'], 'ngay'));
-        $this->assertSame([5_990_000, 4_490_000], [$kq['gia_nguoi_lon'], $kq['gia_tre_em']]);
+    /**
+     * Kiểu file của HIGO: bảng giá tách cột NGÀY ("25, 30") và cột THÁNG ("10"),
+     * ô CHUYẾN BAY gộp nhiều hàng ghi giờ bay, hàng "Phụ thu phòng đơn" dưới bảng;
+     * mục "TRƯỚC NGÀY KHỞI HÀNH" (bay đêm) trên ngày 1; dòng khẩu hiệu trên tên tour;
+     * mục chưa bao gồm có câu "…áp dụng cho ngày khởi hành 30/08 5.500.000VNĐ".
+     */
+    public function test_doc_bang_gia_cot_thang_rieng_kieu_higo_file_word(): void
+    {
+        $kq = app(NhapTourTuFile::class)->doc($this->docx(implode('', [
+            $this->p('CHẠM VÀO MÙA THU'),
+            $this->p('TRÙNG KHÁNH – QUÝ CHÂU', dam: true),
+            $this->p('5 NGÀY 5 ĐÊM', dam: true),
+            $this->p('TRƯỚC NGÀY KHỞI HÀNH : TP.HCM – QUÝ CHÂU (Ăn sáng trên máy bay/ trưa/ tối)', dam: true),
+            $this->p('Trưởng đoàn đón quý khách tại sân bay Tân Sơn Nhất, nghỉ đêm trên máy bay.'),
+            $this->p('Ngày 1 : QUÝ DƯƠNG – Ô GIANG TRẠI (Ăn nhẹ cầm tay/ trưa/ tối)', dam: true),
+            $this->p('Tham quan Ô Giang Trại.'),
+            $this->p('Ngày 2 : TRÙNG KHÁNH – TP.HCM (Ăn sáng/ trưa)', dam: true),
+            $this->p('Bay về TP.HCM.'),
+            $this->p('BẢNG GIÁ TOUR VÀ LỊCH KHỞI HÀNH', dam: true),
+            $this->bang([
+                ['NGÀY KHỞI HÀNH TÍNH THEO GIỜ BAY', 'THÁNG', 'CHUYẾN BAY', 'GIÁ TOUR TRỌN GÓI (VND)'],
+                ['', '', '', 'NGƯỜI LỚN (trên 11 tuổi)', 'TRẺ EM (từ 2 đến dưới 11 tuổi)', 'EM BÉ (dưới 2 tuổi)'],
+                ['25, 30', '10', 'Chuyến đi 04:05 - 08:10 Chuyến về 23:45 - 02:05+1', '18.990.000', '17.990.000', '8.990.000'],
+                ['08, 13', '11', '', '18.990.000', '17.990.000', '8.990.000'],
+                ['22', '', '', '20.990.000', '19.990.000', '8.990.000'], // ô tháng gộp với hàng trên
+                ['Phụ thu phòng đơn', '', '', '4.500.000', '', ''],
+            ]),
+            $this->p('GIÁ TOUR CHƯA BAO GỒM', dam: true),
+            $this->p('Phòng đơn (khi có nhu cầu ở 1 khách/phòng): 4.500.000 VNĐ. Lễ 02/09 áp dụng cho ngày khởi hành 30/08 5.500.000VNĐ'),
+        ])), 'NLG QC - TRUNG KHANH.docx');
+
+        $this->assertSame('Trùng Khánh – Quý Châu 5N5Đ', $kq['ten']); // không dính khẩu hiệu "Chạm vào mùa thu"
+        $this->assertSame(['2026-10-25', '2026-10-30', '2026-11-08', '2026-11-13', '2026-11-22'], array_column($kq['dot'], 'ngay'));
+        $this->assertSame([], $kq['dot_bo_qua']); // không lấy "30/08", "02/09" trong mục chưa bao gồm
+        $this->assertSame(['nguoi_lon' => 20_990_000, 'tre_em' => 19_990_000, 'em_be' => 8_990_000], $kq['dot'][4]['gia']);
+        $this->assertSame([18_990_000, 17_990_000, 8_990_000], [$kq['gia_nguoi_lon'], $kq['gia_tre_em'], $kq['gia_em_be']]);
+
+        $luuY = array_column($kq['luu_y'], 'content', 'title');
+        $this->assertSame("Chuyến đi: 04:05 – 08:10\nChuyến về: 23:45 – 02:05+1", $luuY['Chuyến bay dự kiến']);
+        $this->assertStringContainsString('phụ thu phòng đơn 4.500.000đ', $luuY['Bảng giá theo ngày khởi hành']);
+
+        // "Trước ngày khởi hành" không thành một ngày riêng, ghép vào đầu ngày 1
+        $this->assertSame(['Quý Dương – Ô Giang Trại', 'Trùng Khánh – TP. HCM'], array_column($kq['lich_trinh'], 'tieu_de'));
+        $this->assertStringStartsWith("Trước ngày khởi hành (TP. HCM – Quý Châu):\nTrưởng đoàn đón", $kq['lich_trinh'][0]['noi_dung']);
+        $this->assertStringNotContainsString('Trưởng đoàn đón', (string) $kq['mo_ta']); // trước đây bị lấy làm mô tả tour
+        $this->assertStringContainsString('áp dụng cho ngày khởi hành 30/08', implode("\n", $kq['khong_bao_gom']));
+    }
+
+    /** Như trên, bản PDF: cột tháng nhận theo vị trí dưới chữ "THÁNG" của tiêu đề bảng. */
+    public function test_doc_bang_gia_cot_thang_rieng_kieu_higo_file_pdf(): void
+    {
+        if (! (new ExecutableFinder)->find('pdftohtml')) {
+            $this->markTestSkipped('Máy chưa cài poppler-utils (pdftohtml).');
+        }
+
+        $o = fn (string $phong, float $x, float $y, string $chu) => "BT /{$phong} 11 Tf {$x} {$y} Td ({$chu}) Tj ET\n";
+        $hang = fn (float $y, string $ngay, string $thang, array $gia) => $o('F1', 80, $y, $ngay).$o('F1', 205, $y, $thang)
+            .$o('F1', 300, $y, $gia[0]).$o('F1', 400, $y, $gia[1]).$o('F1', 480, $y, $gia[2]);
+        $tep = $this->pdf(implode('', [
+            $o('F1', 60, 810, 'CHAM VAO MUA THU'),
+            $o('F2', 60, 790, 'TRUNG KHANH - QUY CHAU'),
+            $o('F2', 60, 770, 'TRUOC NGAY KHOI HANH : TP.HCM - QUY CHAU'),
+            $o('F1', 60, 752, 'Truong doan don khach tai san bay Tan Son Nhat.'),
+            $o('F2', 60, 730, 'NGAY 1: QUY DUONG - O GIANG TRAI'),
+            $o('F1', 60, 712, 'Tham quan O Giang Trai.'),
+            $o('F2', 60, 690, 'NGAY 2: TRUNG KHANH - TP.HCM'),
+            $o('F1', 60, 672, 'Bay ve TP.HCM.'),
+            $o('F2', 60, 640, 'BANG GIA TOUR'),
+            // "TRE" và "EM" khác phông, khác cỡ → hai mẩu; "(2-11t)" ở dòng dưới nằm lọt giữa hai mẩu theo chiều ngang
+            $o('F2', 60, 620, 'NGAY KHOI HANH').$o('F2', 200, 620, 'THANG').$o('F2', 300, 620, 'NGUOI LON'),
+            "BT /F2 11 Tf 400 620 Td (TRE) Tj /F1 10 Tf ( EM) Tj ET\n".$o('F1', 410, 606, '(2-11t)').$o('F2', 480, 620, 'EM BE'),
+            $hang(590, '25, 30', '10', ['18.990.000', '17.990.000', '8.990.000']),
+            $hang(570, '08, 13', '11', ['18.990.000', '17.990.000', '8.990.000']),
+            $hang(550, '22', '11', ['20.990.000', '19.990.000', '8.990.000']),
+            $o('F1', 60, 530, 'Phu thu phong don').$o('F1', 300, 530, '4.500.000'),
+            $o('F2', 60, 500, 'GIA TOUR CHUA BAO GOM'),
+            // số tiền nằm giữa câu — không phải ô bảng giá: mẩu tô đậm sát chữ bên trái,
+            // hoặc cả câu chung một mẩu
+            "BT /F1 11 Tf 60 482 Td (Phong don: ) Tj /F2 10 Tf (4.500.000 VND) Tj /F1 11 Tf ( Le 02/09 ap dung cho ngay khoi hanh 30/08 ) Tj /F2 10 Tf (5.500.000VND) Tj ET\n",
+            $o('F1', 60, 464, 'Tien tip ngay le 02/09 ap dung cho ngay khoi hanh 30/08: 1.500.000 VND'),
+        ]));
+
+        $kq = app(NhapTourTuFile::class)->doc($tep, 'trung-khanh-5n5d.pdf');
+
+        $this->assertSame('Trung Khanh – Quy Chau 5N5Đ', $kq['ten']);
+        $this->assertSame(['2026-10-25', '2026-10-30', '2026-11-08', '2026-11-13', '2026-11-22'], array_column($kq['dot'], 'ngay'));
+        $this->assertSame([], $kq['dot_bo_qua']);
+        $this->assertSame([18_990_000, 17_990_000, 8_990_000], [$kq['gia_nguoi_lon'], $kq['gia_tre_em'], $kq['gia_em_be']]);
+        $this->assertStringContainsString('phụ thu phòng đơn 4.500.000đ', array_column($kq['luu_y'], 'content', 'title')['Bảng giá theo ngày khởi hành']);
         $this->assertCount(2, $kq['lich_trinh']);
-        $this->assertStringContainsString('di chuyen len Sapa qua cao toc.', $kq['lich_trinh'][0]['noi_dung']); // dòng bị ngắt được nối lại
-        $this->assertStringNotContainsString('KHOI HANH', $kq['lich_trinh'][1]['noi_dung']);
+        $this->assertStringStartsWith('Trước ngày khởi hành', $kq['lich_trinh'][0]['noi_dung']);
+        $this->assertStringContainsString('Truong doan don khach', $kq['lich_trinh'][0]['noi_dung']);
     }
 }

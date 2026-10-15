@@ -82,8 +82,11 @@ class PhanTichChuongTrinh
 
         // ---- Tiêu đề từng ngày → khoảng của lịch trình ----
         $ngay = $this->cacNgay();
+        // "TRƯỚC NGÀY KHỞI HÀNH : TP.HCM – QUÝ CHÂU" (HIGO): tập trung ở sân bay, bay đêm
+        // trước ngày 1 — không phải một ngày riêng của tour, ghép vào đầu ngày 1
+        $truocNgay1 = $ngay ? $this->truocNgayDau($ngay[0]['i']) : null;
 
-        $dauLichTrinh = $ngay ? $ngay[0]['i'] : count($this->ds);
+        $dauLichTrinh = $truocNgay1['i'] ?? ($ngay ? $ngay[0]['i'] : count($this->ds));
         $cuoiLichTrinh = $ngay ? $this->cuoiNgayCuoi($ngay[count($ngay) - 1]['i']) : count($this->ds);
 
         // ---- Giá + ngày khởi hành (bảng giá nằm trước hoặc sau lịch trình) ----
@@ -99,6 +102,17 @@ class PhanTichChuongTrinh
             $het = isset($ngay[$k + 1]) ? $ngay[$k + 1]['i'] : $cuoiLichTrinh;
             $dong = [];
             $bua = $n['bua'];
+            if ($k === 0 && $truocNgay1) {
+                $dong[] = $truocNgay1['nhan'].($truocNgay1['tieu_de'] !== '' ? " ({$truocNgay1['tieu_de']})" : '').':';
+                for ($i = $truocNgay1['i'] + 1; $i < $n['i']; $i++) {
+                    $m = $this->ds[$i];
+                    if ($m['loai'] === 'anh') {
+                        $anh[] = $m + ['ngay' => $n['so']];
+                    } elseif (($chu = $m['o'] ? implode(' ', array_filter($m['o'])) : $m['chu']) !== '') {
+                        $dong[] = ($m['gach'] ? '• ' : '').$chu;
+                    }
+                }
+            }
             for ($i = $n['i'] + 1; $i < $het; $i++) {
                 $m = $this->ds[$i];
                 if ($m['loai'] === 'anh') {
@@ -307,7 +321,8 @@ class PhanTichChuongTrinh
             if ($chu === '' || preg_match('/^[\s|]*$/u', $chu) && ! $o) {
                 continue;
             }
-            $ra[] = ['loai' => 'chu', 'chu' => $chu, 'dam' => (bool) ($m['dam'] ?? false), 'gach' => $gach, 'o' => $o];
+            $ra[] = ['loai' => 'chu', 'chu' => $chu, 'dam' => (bool) ($m['dam'] ?? false), 'gach' => $gach, 'o' => $o,
+                'cac_dong' => isset($m['cac_dong']) ? array_map(fn ($x) => self::chuan($x), $m['cac_dong']) : null];
         }
 
         return $ra;
@@ -458,6 +473,30 @@ class PhanTichChuongTrinh
             'cot_bua' => $cot,
             'so_o' => count($m['o'] ?? []),
         ];
+    }
+
+    /**
+     * Dòng "TRƯỚC NGÀY KHỞI HÀNH : TP.HCM – QUÝ CHÂU (Ăn …)" ngay trên ngày 1.
+     *
+     * @return array{i: int, nhan: string, tieu_de: string}|null
+     */
+    private function truocNgayDau(int $iNgay1): ?array
+    {
+        for ($i = $iNgay1 - 1; $i >= max(0, $iNgay1 - 15); $i--) {
+            $m = $this->ds[$i];
+            $chu = $m['loai'] === 'chu' ? ($m['o'][0] ?? $m['chu']) : '';
+            if (! preg_match('/^(DEM )?TRUOC NGAY (KHOI HANH|DI)\b/', self::khongDau($chu)) || ! ($m['dam'] || $this->laChuHoa($chu))) {
+                continue;
+            }
+            // phần sau "TRƯỚC NGÀY KHỞI HÀNH": chặng bay, bỏ ngoặc bữa ăn
+            $sau = preg_replace('/^\s*(?:đêm\s+)?trước\s+ngày\s+(?:khởi\s+hành|đi)\s*/iu', '', $m['o'] ? implode(' ', array_filter($m['o'])) : $m['chu']);
+            $sau = preg_replace(['/\([^()]*\)\s*$/u', '/^[\s|:–\-]+|[\s|:–\-]+$/u'], '', $sau);
+
+            return ['i' => $i, 'nhan' => str_starts_with(self::khongDau($chu), 'DEM') ? 'Đêm trước ngày khởi hành' : 'Trước ngày khởi hành',
+                'tieu_de' => $sau === '' ? '' : $this->hoaDau($sau)];
+        }
+
+        return null;
     }
 
     /** Viết hoa toàn bộ (≥ 70% chữ cái là chữ hoa) */
@@ -664,7 +703,9 @@ class PhanTichChuongTrinh
 
                 continue;
             }
-            if ($this->coNgayVaGia($m) || ($m['o'] && $this->laDongTieuDeGia($m['chu']))) {
+            // (hàng "Phụ thu phòng đơn | 4.500.000" của bảng giá đã vào "Bảng giá theo ngày")
+            if ($this->coNgayVaGia($m) || ($m['o'] && $this->laDongTieuDeGia($m['chu']))
+                || (! $hienTai && $m['o'] && mb_strlen($m['chu']) <= 60 && count($this->tienHang($m)) === 1 && preg_match('/PHONG DON|PHU THU/', self::khongDau($m['chu'])))) {
                 $kq['thuoc'][$i] = true;
 
                 continue;
@@ -764,8 +805,12 @@ class PhanTichChuongTrinh
             return '';
         }
         $vt = preg_match('/\d{1,3}(?:[.,]\d{3}){2,3}/', $m['chu'], $k, PREG_OFFSET_CAPTURE) ? $k[0][1] : strlen($m['chu']);
+        $truoc = substr($m['chu'], 0, $vt);
 
-        return substr($m['chu'], 0, $vt);
+        // Dòng chữ thường chỉ là hàng giá khi phần trước số tiền ngắn ("Tháng 10: 17, 24 –",
+        // "Khởi hành 17/10/2026:"); câu dài "Phụ thu lễ 02/09 áp dụng cho ngày khởi hành
+        // 30/08: 1.500.000" là điều kiện kèm theo, không phải ngày khởi hành
+        return preg_match_all('/\p{L}/u', $truoc) <= 20 ? $truoc : '';
     }
 
     /**
@@ -814,6 +859,25 @@ class PhanTichChuongTrinh
         return $ra;
     }
 
+    /**
+     * Hàng bảng có cột ngày và cột "THÁNG" riêng (HIGO, file Word): "25, 30" | "10" →
+     * "Tháng 10: 25, 30". Ô tháng trống (gộp với hàng trên) thì dùng tháng của hàng trên.
+     *
+     * @param  array{0:int,1:int}  $cot  [chỉ số ô ngày, chỉ số ô tháng] theo hàng tiêu đề
+     */
+    private function ngayCotThang(?array $o, array $cot, ?int &$thangTruoc): string
+    {
+        [$ngay, $thang] = [trim($o[$cot[0]] ?? ''), trim($o[$cot[1]] ?? '')];
+        if (preg_match('/^(?:tháng\s*)?0?(\d{1,2})$/iu', $thang, $k) && (int) $k[1] >= 1 && (int) $k[1] <= 12) {
+            $thangTruoc = (int) $k[1];
+        }
+        if (! $thangTruoc || ! preg_match('/^\d{1,2}(?:\s*[,;&]\s*\d{1,2})*\s*,?$/u', $ngay)) {
+            return '';
+        }
+
+        return "Tháng {$thangTruoc}: ".rtrim($ngay, ' ,');
+    }
+
     /** Thứ tự cột tiền theo dòng tiêu đề bảng giá (người lớn / trẻ em / em bé / phụ thu phòng đơn) */
     private function thuTuCot(string $tieuDe): array
     {
@@ -847,6 +911,10 @@ class PhanTichChuongTrinh
         $hangGia = [];
         $this->giaCu = [];
         $homNay = today();
+        $cotThang = null;      // bảng có cột "THÁNG" riêng ("25, 30" | "10"): [chỉ số ô ngày, ô tháng]
+        $thangTruoc = null;    // ô tháng gộp nhiều hàng (Word: hàng dưới để trống) → tháng hàng trên
+        $phongDonChung = null; // hàng "Phụ thu phòng đơn | 4.500.000" dưới bảng
+        $chuHangGia = [];      // chữ ngoài số tiền của các hàng giá (giờ bay "Chuyến đi 04:05 - 08:10")
 
         $dongTieuDe = null;
         foreach ($this->ds as $idx => $m) {
@@ -862,6 +930,10 @@ class PhanTichChuongTrinh
                 $tieuDeGia = $lienTiep && ! ($coNguoiLon && str_contains(self::khongDau($tieuDeGia), 'NGUOI LON'))
                     ? $tieuDeGia.' '.$m['chu'] : $m['chu'];
                 $dongTieuDe = $idx;
+                $thangMoi = $m['o'] ? array_search('THANG', array_map(fn ($o) => self::khongDau(trim($o)), $m['o']), true) : false;
+                $ngayMoi = $m['o'] ? array_key_first(array_filter($m['o'], fn ($o) => preg_match('/^NGAY\b/', self::khongDau(trim($o))))) : null;
+                $cotThang = $thangMoi !== false && $ngayMoi !== null ? [$ngayMoi, $thangMoi] : ($lienTiep ? $cotThang : null);
+                $thangTruoc = null;
                 if (str_contains(self::khongDau($tieuDeGia), 'NGUOI LON') && count($thuTu = $this->thuTuCot($tieuDeGia)) >= 2) {
                     $cot = $thuTu;
                 }
@@ -869,9 +941,17 @@ class PhanTichChuongTrinh
                 continue;
             }
             $tien = $this->tienHang($m);
-            $ngay = $tien ? $this->ngayTrong($this->phanNgay($m)) : [];
+            $ngay = $tien ? $this->ngayTrong($this->phanNgay($m) ?: ($cotThang ? $this->ngayCotThang($m['o'], $cotThang, $thangTruoc) : '')) : [];
+            if ($tien && ! $ngay && $m['o'] && count($tien) === 1 && str_contains(self::khongDau($m['chu']), 'PHONG DON')) {
+                $phongDonChung = $tien[0];
+            }
             if (! $tien || ! $ngay) {
                 continue;
+            }
+            foreach ($m['o'] ?? [] as $o) {
+                if (! $this->tienTrong($o) && trim($o) !== '' && ! preg_match('/tháng\s*\d|\d{1,2}\s*\/\s*\d{1,2}/iu', $o)) {
+                    $chuHangGia[] = $o;
+                }
             }
             $tieuDeGia = '';
             $gia = [];
@@ -919,6 +999,24 @@ class PhanTichChuongTrinh
             }
         }
         usort($dot, fn ($a, $b) => strcmp($a['ngay'], $b['ngay']));
+
+        // Phụ thu phòng đơn ghi một hàng chung dưới bảng → áp cho mọi ngày khởi hành
+        if ($phongDonChung) {
+            foreach ($dot as $d) {
+                $phongDon[$d['ngay']] ??= $phongDonChung;
+            }
+        }
+        // Giờ bay ghi trong ô gộp của bảng giá, không có số hiệu chuyến:
+        // "Chuyến đi 04:05 - 08:10 | Chuyến về 23:45 - 02:05+1"
+        if (! $chuyenBay && $chuHangGia) {
+            $gio = '\d{1,2}[:hH]\d{2}\s*[-–]\s*\d{1,2}[:hH]\d{2}(?:\s*\+\s*1)?';
+            $noi = preg_replace('/\s+/u', ' ', implode(' ', $chuHangGia));
+            foreach (['đi', 'về'] as $chieu) {
+                if (preg_match('/chuyến\s*'.$chieu.'\s*:?\s*('.$gio.')/iu', $noi, $k)) {
+                    $chuyenBay[] = "Chuyến {$chieu}: ".preg_replace('/\s*[-–]\s*/u', ' – ', $k[1]);
+                }
+            }
+        }
 
         return [$dot, array_values(array_unique($boQua)), ['phong_don' => $phongDon], array_values(array_unique($chuyenBay))];
     }
@@ -1079,19 +1177,36 @@ class PhanTichChuongTrinh
                 $dong[] = $m;
             }
         }
+        $toanVan = self::khongDau(implode("\n", array_column($this->ds, 'chu')));
         $laKhauHieu = fn (string $s) => (bool) preg_match('/^(khám phá|hành trình|trải nghiệm|chương trình|du lịch|tour)\b|:/iu', $s);
         $laHoa = fn (string $s) => mb_strtoupper($s) === $s && preg_match('/\p{L}/u', $s);
         foreach ($dong as $k => $m) {
             $chu = $m['chu'];
+            // Tên in to trên trang bìa xuống 2–3 dòng bị nối thành một câu dài ("TRÙNG KHÁNH –
+            // QUÝ CHÂU" / "MAO ĐÀI – THÁC TÂY DU KÍ – CÔNG VIÊN GẤU TRÚC" / "NGHỈ DƯỠNG TRONG
+            // LÒNG CỔ TRẤN…") → lấy các dòng đầu, mỗi dòng là một chặng
+            if (mb_strlen($chu) > 90 && count($m['cac_dong'] ?? []) > 1 && $laHoa($chu)) {
+                $gom = [];
+                foreach ($m['cac_dong'] as $d) {
+                    if ($gom && mb_strlen(implode(' – ', [...$gom, $d])) > 90) {
+                        break;
+                    }
+                    $gom[] = $d;
+                }
+                $chu = implode(' – ', $gom);
+            }
             // (bỏ dòng lịch chạy "Thứ 4 – Thứ 7 hàng tuần", "5 ngày 4 đêm")
             if (mb_strlen($chu) > 90 || $laKhauHieu($chu) || ! preg_match('/\s[–\-]\s/u', $chu) || ! ($laHoa($chu) || $m['dam'])
                 || preg_match('/\bthứ\s*[2-7]\b|chủ nhật|h[àằ]ng tuần|\d+\s*(ngày|đêm)\b/iu', $chu)) {
                 continue;
             }
             // Dòng ngay trên là tên nước / thành phố ngắn ("BẮC KINH", "VƯƠNG QUỐC BHUTAN") → ghép vào trước
+            // — phải là tên địa danh: còn nhắc lại ở chỗ khác trong file; câu khẩu hiệu
+            // "CHẠM VÀO MÙA THU" ở trên tên tour thì không
             $truoc = $dong[$k - 1]['chu'] ?? null;
             $ten = $chu;
-            if ($truoc && mb_strlen($truoc) <= 30 && $laHoa($truoc) && ! $laKhauHieu($truoc) && ! preg_match('/\s[–\-]\s/u', $truoc)) {
+            $diaDanh = fn (string $s) => substr_count($toanVan, self::khongDau(preg_replace('/^VƯƠNG QUỐC\s+/u', '', $s))) >= 2;
+            if ($truoc && mb_strlen($truoc) <= 30 && $laHoa($truoc) && ! $laKhauHieu($truoc) && ! preg_match('/\s[–\-]\s/u', $truoc) && $diaDanh($truoc)) {
                 $ten = preg_replace('/^VƯƠNG QUỐC\s+/u', '', $truoc).' – '.$chu;
             }
 

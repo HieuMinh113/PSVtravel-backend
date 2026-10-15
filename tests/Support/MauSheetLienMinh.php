@@ -2,6 +2,9 @@
 
 namespace Tests\Support;
 
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -87,7 +90,7 @@ class MauSheetLienMinh
         $hn->fromArray(['STT', 'CUNG ĐƯỜNG', 'THỜI GIAN', 'CHƯƠNG TRÌNH', 'HK', 'NGÀY KHỞI HÀNH', 'DEADLINE VISA', 'GIÁ BÁN', 'GHI CHÚ'], null, 'A2');
         $hn->setCellValue('A3', 'THÁNG 10/2026')->mergeCells('A3:I3');
         $hn->fromArray([3, 'CĐV KIX//HND về chiều', '6N5Đ', 'Link tải', 'VN'], null, 'A4');
-        $hn->setCellValue('F4', \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(new \DateTime('2026-11-10')));
+        $hn->setCellValue('F4', Date::PHPToExcel(new \DateTime('2026-11-10')));
         // Lưu 10/11 với định dạng tháng/ngày → hiện "11/10"
         $hn->getStyle('F4')->getNumberFormat()->setFormatCode('mm/dd');
         $hn->setCellValue('G4', '24/09')->setCellValue('H4', '39,900,000');
@@ -183,8 +186,8 @@ class MauSheetLienMinh
         $dong = [['Tháng 1', '21'], ['Tháng 8', '14'], ['Lễ 2/9', '28'], ['Tháng 12', '10; 24'], ['Tháng 1', '8.15.22'], ['Tháng 2', '02(26AL)']];
         foreach ($dong as $i => [$thang, $ngay]) {
             $r = 6 + $i;
-            $t->setCellValueExplicit("D$r", $thang, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING)
-                ->setCellValueExplicit("E$r", $ngay, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING)
+            $t->setCellValueExplicit("D$r", $thang, DataType::TYPE_STRING)
+                ->setCellValueExplicit("E$r", $ngay, DataType::TYPE_STRING)
                 ->setCellValue("F$r", '15.990.000')->setCellValue("G$r", 'VJ')->setCellValue("H$r", '1.000.000');
         }
 
@@ -217,7 +220,7 @@ class MauSheetLienMinh
         $t = $s->getActiveSheet()->setTitle('TQ tuyến khác');
         $t->setCellValue('A2', "TRUNG QUỐC TUYẾN KHÁC  2026\n")->mergeCells('A2:N2');
         $t->fromArray(['STT', 'HÀNH TRÌNH', 'THỜI GIAN', 'PHƯƠNG TIỆN', 'LỊCH KHỞI HÀNH', null, 'GIÁ TOUR', 'TỔNG COM', 'LN', 'COM AG', 'TỔNG CHỖ', 'CHỐT', 'GIỮ', 'NHẬN', 'AG', 'THT'], null, 'A3');
-        $t->setCellValue('A4', '2')->setCellValue('B4', "HÀ NỘI – THÀNH ĐÔ – CỬU TRẠI CÂU")->setCellValue('C4', '6N5Đ')->setCellValue('D4', 'Sichuan airline (3U)');
+        $t->setCellValue('A4', '2')->setCellValue('B4', 'HÀ NỘI – THÀNH ĐÔ – CỬU TRẠI CÂU')->setCellValue('C4', '6N5Đ')->setCellValue('D4', 'Sichuan airline (3U)');
         foreach (['A', 'B', 'C', 'D'] as $c) {
             $t->mergeCells("{$c}4:{$c}7");
         }
@@ -232,7 +235,7 @@ class MauSheetLienMinh
             if ($x[0]) {
                 $t->setCellValue("E$r", $x[0]);
             }
-            $t->setCellValueExplicit("F$r", $x[1], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $t->setCellValueExplicit("F$r", $x[1], DataType::TYPE_STRING);
             $t->fromArray(array_slice($x, 2), null, "G$r");
         }
 
@@ -252,7 +255,7 @@ class MauSheetLienMinh
         $t->setCellValue('I1', 'Đỏ hết chỗ');
         $t->setCellValue('A2', 'TUYẾN CỬU TRẠI CÂU')->mergeCells('A2:I2');
         $t->fromArray([null, 'SUN_6N5D_ THÀNH ĐÔ - CỬU TRẠI CÂU', 'CTC 6N5D', '6N5D', 'SICHUAN'], null, 'A3');
-        $chu = new \PhpOffice\PhpSpreadsheet\RichText\RichText;
+        $chu = new RichText;
         $chu->createTextRun('THÁNG 10: 10, ');
         $chu->createTextRun('24')->getFont()->getColor()->setRGB('FF0000');
         $chu->createTextRun(', 31');
@@ -301,6 +304,56 @@ class MauSheetLienMinh
         return self::luu($s, 'jtravel');
     }
 
+    /**
+     * Kiểu HIGO: tựa bảng (tên tour) + giờ bay ở trên, cột "TOUR LỄ + NOTED" là biến
+     * thể chương trình, "THỨ TỰ ĐOÀN" (2 đoàn cùng ngày), cột THÁNG + KHỞI HÀNH, giá
+     * cũ gạch ngang trong ô giá, "SƠ SINH", cột "SỐ CHỖ" ghi chữ Full / Còn nhận.
+     */
+    public static function higo(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('QUÝ CHÂU - TRÙNG KHÁNH');
+        $t->setCellValue('A1', 'CHƯƠNG TRÌNH TOUR NOSHOP QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ + BBQ + MÌ BÒ TRÙNG KHÁNH')->mergeCells('A1:N1');
+        $t->setCellValue('A2', "04:05 - 08:10\n21:50 - 01:05+1")->mergeCells('A2:N2');
+        $t->setCellValue('A3', "NGÀY KHỞI HÀNH TÍNH THEO GIỜ MÁY BAY CẤT CÁNH\nLƯU Ý CÓ MẶT TRƯỚC GIỜ BAY 3 TIẾNG")->mergeCells('A3:N3');
+        $t->setCellValue('F4', 'GIÁ TOUR (VNĐ/KHÁCH)')->mergeCells('F4:I4');
+        $t->fromArray(['TOUR LỄ + NOTED', 'THỨ TỰ ĐOÀN', 'HÃNG BAY', 'THÁNG', 'KHỞI HÀNH', "NGƯỜI LỚN\n(Từ 11T)", "TRẺ EM\n(2T - <11T)", "SƠ SINH\n(<2T)",
+            'SỐ CHỖ', 'NOTE', "HOA HỒNG\nĐỐI TÁC", 'SỐ LƯỢNG VÉ', 'Link chương trình', 'DEADLINE VISA'], null, 'A5');
+        $kim = 'CHƯƠNG TRÌNH KIM PHẬT SƠN';
+        $laDo = 'CAO ĐIỂM MÙA LÁ ĐỎ LÁ VÀNG + KIM PHẬT SƠN';
+        foreach ([
+            6 => [$kim, null, 'THÁNG 10', 7, null, 14990000, 7990000, 'Full', null, 600000, '25s'],
+            7 => [$laDo, 'ĐOÀN 1', 'THÁNG 10', 21, 15990000, 14990000, 7990000, 'Full', null, 700000, '50s'],
+            8 => [$laDo, 'ĐOÀN 2', 'THÁNG 10', 21, 15990000, 14990000, 7990000, 'Full', null, 700000, null],
+            9 => [$laDo, 'ĐOÀN 1', 'THÁNG 11', 4, 15990000, 14990000, 7990000, 'Full', null, 700000, '25s'],
+            10 => [$laDo, 'ĐOÀN 2', 'THÁNG 11', 4, 15990000, 14990000, 7990000, 'Còn nhận', 'ĐẨY GẤP', 700000, null],
+            11 => [$laDo, 'ĐOÀN 1', 'THÁNG 11', 18, 15990000, 14990000, 7990000, 'Full', null, 700000, '50s'],
+            12 => ['CAO ĐIỂM MÙA LÁ ĐỎ LÁ VÀNG + YẾN TIỆC CUNG ĐÌNH', 'ĐOÀN 2', 'THÁNG 11', 18, 16690000, 15690000, 7990000, 'Còn nhận', null, 800000, null],
+            13 => [$kim, null, 'THÁNG 12', 2, 15990000, 14990000, 7990000, 'Còn nhận', null, 700000, '25s'],
+            14 => [$kim, null, 'THÁNG 12', 16, 15990000, 14990000, 7990000, 'Còn nhận', null, 700000, null],
+            15 => ['TẾT TÂY + Chương trình trượt tuyết Kim Phật Sơn', 'ĐOÀN 1', 'THÁNG 12', 30, 19990000, 18990000, 9990000, 'Còn nhận', null, 1200000, '50s'],
+            16 => ['TẾT TÂY + Chương trình trượt tuyết Kim Phật Sơn', 'ĐOÀN 2', 'THÁNG 12', 30, 19990000, 18990000, 9990000, 'Còn nhận', null, 1200000, null],
+        ] as $r => [$ten, $doan, $thang, $ngay, $nl, $te, $sosinh, $cho, $note, $hh, $ve]) {
+            $t->fromArray([$ten, $doan, null, $thang, $ngay, $nl, $te, $sosinh, $cho, $note, $hh, $ve], null, "A$r");
+            foreach (['F', 'G', 'H', 'K'] as $c) {
+                $t->getStyle("$c$r")->getNumberFormat()->setFormatCode('#,##0');
+            }
+        }
+        // Giá cũ gạch ngang + giá mới trong cùng một ô
+        $gia = new RichText;
+        $gia->createTextRun('15990000')->getFont()->setStrikethrough(true);
+        $gia->createTextRun("\n14.990.000");
+        $t->getCell('F6')->setValue($gia);
+        $t->mergeCells('A7:A11')->mergeCells('A13:A14')->mergeCells('C6:C16');
+        $t->mergeCells('L7:L8')->mergeCells('L9:L10')->mergeCells('L11:L12')->mergeCells('L13:L14')->mergeCells('L15:L16');
+        foreach (['M6' => 'kim-phat-son', 'M7' => 'la-do', 'M12' => 'yen-tiec', 'M13' => 'kim-phat-son', 'M15' => 'tet-tay'] as $o => $link) {
+            $t->setCellValue($o, 'CHƯƠNG TRÌNH')->getCell($o)->getHyperlink()->setUrl("https://docs.google.com/document/d/higo-$link");
+        }
+        $t->mergeCells('M7:M11')->mergeCells('M13:M14')->mergeCells('M15:M16');
+
+        return self::luu($s, 'higo');
+    }
+
     private static function v1TieuDe(Worksheet $t, int $dong, string $tieuDe): void
     {
         $t->setCellValue('A1', $tieuDe)->mergeCells('A1:P1');
@@ -329,7 +382,7 @@ class MauSheetLienMinh
         if ($thang !== null) {
             $t->setCellValue("D$r", $thang);
         }
-        $t->setCellValueExplicit("E$r", $ngay, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $t->setCellValueExplicit("E$r", $ngay, DataType::TYPE_STRING);
         $t->setCellValue("F$r", $gia)->setCellValue("G$r", $com)->setCellValue("H$r", $size)->setCellValue("I$r", $sure)->setCellValue("J$r", $hold);
         if ($nhan !== null) {
             $t->setCellValue("K$r", $nhan);
@@ -345,7 +398,7 @@ class MauSheetLienMinh
     private static function azDong(Worksheet $t, int $r, int $stt, string $ten, string $tg, string $hk, string $ngay, int $con, int $gia, ?string $ghiChu): void
     {
         $t->fromArray([$stt, $ten, $tg, 'Link tải', $hk], null, "A$r");
-        $t->setCellValue("F$r", \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(new \DateTime($ngay)));
+        $t->setCellValue("F$r", Date::PHPToExcel(new \DateTime($ngay)));
         $t->getStyle("F$r")->getNumberFormat()->setFormatCode('d/m');
         $t->setCellValue("H$r", $con)->setCellValue("I$r", $gia)->setCellValue("J$r", $ghiChu);
         $t->getStyle("I$r")->getNumberFormat()->setFormatCode('#,##0\ [$đ-42A]');

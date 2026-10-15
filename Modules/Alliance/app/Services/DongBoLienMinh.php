@@ -2,9 +2,11 @@
 
 namespace Modules\Alliance\Services;
 
+use App\Filament\Resources\AllianceDepartures\AllianceDepartureResource;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -187,6 +189,7 @@ class DongBoLienMinh
 
             if (! $truoc) {
                 $soMoi++;
+
                 continue;
             }
             if ($dong = $this->soSanh($truoc, $ngayDi, $tour, isset($dangBan[$tour->id]), $nguong)) {
@@ -205,14 +208,19 @@ class DongBoLienMinh
     private function soSanh(AllianceDeparture $truoc, AllianceDeparture $sau, AllianceTour $tour, bool $dangBan, int $nguong): ?string
     {
         $ten = e(mb_strimwidth($tour->name, 0, 60, '…')).' '.e($sau->nhanNgay());
-        $conTruoc = $truoc->status === 'con_cho' ? (int) $truoc->seats_left : 0;
-        $conSau = $sau->status === 'con_cho' ? (int) $sau->seats_left : 0;
+        // "Còn nhận" không ghi số chỗ (HIGO) vẫn là đang nhận khách
+        $khongSo = fn (AllianceDeparture $d) => $d->status === 'con_cho' && $d->seats_left === null;
+        $conTruoc = $truoc->status === 'con_cho' ? (int) ($truoc->seats_left ?? 1) : 0;
+        $conSau = $sau->status === 'con_cho' ? (int) ($sau->seats_left ?? 1) : 0;
         $ghiChuBan = $dangBan ? ' <em>(tour PSV đang bán)</em>' : '';
 
+        if ($conTruoc === 0 && $khongSo($sau)) {
+            return "{$ten}: <strong>nhận khách trở lại</strong>{$ghiChuBan}";
+        }
         if ($conTruoc === 0 && $conSau > 0) {
             return "{$ten}: <strong>có lại {$conSau} chỗ</strong>{$ghiChuBan}";
         }
-        if ($conSau > 0 && $conSau <= $nguong && ($conTruoc > $nguong)) {
+        if ($conSau > 0 && $conSau <= $nguong && ($conTruoc > $nguong) && ! $khongSo($sau)) {
             return "{$ten}: sắp hết, còn <strong>{$conSau} chỗ</strong>{$ghiChuBan}";
         }
         if ($conTruoc > 0 && $conSau === 0) {
@@ -293,7 +301,7 @@ class DongBoLienMinh
         }
 
         $daCo = TourDeparture::where('tour_id', $tour->id)->pluck('start_date')
-            ->map(fn ($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())->flip();
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())->flip();
         $them = 0;
         $boQua = 0;
 
@@ -306,6 +314,7 @@ class DongBoLienMinh
             $con = $this->soChoTrenWeb($d);
             if ($con === null) {
                 $boQua++;
+
                 continue;
             }
             TourDeparture::create([
@@ -361,7 +370,7 @@ class DongBoLienMinh
     private function duongDanTraCho(AllianceSource $nguon): string
     {
         try {
-            return \App\Filament\Resources\AllianceDepartures\AllianceDepartureResource::getUrl('index', [
+            return AllianceDepartureResource::getUrl('index', [
                 'filters' => ['alliance_source_id' => ['value' => $nguon->id]],
             ], panel: 'admin');
         } catch (\Throwable) {
