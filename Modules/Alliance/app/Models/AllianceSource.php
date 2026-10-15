@@ -4,6 +4,7 @@ namespace Modules\Alliance\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Alliance\Services\TaiSheetLienMinh;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -32,7 +33,7 @@ class AllianceSource extends Model
         'ghi_chu' => 'Ghi chú',
     ];
 
-    protected $fillable = ['name', 'sheet_url', 'contact', 'note', 'is_active', 'mau_do', 'tab_bo_qua', 'cot_tay'];
+    protected $fillable = ['name', 'sheet_url', 'contact', 'note', 'is_active', 'mau_do', 'default_seats', 'tab_bo_qua', 'cot_tay'];
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -44,6 +45,7 @@ class AllianceSource extends Model
         'cot_tay' => 'array',
         'bao_cao' => 'array',
         'departures_count' => 'integer',
+        'default_seats' => 'integer',
     ];
 
     /**
@@ -56,7 +58,7 @@ class AllianceSource extends Model
             if (! $nguon->isDirty('sheet_url')) {
                 return;
             }
-            $ma = \Modules\Alliance\Services\TaiSheetLienMinh::maFile((string) $nguon->sheet_url);
+            $ma = TaiSheetLienMinh::maFile((string) $nguon->sheet_url);
             $san = $ma ? config("alliance.cau_hinh_san.{$ma}") : null;
             if (! $san) {
                 return;

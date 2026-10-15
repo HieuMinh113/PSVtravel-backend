@@ -2,8 +2,10 @@
 
 namespace Modules\Tour\Transformers;
 
+use App\Services\YouTube;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Tour\Models\Tour;
 
 class TourDetailResource extends JsonResource
 {
@@ -33,13 +35,13 @@ class TourDetailResource extends JsonResource
                 : null,
             // Chỉ trả MÃ video (11 ký tự), không trả link thô — website tự dựng
             // link nhúng youtube-nocookie, không bao giờ nhúng địa chỉ lạ.
-            'video_id' => \App\Services\YouTube::id($this->video_url),
+            'video_id' => YouTube::id($this->video_url),
             'highlights' => $this->highlights ?? [],
             // Tách lúc trả về: tour nhập từ trước có cả đoạn văn dồn vào MỘT
             // mục kèm dấu ➢, để nguyên thì ngoài web thành một dòng dài chạy
             // tràn khỏi khung.
-            'included' => \Modules\Tour\Models\Tour::tachTungMuc($this->included ?? []),
-            'excluded' => \Modules\Tour\Models\Tour::tachTungMuc($this->excluded ?? []),
+            'included' => Tour::tachTungMuc($this->included ?? []),
+            'excluded' => Tour::tachTungMuc($this->excluded ?? []),
             'cancellation_policy' => $this->cancellation_policy,
 
             // Khối "Những thông tin cần lưu ý" ở cuối trang tour.
@@ -80,6 +82,9 @@ class TourDetailResource extends JsonResource
                     'start_date' => $d->start_date->format('Y-m-d'),
                     'start_date_display' => $d->start_date->format('d/m/Y'),
                     'price' => $d->price_override ?? $this->adult_price,
+                    // Giá trẻ em / em bé riêng của đợt (theo sheet đối tác), không có thì giá chung của tour
+                    'price_child' => $d->child_price_override ?? $this->child_price,
+                    'price_infant' => $d->infant_price_override ?? $this->infant_price,
                     'seats_left' => $d->seats_left,
                     // Hạn nộp hồ sơ visa của đợt (riêng của đợt, không có thì theo quy tắc chung)
                     'visa_deadline' => $d->hanVisa($this->resource)?->format('Y-m-d'),

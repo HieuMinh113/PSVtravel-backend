@@ -22,6 +22,7 @@ class AllianceDeparture extends Model
         'departure_date' => 'date',
         'price' => 'integer',
         'price_original' => 'integer',
+        'price_net' => 'boolean',
         'price_child' => 'integer',
         'price_infant' => 'integer',
         'commission' => 'integer',

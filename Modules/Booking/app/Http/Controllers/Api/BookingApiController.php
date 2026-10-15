@@ -53,7 +53,8 @@ class BookingApiController extends Controller
         // Trẻ em: tour chưa nhập giá → để TRỐNG (null) = chờ nhân viên báo giá,
         // KHÔNG cộng vào tổng. (0 là trẻ em miễn phí thật, khác với chưa có giá.)
         $donGiaNguoiLon = $departure?->price_override ?? $tour->adult_price;
-        $donGiaTreEm = $tour->child_price;
+        // Trẻ em: đợt có giá trẻ em riêng (sheet đối tác ghi theo ngày) thì lấy giá đợt
+        $donGiaTreEm = $departure?->child_price_override ?? $tour->child_price;
         $tongTien = $data['adults'] * $donGiaNguoiLon
             + ($donGiaTreEm !== null ? ($data['children'] ?? 0) * $donGiaTreEm : 0);
 

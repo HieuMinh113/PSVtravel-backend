@@ -7,20 +7,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+
 class TourDeparture extends Model
 {
     use LogsActivity;
+
     protected $fillable = [
         'tour_id', 'start_date', 'visa_deadline', 'price_override',
+        'child_price_override', 'infant_price_override',
         'seats_total', 'seats_left', 'status',
     ];
 
     protected $casts = [
-        'start_date'     => 'date',
-        'visa_deadline'  => 'date',
+        'start_date' => 'date',
+        'visa_deadline' => 'date',
         'price_override' => 'integer',
-        'seats_total'    => 'integer',
-        'seats_left'     => 'integer',
+        'child_price_override' => 'integer',
+        'infant_price_override' => 'integer',
+        'alliance_sync' => 'array',
+        'seats_total' => 'integer',
+        'seats_left' => 'integer',
     ];
 
     /**
@@ -68,10 +74,11 @@ class TourDeparture extends Model
     {
         return $han ? (int) today()->diffInDays($han->copy()->startOfDay(), false) : null;
     }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['start_date', 'visa_deadline', 'seats_total', 'seats_left', 'price_override', 'status'])
+            ->logOnly(['start_date', 'visa_deadline', 'seats_total', 'seats_left', 'price_override', 'child_price_override', 'infant_price_override', 'status'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('tour_departure');

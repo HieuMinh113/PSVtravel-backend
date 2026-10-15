@@ -23,8 +23,9 @@ use Modules\Tour\Models\TourDeparture;
  *     sheet thì xoá.
  *  3. So với lần trước → báo động cho điều hành (chuông trong trang quản trị):
  *     có chỗ trở lại, sắp hết chỗ, tour PSV đang bán vừa hết chỗ, ngày mới.
- *  4. Tour PSV có nối với tour liên minh → cập nhật số chỗ các ngày đi trên
- *     website ("Còn 5 chỗ").
+ *  4. Tour PSV có nối với tour liên minh → lịch khởi hành trên website theo
+ *     sheet: tự thêm ngày mới, cập nhật số chỗ ("Còn 5 chỗ") và giá riêng
+ *     từng ngày (người lớn / trẻ em / em bé) — giá nhân viên tự sửa thì giữ.
  */
 class DongBoLienMinh
 {
@@ -37,7 +38,7 @@ class DongBoLienMinh
     ) {}
 
     /**
-     * @return array{ok: bool, so_ngay: int, moi: int, bao_dong: int, cap_nhat_web: int, loi: ?string}
+     * @return array{ok: bool, so_ngay: int, moi: int, bao_dong: int, cap_nhat_web: int, them_web?: int, loi: ?string}
      */
     public function dongBo(AllianceSource $nguon): array
     {
@@ -85,6 +86,7 @@ class DongBoLienMinh
         ])->save();
 
         $capNhatWeb = $this->capNhatTourPsv($tourIds);
+        $themWeb = $this->themNgayChoTourDaNoi($tourIds);
 
         $dong = $thayDoi;
         if (! $lanDau && $soMoi > 0) {
@@ -103,6 +105,7 @@ class DongBoLienMinh
             'moi' => $soMoi,
             'bao_dong' => $lanDau ? 0 : count($dong),
             'cap_nhat_web' => $capNhatWeb,
+            'them_web' => $themWeb,
             'loi' => null,
         ];
     }
@@ -120,7 +123,7 @@ class DongBoLienMinh
         $cu = AllianceDeparture::query()
             ->where('alliance_departures.alliance_source_id', $nguon->id)
             ->join('alliance_tours', 'alliance_tours.id', '=', 'alliance_departures.alliance_tour_id')
-            ->get(['alliance_departures.id', 'alliance_tours.key', 'departure_date', 'weekly', 'seats_left', 'status'])
+            ->get(['alliance_departures.id', 'alliance_tours.key', 'departure_date', 'weekly', 'seats_left', 'status', 'alliance_departures.price', 'alliance_departures.price_net'])
             ->keyBy(fn ($d) => $d->key.'|'.($d->departure_date?->toDateString() ?? 'tuan:'.$d->weekly));
 
         // Tour liên minh đang có tour PSV nối vào — báo kỹ hơn cho các tour này
@@ -169,6 +172,7 @@ class DongBoLienMinh
                 'tour_code' => $d['ma_tour'] ?? null,
                 'price' => $d['gia'],
                 'price_original' => $d['gia_niem_yet'] ?? null,
+                'price_net' => (bool) ($d['gia_net'] ?? false),
                 'price_text' => $d['gia_goc'],
                 'price_child' => $d['gia_tre_em'],
                 'price_infant' => $d['gia_em_be'],
@@ -197,10 +201,15 @@ class DongBoLienMinh
             }
         }
 
-        // Ngày không còn trong sheet (đối tác xoá dòng, hoặc ngày đã qua)
-        AllianceDeparture::where('alliance_source_id', $nguon->id)
-            ->whereNotIn('id', $giu ?: [0])
-            ->delete();
+        // Ngày không còn trong sheet (đối tác xoá dòng, hoặc ngày đã qua). Ngày sắp
+        // tới của tour PSV đang bán bị xoá khỏi sheet → báo để điều hành kiểm tra
+        // (website giữ nguyên đợt đó, không tự đóng).
+        $biXoa = AllianceDeparture::where('alliance_source_id', $nguon->id)->whereNotIn('id', $giu ?: [0]);
+        foreach ((clone $biXoa)->whereDate('departure_date', '>=', today())->whereIn('alliance_tour_id', $dangBan->keys())->with('tour')->get() as $x) {
+            $baoDong[] = e(mb_strimwidth((string) $x->tour?->name, 0, 60, '…')).' '.e($x->nhanNgay())
+                .': <strong>không còn trong sheet đối tác</strong> — kiểm tra lại đợt này trên website';
+        }
+        $biXoa->delete();
 
         return [$baoDong, $soMoi, array_values(array_map(fn ($t) => $t->id, $tours))];
     }
@@ -231,17 +240,23 @@ class DongBoLienMinh
                 return "{$ten}: <strong>".mb_strtolower($lyDo).'</strong>'.$ghiChuBan;
             }
         }
+        // Tour PSV đang bán: đối tác đổi giá ngày này (web tự đổi giá đợt theo sheet)
+        if ($dangBan && $truoc->price && $sau->price && $truoc->price !== $sau->price) {
+            $vnd = fn (int $v) => number_format($v, 0, ',', '.');
+
+            return "{$ten}: giá đổi {$vnd($truoc->price)} → <strong>{$vnd($sau->price)}</strong>".($sau->price_net ? ' (giá NET)' : '').$ghiChuBan;
+        }
 
         return null;
     }
 
     /**
-     * Tour PSV đã nối tour liên minh: cập nhật số chỗ các ngày đi sắp tới theo
-     * sheet. Chỉ đụng những ngày có trong sheet và sheet có ghi số chỗ; ngày
-     * PSV tự mở thêm hoặc sheet không ghi số chỗ thì giữ nguyên.
+     * Tour PSV đã nối tour liên minh: cập nhật số chỗ + giá riêng các ngày đi
+     * sắp tới theo sheet. Chỉ đụng những ngày có trong sheet; ngày PSV tự mở
+     * thêm thì giữ nguyên (xem apDot).
      *
      * @param  list<int>  $tourIds  id tour liên minh vừa đọc
-     * @return int số ngày đi trên website đã đổi số chỗ
+     * @return int số ngày đi trên website đã đổi số chỗ / giá
      */
     public function capNhatTourPsv(array $tourIds): int
     {
@@ -255,30 +270,22 @@ class DongBoLienMinh
             ->get();
 
         foreach ($tourPsv as $tour) {
-            $lm = AllianceDeparture::where('alliance_tour_id', $tour->alliance_tour_id)
-                ->whereNotNull('departure_date') // lịch "Thứ 5 hằng tuần" không khớp ngày cụ thể
-                ->get()->keyBy(fn ($d) => $d->departure_date->toDateString());
-
+            [$lm, $macDinh] = $this->ngayLienMinh($tour);
             foreach ($tour->departures as $dot) {
                 $d = $lm[$dot->start_date->toDateString()] ?? null;
-                if (! $d) {
-                    continue;
+                if ($d && $this->apDot($dot, $d, $macDinh)) {
+                    $doi++;
                 }
-                $con = $this->soChoTrenWeb($d);
-                if ($con === null || $con === $dot->seats_left) {
-                    continue;
-                }
-                $dot->seats_left = $con;
-                $dot->seats_total = max((int) $dot->seats_total, (int) ($d->seats_total ?? 0), $con);
-                $dot->save(); // trạng thái mở/hết tự tính theo số chỗ (xem TourDeparture)
-                $doi++;
             }
         }
 
         return $doi;
     }
 
-    /** Số chỗ hiện trên web cho một ngày liên minh; null = sheet không ghi, giữ nguyên. */
+    /**
+     * Số chỗ trên web cho một ngày liên minh: hết / huỷ / tạm ngưng → 0, sheet
+     * ghi số → số đó; null = sheet không ghi số chỗ ("Còn nhận", không ghi gì).
+     */
     public function soChoTrenWeb(AllianceDeparture $d): ?int
     {
         if (in_array($d->status, ['huy', 'tam_ngung', 'het_cho'], true)) {
@@ -289,8 +296,79 @@ class DongBoLienMinh
     }
 
     /**
-     * Thêm vào tour PSV các ngày đi có trong sheet liên minh mà web chưa có.
-     * Ngày sheet không ghi số chỗ thì bỏ qua (không biết mở bao nhiêu chỗ).
+     * Ghi số chỗ + giá của ngày trong sheet vào đợt khởi hành của tour PSV.
+     *
+     *  - Số chỗ: sheet ghi số / hết chỗ → theo sheet. Sheet không ghi số (đa số
+     *    đối tác chỉ đánh dấu "Full") → giữ số chỗ của web (đã trừ khách PSV
+     *    đặt); riêng đợt mà chính sheet đã đóng trước đó thì mở lại với số chỗ
+     *    mặc định của đối tác.
+     *  - Giá người lớn / trẻ em / em bé: theo sheet, trừ khi nhân viên đã tự sửa
+     *    (giá đang khác giá sheet ghi lần trước). Xoá trống giá thì lần sau lại
+     *    theo sheet. Giá NET (VNA "NET THU VỀ") không phải giá bán → không điền.
+     *
+     * @return bool có đổi số chỗ / giá không
+     */
+    private function apDot(TourDeparture $dot, AllianceDeparture $d, int $macDinh): bool
+    {
+        $da = $dot->alliance_sync ?? [];
+
+        $con = $this->soChoTrenWeb($d);
+        if ($con === null && (int) $dot->seats_left === 0 && ($da['seats'] ?? null) === 0) {
+            $con = $macDinh; // sheet mở lại ngày trước đó ghi hết chỗ
+        }
+        if ($con !== null) {
+            if ($con !== $dot->seats_left) {
+                $dot->seats_left = $con;
+                $dot->seats_total = max((int) $dot->seats_total, (int) ($d->seats_total ?? 0), $con);
+            }
+            $da['seats'] = $con;
+        }
+
+        foreach (self::giaSheet($d) as $cot => $gia) {
+            if ($gia !== null && ($dot->{$cot} === null || $dot->{$cot} === ($da[$cot] ?? null))) {
+                $dot->{$cot} = $gia;
+                $da[$cot] = $gia;
+            }
+        }
+
+        $doi = $dot->isDirty(['seats_left', 'price_override', 'child_price_override', 'infant_price_override']);
+        $dot->alliance_sync = $da;
+        if ($dot->isDirty()) {
+            $dot->save(); // trạng thái mở/hết tự tính theo số chỗ (xem TourDeparture)
+        }
+
+        return $doi;
+    }
+
+    /** @return array{price_override: ?int, child_price_override: ?int, infant_price_override: ?int} */
+    private static function giaSheet(AllianceDeparture $d): array
+    {
+        return [
+            'price_override' => $d->price_net ? null : $d->price,
+            'child_price_override' => $d->price_net ? null : $d->price_child,
+            'infant_price_override' => $d->price_net ? null : $d->price_infant,
+        ];
+    }
+
+    /**
+     * Ngày đi trong sheet (từ hôm nay) của tour liên minh đã nối + số chỗ mặc định của đối tác.
+     *
+     * @return array{0: Collection<string, AllianceDeparture>, 1: int}
+     */
+    private function ngayLienMinh(Tour $tour): array
+    {
+        $lm = AllianceDeparture::where('alliance_tour_id', $tour->alliance_tour_id)
+            ->whereDate('departure_date', '>=', today()) // lịch "Thứ 5 hằng tuần" không khớp ngày cụ thể
+            ->orderBy('departure_date')->with('source:id,default_seats')
+            ->get()->keyBy(fn ($d) => $d->departure_date->toDateString());
+
+        return [$lm, (int) ($lm->first()?->source?->default_seats ?? 10)];
+    }
+
+    /**
+     * Thêm vào tour PSV các ngày đi có trong sheet liên minh mà web chưa có,
+     * kèm số chỗ (sheet không ghi số → số chỗ mặc định của đối tác) và giá
+     * riêng từng ngày.
      *
      * @return array{them: int, bo_qua: int}
      */
@@ -302,31 +380,37 @@ class DongBoLienMinh
 
         $daCo = TourDeparture::where('tour_id', $tour->id)->pluck('start_date')
             ->map(fn ($d) => Carbon::parse($d)->toDateString())->flip();
+        [$lm, $macDinh] = $this->ngayLienMinh($tour);
         $them = 0;
-        $boQua = 0;
-
-        $lm = AllianceDeparture::where('alliance_tour_id', $tour->alliance_tour_id)
-            ->whereDate('departure_date', '>=', today())->orderBy('departure_date')->get();
-        foreach ($lm as $d) {
-            if (isset($daCo[$d->departure_date->toDateString()])) {
+        foreach ($lm as $ngay => $d) {
+            if (isset($daCo[$ngay])) {
                 continue;
             }
-            $con = $this->soChoTrenWeb($d);
-            if ($con === null) {
-                $boQua++;
-
-                continue;
-            }
-            TourDeparture::create([
+            $con = $this->soChoTrenWeb($d) ?? $macDinh;
+            $dot = new TourDeparture([
                 'tour_id' => $tour->id,
-                'start_date' => $d->departure_date->toDateString(),
+                'start_date' => $ngay,
                 'seats_total' => max((int) ($d->seats_total ?? 0), $con),
                 'seats_left' => $con,
+                ...self::giaSheet($d),
             ]);
+            $dot->alliance_sync = array_filter(['seats' => $con, ...self::giaSheet($d)], fn ($v) => $v !== null);
+            $dot->save();
             $them++;
         }
 
-        return ['them' => $them, 'bo_qua' => $boQua];
+        return ['them' => $them, 'bo_qua' => 0];
+    }
+
+    /** Sau mỗi lần đọc sheet: tour PSV đã nối tự có thêm các ngày mới trong sheet. */
+    private function themNgayChoTourDaNoi(array $tourIds): int
+    {
+        if (! $tourIds) {
+            return 0;
+        }
+
+        return Tour::query()->whereIn('alliance_tour_id', $tourIds)->get()
+            ->sum(fn (Tour $tour) => $this->themNgayDi($tour)['them']);
     }
 
     /** Gửi thông báo vào chuông của những người có quyền xem liên minh. */

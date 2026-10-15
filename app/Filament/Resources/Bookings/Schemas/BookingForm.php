@@ -64,6 +64,7 @@ class BookingForm
                     $tour = Tour::find($get('tour_id'));
                     $dot = $state ? TourDeparture::find($state) : null;
                     $set('unit_price_adult', $dot?->price_override ?? $tour?->adult_price ?? 0);
+                    $set('unit_price_child', $dot?->child_price_override ?? $tour?->child_price);
                     // Hạn nhắn khách đóng phần còn lại = ngày đi − 7 ngày
                     $set('remind_on', $dot?->start_date?->copy()->subDays(Booking::NHAC_TRUOC_NGAY)->toDateString());
                     self::tinhTong($get, $set);

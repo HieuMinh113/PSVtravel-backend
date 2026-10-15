@@ -20,6 +20,7 @@ use Modules\Alliance\Services\DocBangLienMinh;
 use Modules\Alliance\Services\DongBoLienMinh;
 use Modules\Alliance\Services\SoanTinLienMinh;
 use Modules\Alliance\Services\TaiSheetLienMinh;
+use Modules\Booking\Models\Booking;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -230,30 +231,77 @@ class LienMinhTest extends TestCase
 
     public function test_doc_kieu_higo_tua_bang_hai_doan_va_gia_gach_ngang(): void
     {
-        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::higo())['dong']);
-        $ngay = fn (string $ngay, string $co) => $d->first(fn ($x) => $x['ngay_di'] === $ngay && str_contains($x['ten_tour'], $co));
-        $this->assertCount(8, $d);
+        $d = collect(app(DocBangLienMinh::class)->doc(MauSheetLienMinh::higo())['dong'])->keyBy('ngay_di');
+        $this->assertCount(7, $d);
 
-        // Tên = tuyến ở dòng tựa trên bảng + biến thể ở cột "TOUR LỄ + NOTED"; số ngày lấy từ tựa
-        $kim = $ngay('2026-10-07', 'KIM PHẬT SƠN');
-        $this->assertSame('QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ – CHƯƠNG TRÌNH KIM PHẬT SƠN', $kim['ten_tour']);
+        // Một tour = tuyến ở dòng tựa trên bảng; cột "TOUR LỄ + NOTED" (biến thể) vào ghi chú
+        $this->assertSame(['QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ'], $d->pluck('ten_tour')->unique()->values()->all());
+        $kim = $d['2026-10-07'];
         $this->assertSame('5N4Đ', $kim['thoi_gian']);
         $this->assertStringContainsString('BBQ', $kim['muc']);
+        $this->assertSame('CHƯƠNG TRÌNH KIM PHẬT SƠN', $kim['ghi_chu']);
         // Giá cũ gạch ngang trong ô giá → giá mới là giá chính; "SƠ SINH" là giá em bé
         $this->assertSame([14990000, 15990000, 14990000, 7990000, 600000], [$kim['gia'], $kim['gia_niem_yet'], $kim['gia_tre_em'], $kim['gia_em_be'], $kim['hoa_hong']]);
         // Cột "SỐ CHỖ" ghi chữ: Full → hết chỗ, "Còn nhận" → còn chỗ (không rõ số)
         $this->assertSame('het_cho', $kim['trang_thai']);
-        $this->assertSame(['con_cho', null], [$ngay('2026-12-02', 'KIM PHẬT SƠN')['trang_thai'], $ngay('2026-12-02', 'KIM PHẬT SƠN')['con_cho']]);
+        $this->assertSame(['con_cho', null], [$d['2026-12-02']['trang_thai'], $d['2026-12-02']['con_cho']]);
         $this->assertSame('https://docs.google.com/document/d/higo-kim-phat-son', $kim['link_chuong_trinh']);
 
         // Hai đoàn cùng ngày: đoàn 1 Full, đoàn 2 Còn nhận → ngày đó còn nhận, ghi chú từng đoàn
-        $la = $ngay('2026-11-04', 'LÁ VÀNG + KIM');
-        $this->assertSame(['con_cho', null], [$la['trang_thai'], $la['con_cho']]);
-        $this->assertSame('ĐOÀN 1: hết chỗ · ĐOÀN 2: còn chỗ (ĐẨY GẤP)', $la['ghi_chu']);
-        $this->assertSame('het_cho', $ngay('2026-10-21', 'LÁ VÀNG + KIM')['trang_thai']);
-        // Cùng ngày 18/11 nhưng khác chương trình → hai tour riêng
-        $this->assertSame('het_cho', $ngay('2026-11-18', 'LÁ VÀNG + KIM')['trang_thai']);
-        $this->assertSame([16690000, 'con_cho'], [$ngay('2026-11-18', 'YẾN TIỆC')['gia'], $ngay('2026-11-18', 'YẾN TIỆC')['trang_thai']]);
+        $this->assertSame(['con_cho', null], [$d['2026-11-04']['trang_thai'], $d['2026-11-04']['con_cho']]);
+        $this->assertStringContainsString('ĐOÀN 1: hết chỗ', $d['2026-11-04']['ghi_chu']);
+        $this->assertStringContainsString('ĐOÀN 2: còn chỗ (CAO ĐIỂM MÙA LÁ ĐỎ LÁ VÀNG + KIM PHẬT SƠN · ĐẨY GẤP)', $d['2026-11-04']['ghi_chu']);
+        $this->assertSame('het_cho', $d['2026-10-21']['trang_thai']);
+        // 18/11: đoàn 1 (Kim Phật Sơn) Full, đoàn 2 (Yến tiệc) còn nhận → giá theo đoàn còn nhận
+        $this->assertSame([16690000, 15690000, 'con_cho'], [$d['2026-11-18']['gia'], $d['2026-11-18']['gia_tre_em'], $d['2026-11-18']['trang_thai']]);
+        $this->assertStringContainsString('YẾN TIỆC CUNG ĐÌNH', $d['2026-11-18']['ghi_chu']);
+    }
+
+    /** HIGO tab Thượng Hải: "NOTE TOUR" là khuyến mãi, tour tách theo hãng bay + SHOP / NO SHOP; tab phí visa bỏ qua. */
+    public function test_doc_kieu_higo_note_tour_shop_va_tab_visa(): void
+    {
+        $kq = app(DocBangLienMinh::class)->doc(MauSheetLienMinh::higoThuongHai());
+        $d = collect($kq['dong']);
+        $ten = 'THƯỢNG HẢI - HÀNG CHÂU - TÔ CHÂU - TÂY SÁCH Ô TRẤN 5N5Đ';
+        $mot = fn (string $ngay, string $hang, string $shop = 'NO SHOP') => $d->first(fn ($x) => $x['ngay_di'] === $ngay && $x['hang_bay'] === $hang && $x['ten_tour'] === "{$ten} – {$shop}");
+
+        // 4 tour: MU no shop, HO no shop, HO shop, 9G (6N5Đ) — không tách theo chữ khuyến mãi
+        $this->assertCount(4, $d->pluck('khoa_tour')->unique());
+        $this->assertSame(['2026-10-20', '2026-10-29', '2026-11-07'], $d->where('hang_bay', 'MU')->pluck('ngay_di')->values()->all());
+        $this->assertSame('6N5Đ', $mot('2026-11-10', '9G')['thoi_gian']);
+
+        $this->assertSame(['het_cho', 'MÙA LÁ VÀNG TẶNG MÌ CUA LÔNG · ĐẨY GẤP'], [$mot('2026-10-20', 'MU')['trang_thai'], $mot('2026-10-20', 'MU')['ghi_chu']]);
+        $this->assertSame(['lien_he', 'KHUYẾN MÃI SỐC · CHECK OP'], [$mot('2026-10-22', 'HO')['trang_thai'], $mot('2026-10-22', 'HO')['ghi_chu']]);
+        $this->assertSame(16990000, $mot('2026-11-07', 'HO', 'SHOP')['gia']);
+        // Giá trẻ em cũng gạch ngang giá cũ → lấy giá mới
+        $this->assertSame([18590000, 18590000], [$mot('2026-11-07', 'MU')['gia'], $mot('2026-11-07', 'MU')['gia_tre_em']]);
+
+        $baoCao = collect($kq['bao_cao'])->keyBy('tab');
+        $this->assertSame('bang_visa', $baoCao['VISA']['tinh_trang']);
+        $this->assertSame([], $baoCao['THƯỢNG HẢI-TÂY SÁCH 5 SAO']['khong_hieu'], 'Dòng giờ bay không bị coi là ô ngày lạ');
+        $this->assertSame([], $kq['canh_bao'], 'Tab phí visa không báo lỗi');
+    }
+
+    /** Hanvina: ba chương trình cùng tên trong một tab là ba tour; tên gọn nhưng giữ khoá cũ; ghi chú trong ô ngày. */
+    public function test_tach_chuong_trinh_cung_ten_va_lam_gon_ten_giu_khoa(): void
+    {
+        $doc = app(DocBangLienMinh::class);
+        $d = collect($doc->doc(MauSheetLienMinh::hanvinaCoBac())['dong']);
+
+        $this->assertSame([
+            'BẮC KINH - CỔ BẮC THỦY TRẤN',
+            'BẮC KINH - CỔ BẮC THỦY TRẤN (01 bữa Vĩnh Lạc Cung Yến)',
+            'BẮC KINH - CỔ BẮC THỦY TRẤN (1 đêm khu nghỉ dưỡng trượt tuyết)',
+            'BẮC KINH – THIÊN TÂN',
+        ], $d->pluck('ten_tour')->unique()->values()->all());
+        // Khối đầu tiên giữ khoá như trước — tour PSV đã nối không mất liên kết
+        $this->assertSame($doc->khoaTour('BẮC KINH - CỔ BẮC THỦY TRẤN', 'CA'), $d->firstWhere('ngay_di', '2026-10-29')['khoa_tour']);
+        $this->assertSame(['2026-12-13'], $d->where('ten_tour', 'BẮC KINH - CỔ BẮC THỦY TRẤN (1 đêm khu nghỉ dưỡng trượt tuyết)')->pluck('ngay_di')->values()->all());
+
+        // Tên bỏ dòng "Thời gian: …" nhưng khoá vẫn tính theo tên cũ; ghi chú trong ngoặc ở ô ngày
+        $tt = $d->firstWhere('ngay_di', '2026-10-21');
+        $this->assertSame($doc->khoaTour('BẮC KINH – THIÊN TÂN – Thời gian: 05 Ngày 04 Đêm', 'CA', '05N04Đ'), $tt['khoa_tour']);
+        $this->assertSame(['05N04Đ', 'chỉ nhận khách có VISA'], [$tt['thoi_gian'], $tt['ghi_chu']]);
     }
 
     public function test_nhan_dien_link_google(): void
@@ -365,11 +413,12 @@ class LienMinhTest extends TestCase
         ]));
         $kq = app(DongBoLienMinh::class)->dongBo($nguon->fresh());
 
-        $this->assertSame(2, $kq['bao_dong']);
+        $this->assertSame(3, $kq['bao_dong']);
         $tb = $nguoi->notifications()->latest()->first();
         $this->assertNotNull($tb);
         $noiDung = $tb->data['body'];
         $this->assertStringContainsString('14/10: sắp hết, còn <strong>2 chỗ</strong>', $noiDung);
+        $this->assertStringContainsString('04/11: <strong>không còn trong sheet đối tác</strong>', $noiDung, 'Tour PSV đang bán: ngày bị xoá khỏi sheet thì báo');
         $this->assertStringContainsString('28/10: <strong>có lại 5 chỗ</strong>', $noiDung);
         $this->assertStringContainsString('tour PSV đang bán', $noiDung);
 
@@ -400,9 +449,9 @@ class LienMinhTest extends TestCase
         $this->assertTrue($nguoi->notifications->contains(fn ($tb) => str_contains($tb->data['body'], 'đọc lại được')));
     }
 
-    public function test_lay_ngay_di_tu_lien_minh_bo_qua_ngay_khong_ro_so_cho(): void
+    public function test_lay_ngay_di_tu_lien_minh_ngay_khong_ro_so_cho_lay_so_cho_mac_dinh(): void
     {
-        $nguon = AllianceSource::create(['name' => 'AZ', 'sheet_url' => self::LINK]);
+        $nguon = AllianceSource::create(['name' => 'AZ', 'sheet_url' => self::LINK, 'default_seats' => 12]);
         $this->traVe(MauSheetLienMinh::az());
         app(DongBoLienMinh::class)->dongBo($nguon);
 
@@ -414,7 +463,9 @@ class LienMinhTest extends TestCase
 
         $hn = AllianceTour::where('name', 'like', 'CĐV KIX%')->firstOrFail();
         $tour2 = Tour::create(['slug' => 'hn-'.uniqid(), 'name' => 'HN', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 1, 'alliance_tour_id' => $hn->id]);
-        $this->assertSame(['them' => 0, 'bo_qua' => 1], app(DongBoLienMinh::class)->themNgayDi($tour2));
+        $this->assertSame(['them' => 1, 'bo_qua' => 0], app(DongBoLienMinh::class)->themNgayDi($tour2));
+        $dot = $tour2->departures()->sole();
+        $this->assertSame([12, 12, 'open', 39900000], [$dot->seats_left, $dot->seats_total, $dot->status, $dot->price_override], 'Sheet không ghi số chỗ → số chỗ mặc định của đối tác, giá theo sheet');
     }
 
     public function test_lenh_chi_doc_sheet_toi_han(): void
@@ -491,7 +542,104 @@ class LienMinhTest extends TestCase
 
         $this->assertSame(1, $kq['bao_dong']);
         $this->assertStringContainsString('21/10: <strong>nhận khách trở lại</strong>', $nguoi->notifications()->latest()->first()->data['body']);
-        $this->assertSame('ĐOÀN 1: hết chỗ · ĐOÀN 2: còn chỗ', $full->fresh()->note);
+        $this->assertStringContainsString('ĐOÀN 2: còn chỗ', $full->fresh()->note);
+    }
+
+    /**
+     * Nối tour PSV với tour liên minh → lịch khởi hành lấy theo sheet: đủ ngày đi, số
+     * chỗ (sheet không ghi số → số chỗ mặc định của đối tác), giá riêng người lớn /
+     * trẻ em / em bé từng ngày. Giá nhân viên tự sửa thì giữ; sheet đổi giá / mở lại
+     * đoàn thì web theo, tour đang bán thì báo.
+     */
+    public function test_noi_tour_lay_ngay_so_cho_va_gia_tung_ngay_tu_sheet(): void
+    {
+        $nguoi = $this->dieuHanh();
+        $nguon = AllianceSource::create(['name' => 'HIGO', 'sheet_url' => self::LINK, 'default_seats' => 8]);
+        $this->traVe(MauSheetLienMinh::higo());
+        $dv = app(DongBoLienMinh::class);
+        $dv->dongBo($nguon);
+        $lm = AllianceTour::where('name', 'QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ')->sole();
+
+        $tour = Tour::create(['slug' => 'qc-'.uniqid(), 'name' => 'Quý Châu', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 15990000, 'child_price' => 14990000]);
+        // Đợt PSV tự tạo, nhân viên đã đặt giá riêng → nối xong vẫn giữ giá, giữ số chỗ
+        $tuTao = TourDeparture::create(['tour_id' => $tour->id, 'start_date' => '2026-12-02', 'seats_total' => 20, 'seats_left' => 20, 'price_override' => 15500000]);
+        $tour->update(['alliance_tour_id' => $lm->id]);
+        $dv->capNhatTourPsv([$lm->id]);
+        $this->assertSame(['them' => 6, 'bo_qua' => 0], $dv->themNgayDi($tour));
+
+        $dot = fn (string $ngay) => $tour->departures()->whereDate('start_date', $ngay)->sole();
+        $this->assertSame([0, 'full'], [$dot('2026-10-21')->seats_left, $dot('2026-10-21')->status], 'Sheet Full → hết chỗ');
+        $this->assertSame([8, 'open'], [$dot('2026-11-04')->seats_left, $dot('2026-11-04')->status], '"Còn nhận" không ghi số → số chỗ mặc định');
+        $this->assertSame([19990000, 18990000, 9990000], [$dot('2026-12-30')->price_override, $dot('2026-12-30')->child_price_override, $dot('2026-12-30')->infant_price_override]);
+        $this->assertSame([16690000, 15690000], [$dot('2026-11-18')->price_override, $dot('2026-11-18')->child_price_override], 'Giá theo đoàn còn nhận');
+        $this->assertSame([15500000, 20], [$tuTao->fresh()->price_override, $tuTao->fresh()->seats_left]);
+
+        // Web: giá trẻ em / em bé theo đợt
+        $this->getJson("/api/v1/tours/{$tour->slug}")->assertOk()->assertJsonFragment([
+            'start_date' => '2026-12-30', 'price' => 19990000, 'price_child' => 18990000, 'price_infant' => 9990000,
+        ]);
+
+        // Khách PSV đặt 3 chỗ ngày 04/11; nhân viên tự sửa giá 30/12
+        $dot('2026-11-04')->update(['seats_left' => 5]);
+        $dot('2026-12-30')->update(['price_override' => 19500000]);
+
+        // Đối tác: mở lại đoàn 2 ngày 21/10, tăng giá 16/12
+        $f = MauSheetLienMinh::higo();
+        $sach = IOFactory::load($f);
+        $sach->getSheet(0)->setCellValue('I8', 'Còn nhận')->setCellValue('F14', 16490000)->setCellValue('F15', 20490000)->setCellValue('F16', 20490000);
+        (new Xlsx($sach))->save($f);
+        $this->traVe($f);
+        $kq = $dv->dongBo($nguon->fresh());
+
+        $this->assertSame([8, 'open'], [$dot('2026-10-21')->seats_left, $dot('2026-10-21')->status], 'Sheet mở lại ngày đã đóng → mở lại với số chỗ mặc định');
+        $this->assertSame(5, $dot('2026-11-04')->seats_left, 'Sheet không ghi số → giữ số chỗ web (đã trừ khách PSV)');
+        $this->assertSame(16490000, $dot('2026-12-16')->price_override, 'Giá theo sheet → đổi theo sheet');
+        $this->assertSame(19500000, $dot('2026-12-30')->price_override, 'Giá nhân viên tự sửa → giữ');
+        $noiDung = $nguoi->notifications()->latest()->first()->data['body'];
+        $this->assertStringContainsString('21/10: <strong>nhận khách trở lại</strong>', $noiDung);
+        $this->assertStringContainsString('16/12: giá đổi 15.990.000 → <strong>16.490.000</strong>', $noiDung);
+        $this->assertGreaterThan(0, $kq['cap_nhat_web']);
+
+        // Xoá trống giá đã sửa tay → lần đọc sau lại theo sheet
+        $dot('2026-12-30')->update(['price_override' => null]);
+        $dv->capNhatTourPsv([$lm->id]);
+        $this->assertSame(20490000, $dot('2026-12-30')->price_override);
+    }
+
+    public function test_dat_tour_tinh_gia_tre_em_theo_dot(): void
+    {
+        $tour = Tour::create(['slug' => 'dt-'.uniqid(), 'name' => 'Quý Châu', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 15990000, 'child_price' => 14990000]);
+        $tet = TourDeparture::create(['tour_id' => $tour->id, 'start_date' => '2026-12-30', 'seats_total' => 10, 'seats_left' => 10, 'price_override' => 19990000, 'child_price_override' => 18990000]);
+        $thuong = TourDeparture::create(['tour_id' => $tour->id, 'start_date' => '2026-12-16', 'seats_total' => 10, 'seats_left' => 10]);
+
+        foreach ([[$tet, 'Khách Tết', 18990000, 19990000 + 18990000], [$thuong, 'Khách thường', 14990000, 15990000 + 14990000]] as [$dot, $ten, $giaTreEm, $tong]) {
+            $this->postJson('/api/v1/bookings', [
+                'tour_id' => $tour->id, 'tour_departure_id' => $dot->id,
+                'customer_name' => $ten, 'customer_phone' => '0909123456', 'adults' => 1, 'children' => 1,
+            ])->assertSuccessful();
+            $don = Booking::where('customer_name', $ten)->sole();
+            $this->assertSame([$giaTreEm, $tong], [(int) $don->unit_price_child, (int) $don->total_price]);
+        }
+    }
+
+    /** VNA ghi "NET THU VỀ": giá net không phải giá bán → không tự điền giá đợt khởi hành. */
+    public function test_gia_net_khong_dien_vao_gia_dot_khoi_hanh(): void
+    {
+        $nguon = AllianceSource::create(['name' => 'VNA', 'sheet_url' => self::LINK]);
+        $f = MauSheetLienMinh::vna();
+        $sach = IOFactory::load($f);
+        $sach->getSheet(0)->setCellValue('G4', "NET THU VỀ\n19.390.000");
+        (new Xlsx($sach))->save($f);
+        $this->traVe($f);
+        app(DongBoLienMinh::class)->dongBo($nguon);
+
+        $d = AllianceDeparture::whereDate('departure_date', '2026-11-13')->sole();
+        $this->assertSame([19390000, true], [$d->price, $d->price_net]);
+        $this->assertStringContainsString('NET', SoanTinLienMinh::tour($d->tour));
+
+        $tour = Tour::create(['slug' => 'sb-'.uniqid(), 'name' => 'Seoul Busan', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 22990000, 'alliance_tour_id' => $d->alliance_tour_id]);
+        app(DongBoLienMinh::class)->themNgayDi($tour);
+        $this->assertSame([null, 4], [$tour->departures()->whereDate('start_date', '2026-11-13')->value('price_override'), $tour->departures()->whereDate('start_date', '2026-11-13')->value('seats_left')]);
     }
 
     public function test_noi_tour_trong_form_cap_nhat_so_cho_ngay_va_nut_lay_ngay_di(): void

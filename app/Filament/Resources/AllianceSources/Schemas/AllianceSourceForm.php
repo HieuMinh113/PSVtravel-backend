@@ -53,6 +53,16 @@ class AllianceSourceForm
                 Textarea::make('note')
                     ->label('Ghi chú nội bộ')
                     ->rows(2),
+                // Đa số đối tác chỉ đánh dấu "Full" khi hết, không ghi số chỗ còn
+                TextInput::make('default_seats')
+                    ->label('Số chỗ mặc định khi sheet không ghi số chỗ')
+                    ->helperText('Tour PSV nối với tour của đối tác này: ngày đi sheet không ghi số chỗ ("Còn nhận" hoặc để trống) được mở trên web với số chỗ này. Sheet ghi Full / huỷ thì web tự hết chỗ.')
+                    ->numeric()
+                    ->integer()
+                    ->minValue(1)
+                    ->maxValue(200)
+                    ->default(10)
+                    ->required(),
 
                 Section::make('Cách đọc sheet này')
                     ->description('Thường không cần chỉnh — máy tự nhận ra cột theo chữ tiêu đề. Chỉ chỉnh khi báo cáo bên dưới cho thấy đọc thiếu.')
@@ -135,6 +145,7 @@ class AllianceSourceForm
                 'an' => '<span style="color:#6b7280">tab ẩn — không đọc</span>',
                 'bo_qua' => '<span style="color:#6b7280">đang bỏ qua</span>',
                 'khong_co_bang' => '<span style="color:#b45309">không thấy bảng lịch tour (không có cột ngày đi)</span>',
+                'bang_visa' => '<span style="color:#6b7280">bảng phí visa — không phải lịch tour, bỏ qua</span>',
                 default => '<strong>'.(int) ($b['so_ngay'] ?? 0).'</strong> ngày đi sắp tới'
                     .(! empty($b['mau_do']) ? ' · <span style="color:#dc2626">ngày tô đỏ = hết chỗ</span>' : '')
                     .(! empty($b['cot_tay']) ? ' · đọc theo cột khai tay' : ''),

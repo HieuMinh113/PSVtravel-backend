@@ -5,11 +5,13 @@ namespace App\Filament\Resources\Tours\Pages;
 use App\Filament\Resources\Tours\Actions\MaQrAction;
 use App\Filament\Resources\Tours\TourResource;
 use Filament\Actions\DeleteAction;
-use Modules\Tour\Models\Tour;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Modules\Alliance\Services\DongBoLienMinh;
+use Modules\Tour\Models\Tour;
 
 class EditTour extends EditRecord
 {
@@ -33,15 +35,24 @@ class EditTour extends EditRecord
             RestoreAction::make(),
         ];
     }
-    /** Vừa nối (hoặc đổi) tour liên minh → cập nhật số chỗ ngay, không chờ lần đọc sheet sau. */
+
+    /**
+     * Vừa nối (hoặc đổi) tour liên minh → lấy ngay ngày đi, số chỗ, giá từng ngày
+     * theo sheet, không chờ lần đọc sheet sau.
+     */
     protected function afterSave(): void
     {
         if ($this->record->wasChanged('alliance_tour_id') && $this->record->alliance_tour_id) {
-            $doi = app(\Modules\Alliance\Services\DongBoLienMinh::class)
-                ->capNhatTourPsv([$this->record->alliance_tour_id]);
-            if ($doi) {
-                \Filament\Notifications\Notification::make()->success()
-                    ->title("Đã cập nhật số chỗ {$doi} ngày đi theo sheet liên minh")
+            $dv = app(DongBoLienMinh::class);
+            $doi = $dv->capNhatTourPsv([$this->record->alliance_tour_id]);
+            $them = $dv->themNgayDi($this->record)['them'];
+            if ($doi || $them) {
+                Notification::make()->success()
+                    ->title('Đã lấy lịch khởi hành theo sheet liên minh')
+                    ->body(implode(' · ', array_filter([
+                        $them ? "Thêm {$them} ngày đi" : null,
+                        $doi ? "Cập nhật số chỗ / giá {$doi} ngày đã có" : null,
+                    ])))
                     ->send();
             }
         }

@@ -182,7 +182,7 @@ class SoanTinLienMinh
     {
         $d = $dot->first();
         if ($d->price) {
-            return self::nghin($d->price).($d->price_original ? ' (giá gốc '.self::nghin($d->price_original).')' : '');
+            return self::nghin($d->price).($d->price_net ? ' NET' : '').($d->price_original ? ' (giá gốc '.self::nghin($d->price_original).')' : '');
         }
 
         return filled($d->price_text) ? trim($d->price_text) : null;

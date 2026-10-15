@@ -78,9 +78,12 @@ class AllianceDeparturesTable
                     ->placeholder(fn (AllianceDeparture $record) => $record->price_text ?: '—')
                     ->tooltip(fn (AllianceDeparture $record) => $record->price_text ? 'Trong sheet ghi: '.$record->price_text : null)
                     // Có giá khuyến mãi: giá chính là giá KM, giá gốc gạch ngang bên dưới
-                    ->description(fn (AllianceDeparture $record) => $record->price_original
-                        ? new HtmlString('<span style="text-decoration:line-through">'.e(self::tien($record->price_original)).'</span> · giá KM')
-                        : ($record->price_child ? 'Trẻ em '.self::tien($record->price_child) : null))
+                    ->description(fn (AllianceDeparture $record) => match (true) {
+                        $record->price_net => 'Giá NET (thu về) — không phải giá bán',
+                        (bool) $record->price_original => new HtmlString('<span style="text-decoration:line-through">'.e(self::tien($record->price_original)).'</span> · giá KM'),
+                        (bool) $record->price_child => 'Trẻ em '.self::tien($record->price_child),
+                        default => null,
+                    })
                     ->color(fn (AllianceDeparture $record) => $record->price_original ? 'danger' : null)
                     ->sortable(),
                 TextColumn::make('commission')

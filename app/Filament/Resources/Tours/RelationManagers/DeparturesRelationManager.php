@@ -1,18 +1,25 @@
 <?php
 
 namespace App\Filament\Resources\Tours\RelationManagers;
-use Modules\Tour\Models\TourDeparture;
-use Filament\Schemas\Components\Utilities\Get;
+
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
+use Modules\Alliance\Models\AllianceDeparture;
+use Modules\Alliance\Services\DongBoLienMinh;
+use Modules\Tour\Models\TourDeparture;
 
 class DeparturesRelationManager extends RelationManager
 {
@@ -52,7 +59,7 @@ class DeparturesRelationManager extends RelationManager
 
                             if ($daCo) {
                                 $fail('Tour này đã có đợt khởi hành ngày '
-                                    .\Illuminate\Support\Carbon::parse($value)->format('d/m/Y')
+                                    .Carbon::parse($value)->format('d/m/Y')
                                     .'. Chọn ngày khác hoặc sửa đợt đã có.');
                             }
                         };
@@ -74,6 +81,17 @@ class DeparturesRelationManager extends RelationManager
             TextInput::make('price_override')
                 ->label('Giá riêng đợt này')
                 ->helperText('Để trống nếu dùng giá mặc định của tour')
+                ->numeric()
+                ->suffix('₫'),
+            // Giá trẻ em / em bé riêng của đợt (sheet đối tác ghi giá từng ngày)
+            TextInput::make('child_price_override')
+                ->label('Giá trẻ em riêng đợt này')
+                ->helperText('Để trống = giá trẻ em của tour')
+                ->numeric()
+                ->suffix('₫'),
+            TextInput::make('infant_price_override')
+                ->label('Giá em bé riêng đợt này')
+                ->helperText('Để trống = giá em bé của tour')
                 ->numeric()
                 ->suffix('₫'),
             TextInput::make('seats_total')
@@ -116,19 +134,48 @@ class DeparturesRelationManager extends RelationManager
         return $n > 0 ? "trước ngày khởi hành {$n} ngày" : null;
     }
 
-    /** @var array<string,string>|null ngày => "Theo sheet: ..." (nạp 1 lần cho cả bảng) */
+    /** @var array<string,AllianceDeparture>|null ngày => ngày đi trong sheet (nạp 1 lần cho cả bảng) */
     private ?array $ngayLienMinh = null;
 
     private function ngayLienMinh(): array
     {
-        return $this->ngayLienMinh ??= \Modules\Alliance\Models\AllianceDeparture::query()
+        return $this->ngayLienMinh ??= AllianceDeparture::query()
             ->where('alliance_tour_id', $this->getOwnerRecord()->alliance_tour_id)
             ->whereNotNull('departure_date')
             ->get()
-            ->mapWithKeys(fn ($d) => [$d->departure_date->toDateString() => 'Theo sheet: '.($d->status === 'con_cho'
-                ? "còn {$d->seats_left}"
-                : mb_strtolower(\Modules\Alliance\Models\AllianceDeparture::TRANG_THAI[$d->status] ?? $d->status))])
+            ->keyBy(fn ($d) => $d->departure_date->toDateString())
             ->all();
+    }
+
+    /** "Theo sheet: còn 5" / "Theo sheet: còn nhận" / "Theo sheet: hết chỗ" */
+    private function choTheoSheet(TourDeparture $dot): string
+    {
+        $d = $this->ngayLienMinh()[$dot->start_date->toDateString()] ?? null;
+        if (! $d) {
+            return 'Sheet không có ngày này';
+        }
+
+        return 'Theo sheet: '.($d->status === 'con_cho'
+            ? ($d->seats_left !== null ? "còn {$d->seats_left}" : 'còn nhận')
+            : mb_strtolower(AllianceDeparture::TRANG_THAI[$d->status] ?? $d->status));
+    }
+
+    /** Dưới cột giá riêng: giá trẻ em / em bé riêng, và giá đang theo sheet hay đã sửa tay. */
+    private function moTaGia(TourDeparture $dot): ?string
+    {
+        $vnd = fn (?int $v) => $v !== null ? number_format($v, 0, ',', '.').'₫' : null;
+        $phan = array_filter([
+            $dot->child_price_override !== null ? 'Trẻ em '.$vnd($dot->child_price_override) : null,
+            $dot->infant_price_override !== null ? 'Em bé '.$vnd($dot->infant_price_override) : null,
+        ]);
+        $d = $this->getOwnerRecord()->alliance_tour_id ? ($this->ngayLienMinh()[$dot->start_date->toDateString()] ?? null) : null;
+        if ($d && $d->price && ! $d->price_net && $dot->price_override !== null) {
+            $phan[] = $dot->price_override === $d->price ? 'theo sheet' : 'sửa tay (sheet '.$vnd($d->price).')';
+        } elseif ($d && $d->price_net) {
+            $phan[] = 'sheet ghi giá NET '.$vnd($d->price);
+        }
+
+        return $phan ? implode(' · ', $phan) : null;
     }
 
     public function table(Table $table): Table
@@ -162,11 +209,12 @@ class DeparturesRelationManager extends RelationManager
                 TextColumn::make('price_override')
                     ->label('Giá riêng')
                     ->money('VND')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->description(fn (TourDeparture $record): ?string => $this->moTaGia($record)),
                 TextColumn::make('seats_total')->label('Tổng chỗ'),
                 TextColumn::make('seats_left')->label('Còn')
                     ->description(fn (TourDeparture $record): ?string => $this->getOwnerRecord()->alliance_tour_id
-                        ? ($this->ngayLienMinh()[$record->start_date->toDateString()] ?? 'Sheet không có ngày này')
+                        ? $this->choTheoSheet($record)
                         : null),
                 TextColumn::make('status')
                     ->label('Trạng thái')
@@ -187,20 +235,22 @@ class DeparturesRelationManager extends RelationManager
                 CreateAction::make()->label('Thêm đợt khởi hành'),
                 // Tour đã nối với tour liên minh: thêm một lần mọi ngày đi trong
                 // sheet đối tác mà web chưa có, kèm số chỗ theo sheet.
-                \Filament\Actions\Action::make('layTuLienMinh')
+                Action::make('layTuLienMinh')
                     ->label('Lấy ngày đi từ liên minh')
-                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedArrowDownTray)
+                    ->icon(Heroicon::OutlinedArrowDownTray)
                     ->color('gray')
                     ->visible(fn (): bool => (bool) $this->getOwnerRecord()->alliance_tour_id
                         && auth()->user()?->can('create', TourDeparture::class))
                     ->requiresConfirmation()
-                    ->modalDescription('Thêm các ngày khởi hành có trong sheet đối tác mà tour này chưa có. Ngày đã có thì giữ nguyên; ngày sheet không ghi số chỗ thì bỏ qua.')
+                    ->modalDescription('Thêm các ngày khởi hành có trong sheet đối tác mà tour này chưa có, kèm số chỗ và giá từng ngày; ngày đã có thì cập nhật số chỗ / giá theo sheet (giá bạn tự sửa thì giữ). Sheet không ghi số chỗ thì lấy số chỗ mặc định của đối tác. Máy cũng tự làm việc này mỗi lần đọc sheet.')
                     ->action(function (): void {
-                        $kq = app(\Modules\Alliance\Services\DongBoLienMinh::class)->themNgayDi($this->getOwnerRecord());
-                        \Filament\Notifications\Notification::make()
+                        $dv = app(DongBoLienMinh::class);
+                        $doi = $dv->capNhatTourPsv([$this->getOwnerRecord()->alliance_tour_id]);
+                        $kq = $dv->themNgayDi($this->getOwnerRecord());
+                        Notification::make()
                             ->success()
                             ->title($kq['them'] ? "Đã thêm {$kq['them']} ngày khởi hành" : 'Không có ngày mới để thêm')
-                            ->body($kq['bo_qua'] ? "Bỏ qua {$kq['bo_qua']} ngày vì sheet không ghi số chỗ." : null)
+                            ->body($doi ? "Cập nhật số chỗ / giá {$doi} ngày đã có." : null)
                             ->send();
                     }),
             ])

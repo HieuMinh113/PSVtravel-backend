@@ -2,17 +2,21 @@
 
 namespace App\Filament\Resources\Tours\Schemas;
 
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\Str;
+use App\Filament\Resources\AllianceDepartures\Tables\AllianceDeparturesTable;
+use App\Services\TepTaiLen;
+use App\Services\YouTube;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
+use Modules\Alliance\Models\AllianceTour;
 use Modules\Tour\Models\Tour;
 
 class TourForm
@@ -33,9 +37,9 @@ class TourForm
     /** Tìm tour liên minh theo tên tour / tên đối tác cho ô chọn. */
     private static function timTourLienMinh(string $tim): array
     {
-        $like = \App\Filament\Resources\AllianceDepartures\Tables\AllianceDeparturesTable::like();
+        $like = AllianceDeparturesTable::like();
 
-        return \Modules\Alliance\Models\AllianceTour::query()
+        return AllianceTour::query()
             ->with('source')
             ->withCount(['departures' => fn ($q) => $q->whereDate('departure_date', '>=', today())])
             ->where(fn ($q) => $q->where('name', $like, "%{$tim}%")
@@ -175,7 +179,7 @@ class TourForm
                     ->default(0)
                     ->required()
                     ->rules([
-                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                        fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                             $ngay = (int) $get('duration_days');
                             if ((int) $value > $ngay) {
                                 $fail('Số đêm không được nhiều hơn số ngày.');
@@ -200,7 +204,7 @@ class TourForm
                     ->minValue(0)
                     ->suffix('₫')
                     ->rules([
-                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                        fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                             $nguoiLon = (int) $get('adult_price');
                             if ($value !== null && $value !== '' && (int) $value > $nguoiLon) {
                                 $fail('Giá trẻ em không được cao hơn giá người lớn.');
@@ -214,7 +218,7 @@ class TourForm
                     ->minValue(0)
                     ->suffix('₫')
                     ->rules([
-                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                        fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                             if ($value !== null && $value !== '' && (int) $value > (int) $get('adult_price')) {
                                 $fail('Giá em bé không được cao hơn giá người lớn.');
                             }
@@ -229,7 +233,7 @@ class TourForm
                     ->rules([
                         // Giá gốc thấp hơn giá bán thì trang tour sẽ hiện "giảm giá âm" —
                         // khách nhìn thấy là mất tin ngay. Chặn từ lúc nhập.
-                        fn (\Filament\Schemas\Components\Utilities\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                        fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
                             if ($value === null || $value === '') {
                                 return;
                             }
@@ -247,7 +251,7 @@ class TourForm
                     ->maxLength(255),
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
+                    ->image()->acceptedFileTypes(TepTaiLen::ANH)
                     ->directory('tours')
                     ->disk('public'),
 
@@ -258,7 +262,7 @@ class TourForm
                     ->placeholder('https://www.youtube.com/watch?v=...')
                     ->helperText('Dán link video quay cảnh tour. Hiện ngay dưới ảnh bìa trên trang tour. Để trống nếu chưa có.')
                     ->maxLength(255)
-                    ->rules([\App\Services\YouTube::quyTac()]),
+                    ->rules([YouTube::quyTac()]),
 
                 TagsInput::make('highlights')
                     ->label('Điểm nổi bật')
@@ -359,10 +363,10 @@ class TourForm
                 Select::make('alliance_tour_id')
                     ->label('Lấy số chỗ theo tour liên minh')
                     ->placeholder('Không nối — tự nhập số chỗ')
-                    ->helperText('Chọn tour tương ứng trong sheet đối tác. Ngày đi nào trùng ngày trong sheet sẽ tự cập nhật “Còn N chỗ” trên website; ngày sheet ghi FULL / huỷ / tạm ngưng thì web tự hết chỗ. Gõ tên tour hoặc đối tác để tìm.')
+                    ->helperText('Chọn tour tương ứng trong sheet đối tác. Lịch khởi hành tự lấy theo sheet: thêm ngày đi mới, cập nhật “Còn N chỗ” và giá riêng từng ngày (người lớn / trẻ em / em bé); ngày sheet ghi FULL / huỷ / tạm ngưng thì web tự hết chỗ. Giá bạn tự sửa thì giữ nguyên. Gõ tên tour hoặc đối tác để tìm.')
                     ->searchable()
                     ->getSearchResultsUsing(fn (string $search): array => self::timTourLienMinh($search))
-                    ->getOptionLabelUsing(fn ($value): ?string => \Modules\Alliance\Models\AllianceTour::with('source')->find($value)?->nhan())
+                    ->getOptionLabelUsing(fn ($value): ?string => AllianceTour::with('source')->find($value)?->nhan())
                     ->visible(fn (): bool => (bool) auth()->user()?->can('ViewAny:AllianceDeparture'))
                     ->columnSpanFull(),
             ]);

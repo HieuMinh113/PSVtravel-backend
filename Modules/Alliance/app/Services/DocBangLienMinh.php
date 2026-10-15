@@ -143,6 +143,7 @@ class DocBangLienMinh
         $coBang = (bool) $cot;
         $tuaBang = null;       // dòng tựa gộp ngang phía trên bảng
         $tuaTen = null;        // phần tên tour lấy từ dòng tựa (HIGO: "QUÝ CHÂU - TRÙNG KHÁNH 5N4Đ")
+        $noiDungDau = [];      // khoá tour => nội dung ô tên của khối gặp đầu tiên trong tab
 
         // Lưới thưa (bỏ dòng trống) → chạy tới chỉ số dòng cuối, không phải count().
         $soDong = $luoi ? max(array_keys($luoi)) + 1 : 0;
@@ -210,7 +211,19 @@ class DocBangLienMinh
             }
 
             $thongTin = $this->thongTinDong($o, $cot, $muc, $tenNguCanh, $tuaTen);
-            $khoaTour = $this->khoaTour($thongTin['ten_tour'], $thongTin['hang_bay'], $thongTin['thoi_gian']);
+            $khoaTour = $this->khoaTour($thongTin['ten_khoa'], $thongTin['hang_bay'], $thongTin['thoi_gian']);
+            unset($thongTin['ten_khoa']);
+            // Hai khối cùng tên trong một tab mà nội dung khác nhau là hai chương trình
+            // (Hanvina: "BẮC KINH - CỔ BẮC THỦY TRẤN" thường / Vĩnh Lạc Cung Yến / trượt
+            // tuyết). Khối gặp đầu tiên giữ khoá cũ — tour PSV đã nối không mất liên kết.
+            if ($thongTin['chi_tiet'] !== null) {
+                $noiDung = $this->chuanHoa($thongTin['chi_tiet']);
+                $dau = $noiDungDau[$khoaTour] ??= ['nd' => $noiDung, 'chu' => $thongTin['chi_tiet']];
+                if ($dau['nd'] !== $noiDung) {
+                    $khoaTour = substr(sha1($khoaTour.'|'.$noiDung), 0, 20);
+                    $thongTin['ten_tour'] = $this->catDai($thongTin['ten_tour'].' ('.$this->dongKhacBiet($thongTin['chi_tiet'], $dau['chu']).')', 250);
+                }
+            }
 
             [$cacNgay, $tuan, $thangMoi] = $this->ngayCuaDong($o, $cot, $thangTheoTour[$khoaTour] ?? null);
             if ($thangMoi) {
@@ -218,7 +231,9 @@ class DocBangLienMinh
             }
             if (! $cacNgay && ! $tuan) {
                 $chiThang = ($x = $this->chuONgay($o, $cot)) && $this->thangTrongO($x) && ! preg_match('/\d\D+\d/', preg_replace('/^\s*\S+\s*\d{1,2}/u', '', $x));
-                if (! $chiThang && count($khongHieu) < self::SO_KHONG_HIEU_TOI_DA && ($chuNgay = $this->chuONgay($o, $cot)) && preg_match('/(?<!\d)\d{1,2}(?!\d)/', $chuNgay)) {
+                // (ô ghi giờ bay "HO1328 01:20 ~ 06:35" không phải ô ngày)
+                if (! $chiThang && count($khongHieu) < self::SO_KHONG_HIEU_TOI_DA && ($chuNgay = $this->chuONgay($o, $cot)) && preg_match('/(?<!\d)\d{1,2}(?!\d)/', $chuNgay)
+                    && ! preg_match('/\d{1,2}:\d{2}/', $chuNgay)) {
                     $khongHieu[] = ['dong' => $r + 1, 'chu' => $this->catDai($this->motDong($chuNgay), 80)];
                 }
 
@@ -232,7 +247,7 @@ class DocBangLienMinh
             }
             $chung = $thongTin + [
                 'tab' => $tenTab,
-                'muc' => $muc ?? $thongTin['nhom'] ?? ($tuaTen ? $tuaBang : null),
+                'muc' => $tuaTen ? $tuaBang : ($muc ?? $thongTin['nhom']),
                 'khoa_tour' => $khoaTour,
                 'dong_sheet' => $r + 1,
                 'lich_tuan' => null,
@@ -245,14 +260,18 @@ class DocBangLienMinh
             }
 
             $namThang = $this->timNamTrongOThang($this->chu($o, $cot['thang'] ?? []));
+            $chuOThang = (string) $this->chuONgay($o, $cot);
             foreach ($cacNgay as [$d, $m, $y, $do, $chuDong]) {
+                // Ghi chú trong ngoặc cạnh ngày: "21/10/2026 (chỉ nhận khách có VISA)",
+                // "Tháng 12: 31 (TẾT DƯƠNG)" — ô chỉ có một ngày thì lấy cả ô
+                $ghiChuNgay = $this->trongNgoac(count($cacNgay) === 1 ? $chuOThang : $chuDong);
                 $choSuyNam[$khoaTour][] = [
                     'ng' => [$d, $m, $y ?? $this->namTheoTet($d, $m, $chuDong, $ngayCapNhat ?? $this->homNay)],
                     'nam_thang' => $namThang,
                     'nam_muc' => $namMuc ?? $namTab,
                     'moc' => $ngayCapNhat ?? $this->homNay,
                     'do' => $do,
-                    'dong' => $chung,
+                    'dong' => $ghiChuNgay ? ['ghi_chu' => $this->noiGhiChu($chung['ghi_chu'], $ghiChuNgay)] + $chung : $chung,
                 ];
             }
         }
@@ -277,15 +296,22 @@ class DocBangLienMinh
             }
         }
 
+        // Tab bảng phí visa (Triều Hảo "VISA", Việt Việt "DỊCH VỤ VISA LẺ") — không phải
+        // lịch khởi hành: bỏ qua, không báo lỗi
+        $dauTab = $tenTab;
+        foreach (array_slice($luoi, 0, 6) as $hang) {
+            $dauTab .= ' '.implode(' ', array_column($hang, 'chu'));
+        }
+        $bangVisa = ! $coBang && preg_match('/\bVISA\b/', $this->chuanHoa($dauTab));
         $this->baoCao[] = [
             'tab' => $tenTab,
-            'tinh_trang' => $coBang ? 'da_doc' : 'khong_co_bang',
+            'tinh_trang' => $coBang ? 'da_doc' : ($bangVisa ? 'bang_visa' : 'khong_co_bang'),
             'so_ngay' => count($ketQua),
             'cot_tay' => (bool) $banDoTay,
             'mau_do' => $doLaHet,
             'khong_hieu' => $khongHieu,
         ];
-        if (! $coBang && $soDong > 0) {
+        if (! $coBang && ! $bangVisa && $soDong > 0) {
             $this->canhBao[] = "Tab “{$tenTab}”: không tìm thấy dòng tiêu đề có cột ngày khởi hành.";
         }
 
@@ -535,7 +561,7 @@ class DocBangLienMinh
             // HIGO "TOUR LỄ + NOTED": cột ghi biến thể chương trình ("CHƯƠNG TRÌNH KIM PHẬT
             // SƠN", "TẾT TÂY + …"), tên tuyến nằm ở dòng tựa trên bảng
             [$a, $b] = $nhan[$cot['nhom'][0]];
-            if (str_starts_with($b !== '' ? $b : $a, 'TOUR ')) {
+            if (preg_match('/^(TOUR|NOTE) /', $b !== '' ? $b : $a)) { // "TOUR LỄ + NOTED", "NOTE TOUR"
                 $cot['_ten_bien_the'] = [];
             }
             $cot['ten'] = $cot['nhom'];
@@ -637,6 +663,10 @@ class DocBangLienMinh
         // HIGO: "THỨ TỰ ĐOÀN" — 2 đoàn cùng ngày đi ghi 2 dòng "ĐOÀN 1", "ĐOÀN 2"
         if ($co($cuoi, 'THU TU DOAN', 'SO DOAN', 'DOAN SO') || $cuoi === 'DOAN') {
             return ['doan', 1];
+        }
+        // HIGO: "KÍ HIỆU SHOP" — NO SHOP / SHOP là hai sản phẩm khác nhau
+        if (in_array($cuoi, ['SHOP', 'KI HIEU SHOP', 'KY HIEU SHOP', 'LOAI SHOP'], true)) {
+            return ['shop', 1];
         }
         if ($co($cuoi, 'NHAN', 'CON CHO', 'CON LAI', 'CHO TRONG', 'CON NHAN')) {
             return ['con_cho', 1];
@@ -750,7 +780,7 @@ class DocBangLienMinh
             return null;
         }
         $ten = substr($tua, 0, $m[0][1] + strlen($m[0][0]));
-        $ten = preg_replace('/^\s*(?:CHƯƠNG TRÌNH\s+)?(?:TOUR\s+)?(?:NO\s*-?\s*SHOP(?:PING)?\s+)?/iu', '', $ten);
+        $ten = preg_replace('/^\s*(?:CHƯƠNG TRÌNH\s+)?(?:TOUR\s+)?(?:TUYẾN\s+)?(?:NO\s*-?\s*SHOP(?:PING)?\s+)?/iu', '', $ten);
         $ten = preg_replace('/^[\s\-–:|]+|[\s\-–:|]+$/u', '', $ten);
 
         return $ten !== '' ? $this->catDai($ten, 150) : null;
@@ -771,10 +801,19 @@ class DocBangLienMinh
     private function thongTinDong(array $o, array $cot, ?string $muc, ?string $tenNguCanh, ?string $tuaTen = null): array
     {
         $oTen = $this->o($o, $cot['ten'] ?? []);
-        [$ten, $chiTiet] = $oTen ? $this->tachTen($oTen['chu']) : [null, null];
+        // $tenKhoa: tên theo cách đọc cũ, chỉ dùng làm khoá — đổi cách làm gọn tên
+        // hiển thị không được làm đổi khoá (tour PSV đã nối sẽ mất liên kết)
+        [$tenKhoa, $chiTiet, $ten] = $oTen ? $this->tachTen($oTen['chu']) : [null, null, null];
+        $tenKhoa ??= $tenNguCanh;
         $ten ??= $tenNguCanh;
+        $bienThe = null;
         if ($tuaTen) {
-            $ten = $ten ? "{$tuaTen} – {$ten}" : $tuaTen;
+            // HIGO: cột "TOUR LỄ + NOTED" / "NOTE TOUR" ghi khuyến mãi, biến thể ("KHUYẾN
+            // MÃI SỐC", "TẾT TÂY + …") → ghi chú của ngày. Tour = tuyến ở dòng tựa + SHOP / NO SHOP.
+            $bienThe = $oTen ? $this->motDong($oTen['chu']) : null;
+            $shop = ($x = $this->chu($o, $cot['shop'] ?? [])) ? mb_strtoupper($this->motDong($x)) : null;
+            $ten = $tenKhoa = $tuaTen.($shop ? " – {$shop}" : '');
+            $chiTiet = null;
         }
         $hang = $this->chu($o, $cot['hang_bay'] ?? []) ?: $this->timHangBay($chiTiet);
         $linkChu = null;
@@ -795,6 +834,7 @@ class DocBangLienMinh
                 : '';
             $ten = trim(($muc ?? $nhom ?? '').($nhan !== '' ? ' – '.$nhan : ''), ' –') ?: 'Tour';
         }
+        $tenKhoa ??= $ten;
 
         $chuGhiChu = $this->chu($o, $cot['ghi_chu'] ?? []);
         $chuCon = $this->chu($o, $cot['con_cho'] ?? []);
@@ -822,18 +862,18 @@ class DocBangLienMinh
                 $chuTinhTrang[] = $x['chu'];
             }
         }
-
-        $oGia = $this->o($o, $cot['gia'] ?? []);
-        $gia = $this->tien($oGia);
-        $giaNiemYet = null;
-        // Giá cũ gạch ngang + giá mới cùng một ô ("15990000" gạch ⏎ "14.990.000" — HIGO)
-        if ($oGia && $oGia['gach']) {
-            $cu = $this->tien(['chu' => implode(' ', $oGia['gach'])] + $oGia);
-            $moi = $this->tien(['chu' => trim(str_replace($oGia['gach'], '', $oGia['chu']))] + $oGia);
-            if ($cu && $moi && $moi < $cu) {
-                [$gia, $giaNiemYet] = [$moi, $cu];
+        // Chữ khác trong các cột chỗ ("ĐẨY GẤP", "CHECK OP" — HIGO) → ghi chú
+        $ghiChuCho = [];
+        foreach (['con_cho', 'tong_cho', 'da_chot', 'dang_giu'] as $vaiTro) {
+            $x = $this->o($o, $cot[$vaiTro] ?? []);
+            if ($x && $x['so'] === null && ! preg_match('/\d/', $x['chu']) && ! $this->laChuTinhTrang($x['chu'])) {
+                $ghiChuCho[] = $this->motDong($x['chu']);
             }
         }
+
+        $oGia = $this->o($o, $cot['gia'] ?? []);
+        // Giá cũ gạch ngang + giá mới cùng một ô ("15990000" gạch ⏎ "14.990.000" — HIGO)
+        [$gia, $giaNiemYet] = $this->giaTrongO($oGia);
         $oKm = $this->o($o, $cot['gia_km'] ?? []);
         $giaKm = $this->tien($oKm);
         // Giá KM hợp lệ phải thấp hơn giá gốc và không thấp vô lý (< 30%).
@@ -852,6 +892,7 @@ class DocBangLienMinh
 
         return [
             'ten_tour' => $this->catDai($ten, 250),
+            'ten_khoa' => $tenKhoa,
             'chi_tiet' => $chiTiet ? $this->catDai($chiTiet, 1000) : null,
             'thoi_gian' => $this->chu($o, $cot['thoi_gian'] ?? []) ?: $this->timThoiGian(($oTen['chu'] ?? '')."\n".$ten),
             'hang_bay' => $hang ? $this->catDai($hang, 500) : null,
@@ -860,15 +901,17 @@ class DocBangLienMinh
             'gia' => $gia,
             'gia_niem_yet' => $giaNiemYet,
             'gia_goc' => $oGia ? $this->catDai($oGia['chu'], 120) : null,
-            'gia_tre_em' => $this->tien($this->o($o, $cot['gia_tre_em'] ?? [])),
-            'gia_em_be' => $this->tien($this->o($o, $cot['gia_em_be'] ?? [])),
+            // VNA ghi "NET THU VỀ 19.390.000": giá net, không phải giá bán cho khách
+            'gia_net' => $oGia && preg_match('/\bNET\b/', $this->chuanHoa($oGia['chu'])),
+            'gia_tre_em' => $this->giaTrongO($this->o($o, $cot['gia_tre_em'] ?? []))[0],
+            'gia_em_be' => $this->giaTrongO($this->o($o, $cot['gia_em_be'] ?? []))[0],
             'hoa_hong' => $this->tien($this->o($o, $cot['hoa_hong'] ?? [])),
             'tong_cho' => $tong,
             'da_chot' => $chot,
             'dang_giu' => $giu,
             'con_cho' => $con,
             'trang_thai' => $this->trangThai($con, $chuGhiChu, $chuCon, array_filter($chuTinhTrang)),
-            'ghi_chu' => $chuGhiChu ? $this->catDai($chuGhiChu, 500) : null,
+            'ghi_chu' => $this->noiGhiChu($bienThe, $chuGhiChu, ...$ghiChuCho),
             'link_chuong_trinh' => $link,
             'han_visa' => $this->chu($o, $cot['han_visa'] ?? []) ?: null,
             'doan' => ($x = $this->chu($o, $cot['doan'] ?? [])) ? $this->catDai($this->motDong($x), 40) : null,
@@ -880,7 +923,7 @@ class DocBangLienMinh
      * → tên = các dòng đầu cho tới khi gặp dòng chú thích / hãng bay / số hiệu
      * chuyến; phần còn lại là chi tiết.
      *
-     * @return array{0: ?string, 1: ?string}
+     * @return array{0: ?string, 1: ?string, 2: ?string} [tên làm khoá, chi tiết, tên hiển thị]
      */
     private function tachTen(string $chu): array
     {
@@ -895,7 +938,80 @@ class DocBangLienMinh
         $phanTen = trim(implode(' – ', $ten));
         $phanTen = preg_replace('/^\d+\s*[\.\)]\s*(?=\D)/u', '', $phanTen); // "9. THƯỢNG HẢI" → "THƯỢNG HẢI"
 
-        return [$phanTen ?: null, count($dong) > count($ten) ? implode("\n", $dong) : null];
+        // Tên hiển thị: bỏ dòng phụ ("Thời gian: 06 Ngày 05 Đêm", "NGÀY TRÊN LKH LÀ NGÀY
+        // BAY", "#Tập trung sân bay…", "+ 2 đêm…") và gạch nối thừa "HÀNG CHÂU – – Ô TRẤN"
+        $gon = array_filter($ten, fn ($d, $i) => $i === 0 || ! $this->laDongPhu($d), ARRAY_FILTER_USE_BOTH);
+        $tenGon = preg_replace(['/^\d+\s*[\.\)]\s*(?=\D)/u', '/\s*[–-]\s*(?:[–-]\s*)+/u'], ['', ' – '], implode(' – ', $gon));
+        $tenGon = preg_replace('/^[\s–\-"“”\']+|[\s–\-"“”\']+$/u', '', $tenGon);
+
+        return [$phanTen ?: null, count($dong) > count($ten) ? implode("\n", $dong) : null, ($tenGon ?: $phanTen) ?: null];
+    }
+
+    /** Dòng phụ trong ô tên: ghi chú thời gian, mốc ngày bay, gạch đầu dòng "#", "+", "*". */
+    private function laDongPhu(string $d): bool
+    {
+        return (bool) preg_match('/^[#+*•]/u', $d) || (bool) preg_match('/^(THOI GIAN|NGAY TREN LKH|NGAY TREN LICH)/', $this->chuanHoa($d));
+    }
+
+    /** Giá trong ô; giá cũ gạch ngang + giá mới cùng ô → [giá mới, giá cũ]. */
+    private function giaTrongO(?array $o): array
+    {
+        $gia = $this->tien($o);
+        if ($o && ($o['gach'] ?? [])) {
+            $cu = $this->tien(['chu' => implode(' ', $o['gach'])] + $o);
+            $moi = $this->tien(['chu' => trim(str_replace($o['gach'], '', $o['chu']))] + $o);
+            if ($cu && $moi && $moi < $cu) {
+                return [$moi, $cu];
+            }
+        }
+
+        return [$gia, null];
+    }
+
+    /** Ô chỗ chỉ ghi tình trạng ("Full", "Còn nhận", "ĐÓNG", "-"…), không phải ghi chú. */
+    private function laChuTinhTrang(string $chu): bool
+    {
+        $k = $this->chuanHoa($chu);
+
+        return $k === '' || (bool) preg_match('/^(FULL|HET CHO|HET|DONG|DONG DOAN|DA DONG DOAN|SOLD OUT|HUY|HUY DOAN|HUY TOUR|CANCEL|CANCELLED|TAM NGUNG|TAM NGUNG NHAN KHACH|STOP|CON NHAN|CON NHAN KHACH|CON CHO|NHAN KHACH|DANG NHAN|OPEN|AVAILABLE)$/', $k);
+    }
+
+    /** Các đoạn trong ngoặc của một ô ngày: "21/10/2026 (chỉ nhận khách có VISA)" → "chỉ nhận khách có VISA". */
+    private function trongNgoac(string $chu): ?string
+    {
+        preg_match_all('/\(([^()]*)\)/u', $chu, $m);
+        // "02(26AL)" → "26 âm lịch"
+        $ds = array_filter(array_map(fn ($x) => preg_replace('/^(\d{1,2})\s*AL$/iu', '$1 âm lịch', $this->motDong($x)), $m[1]), fn ($x) => $x !== '');
+
+        return $ds ? implode(' · ', array_unique($ds)) : null;
+    }
+
+    /** Nối các ghi chú (bỏ trống, bỏ trùng), tối đa 500 ký tự. */
+    private function noiGhiChu(?string ...$phan): ?string
+    {
+        $ra = [];
+        foreach ($phan as $x) {
+            $x = $x === null ? '' : trim($x);
+            if ($x !== '' && ! collect($ra)->contains(fn ($y) => str_contains(mb_strtoupper($y), mb_strtoupper($x)))) {
+                $ra[] = $x;
+            }
+        }
+
+        return $ra ? $this->catDai(implode(' · ', $ra), 500) : null;
+    }
+
+    /** Dòng đầu tiên của ô tên khác với khối cùng tên gặp trước — để phân biệt hai chương trình. */
+    private function dongKhacBiet(string $chiTiet, string $chiTietDau): string
+    {
+        $dau = array_map(fn ($d) => $this->chuanHoa($d), explode("\n", $chiTietDau));
+        foreach (explode("\n", $chiTiet) as $d) {
+            $d = trim($d);
+            if ($d !== '' && ! in_array($this->chuanHoa($d), $dau, true)) {
+                return $this->catDai(preg_replace('/^[#+*•\-\s]+/u', '', $d), 60);
+            }
+        }
+
+        return 'chương trình khác';
     }
 
     private function laDongChiTiet(string $d): bool
@@ -1699,7 +1815,8 @@ class DocBangLienMinh
         $nhan = ['con_cho' => 'còn chỗ', 'het_cho' => 'hết chỗ', 'huy' => 'huỷ', 'tam_ngung' => 'tạm ngưng', 'lien_he' => 'liên hệ'];
         $uuTien = ['con_cho', 'lien_he', 'tam_ngung', 'het_cho', 'huy'];
         $tinhTrang = array_column($doan, 'trang_thai');
-        $gop = $doan[0];
+        // giá, link… lấy theo đoàn còn nhận khách (đoàn hết chỗ không bán được)
+        $gop = collect($doan)->firstWhere('trang_thai', 'con_cho') ?? $doan[0];
         $gop['trang_thai'] = collect($uuTien)->first(fn ($t) => in_array($t, $tinhTrang, true)) ?? $gop['trang_thai'];
         $mo = array_filter($doan, fn ($d) => $d['trang_thai'] === 'con_cho');
         // số chỗ còn: cộng các đoàn còn nhận — chỉ khi đoàn nào cũng ghi số

@@ -354,6 +354,82 @@ class MauSheetLienMinh
         return self::luu($s, 'higo');
     }
 
+    /**
+     * HIGO tab Thượng Hải: cột "NOTE TOUR" là khuyến mãi ("KHUYẾN MÃI SỐC"), "KÍ HIỆU
+     * SHOP", "KÝ HIỆU HÃNG BAY" (MU / HO / 9G), giá người lớn + trẻ em gạch ngang, cột
+     * "ĐANG GIỮ" ghi chữ "ĐẨY GẤP" / "CHECK OP". Kèm tab bảng phí visa (Triều Hảo).
+     */
+    public static function higoThuongHai(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('THƯỢNG HẢI-TÂY SÁCH 5 SAO');
+        $t->setCellValue('B1', "CHƯƠNG TRÌNH TOUR TUYẾN THƯỢNG HẢI - HÀNG CHÂU - TÔ CHÂU - TÂY SÁCH Ô TRẤN 5N5Đ + MÌ CUA LÔNG\nCHƯƠNG TRÌNH 5 SAO")->mergeCells('B1:M1');
+        $t->fromArray(['NOTE TOUR', 'KÍ HIỆU SHOP', 'KÝ HIỆU HÃNG BAY', 'THÁNG', 'KHỞI HÀNH', "NGƯỜI LỚN\n(Từ 11T)", "TRẺ EM\n(2T - <11T)", "SƠ SINH\n(<2T)",
+            'SỐ CHỖ', 'ĐANG GIỮ', "HOA HỒNG\nĐỐI TÁC", 'Link chương trình', 'DEADLINE VISA'], null, 'A2');
+        $t->setCellValue('B3', 'HO1328 01:20 ~ 06:35 - HO1327 21:00 ~ 00:25')->mergeCells('B3:H3');
+        $t->setCellValue('I3', 'GIỜ BAY MU TÙY VÀO TỪNG NGÀY')->mergeCells('I3:M3');
+        $t->setCellValue('B4', 'NGÀY KHỞI HÀNH TÍNH THEO GIỜ MÁY BAY CẤT CÁNH')->mergeCells('B4:M4');
+        $t->setCellValue('F5', 'GIÁ TOUR (VNĐ/KHÁCH)')->mergeCells('F5:H5');
+        $laVang = 'MÙA LÁ VÀNG TẶNG MÌ CUA LÔNG';
+        foreach ([
+            6 => [$laVang, 'NO SHOP', 'MU', 'THÁNG 10', 20, ['20.990.000', '18.990.000'], 18990000, 9990000, 'Full', 'ĐẨY GẤP', 500000],
+            7 => ['KHUYẾN MÃI SỐC', 'NO SHOP', 'HO', 'THÁNG 10', 22, ['20.990.000', '16.990.000'], 16990000, 9990000, 'CHECK OP', 'CHECK OP', 200000],
+            8 => [$laVang, 'NO SHOP', 'MU', 'THÁNG 10', 29, ['19.990.000', '17.990.000'], 17990000, 9990000, 'Còn nhận', 'ĐẨY GẤP', 500000],
+            9 => [$laVang, 'SHOP', 'HO', 'THÁNG 11', 7, ['17,990,000', '16,990,000'], 16990000, 8990000, 'Còn nhận', null, 500000],
+            10 => [$laVang, 'NO SHOP', 'MU', 'THÁNG 11', 7, ['19.990.000', '18.590.000'], ['18,990,000', '18,590,000'], 9990000, 'Còn nhận', null, 500000],
+            11 => ['TH 9G 6N5D: BỔ SUNG', 'NO SHOP', '9G', 'THÁNG 11', 10, 15990000, 14990000, 6990000, 'Còn nhận', null, 500000],
+        ] as $r => $dong) {
+            $t->fromArray(array_map(fn ($v) => is_array($v) ? null : $v, $dong), null, "A$r");
+            foreach (['F' => $dong[5], 'G' => $dong[6]] as $c => $v) {
+                if (is_array($v)) { // giá cũ gạch ngang ⏎ giá mới
+                    $gia = new RichText;
+                    $gia->createTextRun($v[0])->getFont()->setStrikethrough(true);
+                    $gia->createTextRun("\n".$v[1]);
+                    $t->getCell("$c$r")->setValue($gia);
+                }
+            }
+        }
+
+        $visa = $s->createSheet()->setTitle('VISA');
+        $visa->setCellValue('A1', 'VISA FEE - THT - HAN BRANCH')->mergeCells('A1:F1');
+        $visa->fromArray(['STT', 'QUỐC GIA', 'LOẠI VISA', 'THỜI GIAN DỰ KIẾN TỪ NGÀY LÀM HỒ SƠ', 'GIÁ BÁN KHÁCH TRỰC TIẾP (USD)', 'GIÁ BÁN ĐẠI LÝ (USD)'], null, 'A3');
+        $visa->fromArray([1, 'MỸ ( DÁN)', null, 'Theo lịch pvan của ĐSQ', '7.500.000', '6.500.000'], null, 'A4');
+
+        return self::luu($s, 'higo-th');
+    }
+
+    /**
+     * Hanvina: ba chương trình CÙNG TÊN "BẮC KINH - CỔ BẮC THỦY TRẤN" (thường / Vĩnh Lạc
+     * Cung Yến / trượt tuyết) cùng hãng CA; ô tên có dòng phụ "Thời gian: …"; ô ngày có
+     * ghi chú trong ngoặc.
+     */
+    public static function hanvinaCoBac(): string
+    {
+        $s = new Spreadsheet;
+        $t = $s->getActiveSheet()->setTitle('BẮC KINH');
+        $t->fromArray([null, 'HÀNH TRÌNH', 'LINK CT', 'TIME', 'HÀNG KHÔNG', 'NGÀY KHỞI HÀNH', 'GIÁ TOUR', 'COM', 'SL'], null, 'A1');
+        $t->setCellValue('B2', 'BẮC KINH MONO NO SHOPPING')->mergeCells('B2:I2');
+        $ten = "BẮC KINH - CỔ BẮC THỦY TRẤN\n2 Đêm khách sạn trung tâm\n";
+        foreach ([
+            [3, 4, $ten.'Hái hoa quả theo mùa', [['29/10/2026', '21.490.000', 'Full'], ['31/10/2026', '21.490.000', null]]],
+            [5, 6, $ten."01 bữa Vĩnh Lạc Cung Yến\nCáp treo Vạn Lý Trường Thành", [['01/12/2026', '19.990.000', null], ['31/12/2026', '22.490.000', null]]],
+            [7, 8, $ten."1 đêm khu nghỉ dưỡng trượt tuyết\nTrượt tuyết và tắm suối nóng", [['13/12/2026', '20.990.000', null], ['13/12/2026', '20.990.000', null]]],
+        ] as [$tu, $den, $chu, $ngay]) {
+            $t->setCellValue("B$tu", $chu)->mergeCells("B$tu:B$den");
+            $t->setCellValue("E$tu", 'CA')->mergeCells("E$tu:E$den");
+            foreach ($ngay as $i => [$n, $gia, $sl]) {
+                $t->setCellValueExplicit('F'.($tu + $i), $n, DataType::TYPE_STRING);
+                $t->setCellValue('G'.($tu + $i), $gia)->setCellValue('H'.($tu + $i), '1.200.000')->setCellValue('I'.($tu + $i), $sl);
+            }
+        }
+        $t->setCellValue('B9', "BẮC KINH – THIÊN TÂN\nThời gian: 05 Ngày 04 Đêm");
+        $t->setCellValue('E9', 'CA');
+        $t->setCellValueExplicit('F9', '21/10/2026 (chỉ nhận khách có VISA)', DataType::TYPE_STRING);
+        $t->setCellValue('G9', '17.990.000')->setCellValue('H9', '1.000.000');
+
+        return self::luu($s, 'hanvina-cobac');
+    }
+
     private static function v1TieuDe(Worksheet $t, int $dong, string $tieuDe): void
     {
         $t->setCellValue('A1', $tieuDe)->mergeCells('A1:P1');
