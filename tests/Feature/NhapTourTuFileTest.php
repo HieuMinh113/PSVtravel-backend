@@ -250,6 +250,34 @@ class NhapTourTuFileTest extends TestCase
         $this->assertSame($kq['bao_gom'], $tour->refresh()->included);
     }
 
+    /**
+     * Bảng giá không ghi năm: không lấy năm cũ nhắc đâu đó trong file ("Nghị định …
+     * 2024") — trước đây cả bảng thành 2024, mọi ngày "đã qua" (production).
+     */
+    public function test_bang_gia_khong_ghi_nam_khong_lay_nam_cu_trong_file(): void
+    {
+        $dong = fn (string $chu, bool $dam = false) => ['loai' => 'chu', 'chu' => $chu, 'dam' => $dam, 'gach' => false, 'o' => null];
+        $hang = fn (array $o) => ['loai' => 'chu', 'chu' => implode(' | ', $o), 'dam' => false, 'gach' => false, 'o' => $o];
+        $tour = fn (array $bang) => (new PhanTichChuongTrinh)->phanTich([
+            $dong('HÀ NỘI – BẮC KINH', dam: true),
+            $dong('NGÀY 1: HÀ NỘI – BẮC KINH', dam: true), $dong('Bay đi Bắc Kinh.'),
+            $dong('NGÀY 2: BẮC KINH – HÀ NỘI', dam: true), $dong('Về Hà Nội.'),
+            $hang(['NGÀY KHỞI HÀNH', 'NGƯỜI LỚN', 'TRẺ EM']),
+            ...array_map($hang, $bang),
+            $dong('LƯU Ý:', dam: true),
+            $dong('Hộ chiếu theo Nghị định 2024 phải còn hạn 6 tháng. Cập nhật 2024.'),
+        ], 'x.pdf');
+
+        $kq = $tour([['01/10, 06/10', '15.990.000', '14.990.000'], ['17/10, 30/11', '15.990.000', '14.990.000']]);
+        $this->assertSame(['01/10/2026', '06/10/2026'], $kq['dot_bo_qua']);
+        $this->assertSame(['2026-10-17', '2026-11-30'], array_column($kq['dot'], 'ngay'));
+
+        // Cả bảng đã qua trong năm nay ("tháng 1" nhập vào tháng 10) → năm sau, có cảnh báo
+        $kq = $tour([['05/01, 12/01', '15.990.000', '14.990.000']]);
+        $this->assertSame(['2027-01-05', '2027-01-12'], array_column($kq['dot'], 'ngay'));
+        $this->assertTrue(collect($kq['canh_bao'])->contains(fn ($c) => str_contains($c, 'đã hiểu là năm 2027')));
+    }
+
     public function test_chuan_hoa_chu_gia_va_ky_hieu(): void
     {
         $this->assertSame('xem show ở Tây Hồ', PhanTichChuongTrinh::chuan("xem\u{00A0}ѕhoᴡ  ở Tây\u{200B} Hồ"));

@@ -929,7 +929,9 @@ class PhanTichChuongTrinh
      *  - đứng sau một ngày có năm: cùng năm, sang tháng nhỏ hơn hẳn (12 → 1) thì +1
      *  - đứng TRƯỚC ngày có năm đầu tiên: suy ngược ("Tháng 9 … Tháng 12" rồi
      *    "Tháng 3/2027" → tháng 9–12 là năm 2026)
-     *  - cả bảng không ghi năm: năm xuất hiện nhiều nhất trong file
+     *  - cả bảng không ghi năm: năm gợi ý từ file (xem namThamChieu); nếu với năm
+     *    đó MỌI ngày đều đã qua thì là lịch của năm sau ("05/01, 12/01" nhập vào
+     *    tháng 10 → tháng 1 năm sau)
      *
      * @param  list<array{0:int,1:int,2:?int}>  $ds
      * @return list<int>
@@ -955,6 +957,15 @@ class PhanTichChuongTrinh
             $ra[$k] = $nam;
             $thangTruoc = $ds[$k][1];
         }
+        if ($dau === null && $ds) {
+            for ($lan = 0; $lan < 2 && $this->deuDaQua($ds, $ra); $lan++) {
+                $ra = array_map(fn ($n) => $n + 1, $ra);
+            }
+            if ($lan > 0) {
+                $this->canhBao[] = 'Bảng giá không ghi năm, các ngày trong năm '.($ra[0] - $lan).' đều đã qua — đã hiểu là năm '
+                    .$ra[0].($ra[0] !== end($ra) ? '–'.end($ra) : '').'. Kiểm tra lại ngày khởi hành.';
+            }
+        }
         if ($dau) {
             $nam = $ra[$dau];
             $thangSau = $ds[$dau][1];
@@ -970,15 +981,36 @@ class PhanTichChuongTrinh
         return $ra;
     }
 
+    /** Mọi ngày (với năm đã gán) đều trước hôm nay */
+    private function deuDaQua(array $ds, array $nam): bool
+    {
+        foreach ($ds as $k => [$d, $t]) {
+            if (checkdate($t, $d, $nam[$k]) && ! Carbon::create($nam[$k], $t, $d)->startOfDay()->lt(today())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** @var list<?int> giá người lớn của mọi hàng (kể cả ngày đã qua) */
     private array $giaCu = [];
 
-    /** Năm dùng cho các ngày không ghi năm: năm xuất hiện nhiều nhất trong file (bằng nhau thì năm gặp trước), không có thì năm nay. */
+    /**
+     * Năm dùng cho các ngày không ghi năm: năm xuất hiện nhiều nhất trong file
+     * (bằng nhau thì năm gặp trước), không có thì năm nay.
+     *
+     * Chỉ tính năm trong khoảng năm ngoái → 2 năm tới: file hay nhắc năm cũ
+     * ("Nghị định … 2024", "cập nhật 2024") — lấy năm đó thì cả bảng giá bị
+     * gán năm 2024, mọi ngày khởi hành thành "đã qua".
+     */
     private function namThamChieu(string $toanVan): int
     {
+        $namNay = (int) today()->year;
         preg_match_all('/(?<!\d)(20[2-4]\d)(?!\d)/', $toanVan, $k);
+        $k[1] = array_values(array_filter($k[1], fn ($n) => (int) $n >= $namNay - 1 && (int) $n <= $namNay + 2));
         if (! $k[1]) {
-            return (int) today()->year;
+            return $namNay;
         }
         $dem = array_count_values($k[1]);
         $max = max($dem);
