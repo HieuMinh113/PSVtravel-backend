@@ -15,9 +15,4 @@ class EditVisaChecklist extends EditRecord
     {
         return [XuatMauAction::make(), DeleteAction::make()];
     }
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
 }

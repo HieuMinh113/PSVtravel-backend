@@ -26,9 +26,4 @@ class EditAllianceSource extends EditRecord
             DocNgayAction::chay($this->record);
         }
     }
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
 }

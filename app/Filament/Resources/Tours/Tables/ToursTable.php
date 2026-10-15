@@ -27,6 +27,15 @@ class ToursTable
                     ->label('Tên tour')
                     ->searchable()
                     ->sortable(),
+                // Danh mục tour (Miền Trung, Hàn Quốc…) — một tour có thể nằm ở nhiều danh mục
+                TextColumn::make('categories.name')
+                    ->label('Danh mục')
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('Chưa có')
+                    ->limitList(2)
+                    ->expandableLimitedList()
+                    ->searchable(),
                 TextColumn::make('type')
                     ->label('Loại')
                     ->badge()
