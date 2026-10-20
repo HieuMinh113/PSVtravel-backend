@@ -35,6 +35,12 @@ class BookingApiController extends Controller
                     'message' => 'Đợt khởi hành đã đóng hoặc không hợp lệ.',
                 ], 422);
             }
+            // Quá hạn nộp hồ sơ visa (khách mở trang từ trước / link cũ) → không nhận đặt online
+            if ($departure->quaHanVisa($tour)) {
+                return response()->json([
+                    'message' => 'Đợt khởi hành này đã hết hạn nhận hồ sơ visa. Vui lòng chọn đợt khác hoặc liên hệ để được tư vấn.',
+                ], 422);
+            }
 
             $soKhach = $data['adults'] + ($data['children'] ?? 0);
             if ($departure->seats_left < $soKhach) {

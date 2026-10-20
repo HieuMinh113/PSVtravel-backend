@@ -2,9 +2,11 @@
 
 namespace Modules\Tour\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Modules\Tour\Services\HanNopVisa;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -21,6 +23,7 @@ class TourDeparture extends Model
     protected $casts = [
         'start_date' => 'date',
         'visa_deadline' => 'date',
+        'visa_last_day' => 'date',
         'price_override' => 'integer',
         'child_price_override' => 'integer',
         'infant_price_override' => 'integer',
@@ -41,6 +44,9 @@ class TourDeparture extends Model
     protected static function booted(): void
     {
         static::saving(function (TourDeparture $dot) {
+            // Hạn chót nộp visa (lưu sẵn để website lọc đợt quá hạn bằng SQL)
+            $dot->visa_last_day = HanNopVisa::hanChot($dot, $dot->tour);
+
             if ($dot->status === 'closed') {
                 return;
             }
@@ -55,18 +61,29 @@ class TourDeparture extends Model
     }
 
     /**
-     * Hạn nộp hồ sơ visa của đợt này: ngày riêng của đợt nếu có, không thì
-     * theo quy tắc chung của tour "trước ngày khởi hành N ngày". Null = tour
-     * không đặt hạn (thường là tour không cần visa).
+     * Hạn nộp hồ sơ visa của đợt này (ngày cuối còn nhận khách): hạn sớm nhất
+     * trong hạn riêng của đợt, quy tắc chung của tour "trước ngày khởi hành N
+     * ngày" và hạn theo nước của nhân viên visa (xem HanNopVisa). Null = không
+     * có hạn (thường là tour không cần visa).
      */
     public function hanVisa(?Tour $tour = null): ?Carbon
     {
-        if ($this->visa_deadline) {
-            return $this->visa_deadline;
-        }
-        $soNgay = (int) ($tour ?? $this->tour)?->visa_deadline_days;
+        return HanNopVisa::hanChot($this, $tour ?? $this->tour);
+    }
 
-        return $soNgay > 0 && $this->start_date ? $this->start_date->copy()->subDays($soNgay) : null;
+    /** Đã qua hạn nộp visa → đợt bị ẩn trên website, không đặt online được. */
+    public function quaHanVisa(?Tour $tour = null): bool
+    {
+        return (bool) $this->hanVisa($tour)?->lt(today());
+    }
+
+    /** Đợt khách thấy và đặt được trên website: còn nhận, chưa đi, chưa quá hạn nộp visa. */
+    public function scopeHienTrenWeb(Builder $query): Builder
+    {
+        return $query->where('tour_departures.status', 'open')
+            ->whereDate('tour_departures.start_date', '>=', today())
+            ->where(fn (Builder $q) => $q->whereNull('tour_departures.visa_last_day')
+                ->orWhereDate('tour_departures.visa_last_day', '>=', today()));
     }
 
     /** Hạn visa còn bao nhiêu ngày (âm = đã qua hạn). */

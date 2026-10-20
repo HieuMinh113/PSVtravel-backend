@@ -73,9 +73,13 @@ class TourDetailResource extends JsonResource
                     ->values(),
             ]),
 
-            // Chỉ đợt còn hiệu lực, còn chỗ
+            // Mọi đợt sắp tới còn nhận khách đều đã quá hạn nộp visa → trang tour báo
+            // "hết hạn nhận hồ sơ", mời liên hệ (tour đã ẩn khỏi danh sách)
+            'het_han_visa' => $this->resource->hetHanVisa(),
+
+            // Chỉ đợt còn hiệu lực, còn chỗ, chưa quá hạn nộp visa
             'departures' => $this->departures
-                ->filter(fn ($d) => $d->status === 'open' && ! $d->start_date->lt(now()->startOfDay()))
+                ->filter(fn ($d) => $d->status === 'open' && ! $d->start_date->lt(now()->startOfDay()) && ! $d->quaHanVisa($this->resource))
                 ->values()
                 ->map(fn ($d) => [
                     'id' => $d->id,

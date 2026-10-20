@@ -2,6 +2,7 @@
 
 namespace Modules\Guide\Transformers;
 
+use App\Services\YouTube;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,7 +17,7 @@ class GuideDetailResource extends JsonResource
             'content' => $this->content,
             'cover_image' => $this->anh($this->cover_image),
             // Chỉ trả MÃ video — website tự dựng link nhúng youtube-nocookie
-            'video_id' => \App\Services\YouTube::id($this->video_url),
+            'video_id' => YouTube::id($this->video_url),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'category' => $this->category,
             'author_name' => $this->whenLoaded('author', fn () => $this->author?->name),
@@ -51,8 +52,9 @@ class GuideDetailResource extends JsonResource
     // Rút gọn tour về đúng những trường ô đặt tour cần (giá, đợt khởi hành, số chỗ).
     private function duLieuTour($tour): array
     {
+        // (bỏ cả đợt đã quá hạn nộp visa — khách không đặt được nữa)
         $departures = $tour->departures
-            ->filter(fn ($d) => $d->status === 'open' && ! $d->start_date->lt(now()->startOfDay()))
+            ->filter(fn ($d) => $d->status === 'open' && ! $d->start_date->lt(now()->startOfDay()) && ! $d->quaHanVisa($tour))
             ->values();
         $dauTien = $departures->first();
 
@@ -71,6 +73,7 @@ class GuideDetailResource extends JsonResource
             'infant_price' => $tour->infant_price,
             'old_price' => $tour->old_price,
             'cover_image' => $this->anh($tour->cover_image),
+            'het_han_visa' => $tour->hetHanVisa(),
             'next_start_date' => $dauTien?->start_date?->format('d/m/Y'),
             'next_seats_left' => $dauTien?->seats_left,
             'departures' => $departures->map(fn ($d) => [

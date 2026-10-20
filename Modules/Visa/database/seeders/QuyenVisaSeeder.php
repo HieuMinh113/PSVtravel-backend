@@ -19,6 +19,8 @@ class QuyenVisaSeeder extends Seeder
     public const QUYEN = [
         'ViewAny:VisaCase', 'View:VisaCase', 'Create:VisaCase', 'Update:VisaCase', 'Delete:VisaCase', 'DeleteAny:VisaCase',
         'ViewAny:VisaChecklist', 'View:VisaChecklist', 'Create:VisaChecklist', 'Update:VisaChecklist', 'Delete:VisaChecklist', 'DeleteAny:VisaChecklist',
+        // Hạn nộp visa theo nước — quá hạn thì đợt khởi hành tự ẩn trên website
+        'ViewAny:VisaDeadline', 'View:VisaDeadline', 'Create:VisaDeadline', 'Update:VisaDeadline', 'Delete:VisaDeadline', 'DeleteAny:VisaDeadline',
     ];
 
     /**

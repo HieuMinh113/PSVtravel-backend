@@ -243,7 +243,7 @@ class PhanTichChuongTrinh
             ->map(fn ($d) => Carbon::parse($d['ngay'])->format('d/m'))->values() : collect();
         if ($quaHanVisa->isNotEmpty()) {
             $this->canhBao[] = $quaHanVisa->count()." ngày khởi hành đã quá hạn nộp hồ sơ visa (trước {$hanVisa} ngày): "
-                .$quaHanVisa->implode(', ').' — vẫn được tạo, đóng bán ở "Lịch khởi hành" nếu không kịp làm visa.';
+                .$quaHanVisa->implode(', ').' — vẫn được tạo nhưng tự ẩn trên website (khách không đặt được).';
         }
         if (! $nuoc && ! preg_match('/\b(việt nam)\b/iu', $toanVan)) {
             $this->canhBao[] = 'Không nhận ra nước đến — chọn loại tour / quốc gia trong form.';

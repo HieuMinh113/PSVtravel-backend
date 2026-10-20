@@ -257,7 +257,8 @@ class Booking extends Model
             $dot = TourDeparture::find($dot->getKey());
         }
         $tour = $this->tour;
-        if ($tour && ! array_key_exists('visa_deadline_days', $tour->getAttributes())) {
+        // (hạn theo nước cần thêm loại tour + quốc gia)
+        if ($tour && array_diff(['visa_deadline_days', 'type', 'country'], array_keys($tour->getAttributes()))) {
             $tour = Tour::withTrashed()->find($tour->getKey());
         }
 

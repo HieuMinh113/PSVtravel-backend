@@ -20,8 +20,8 @@ class CategoryApiController extends Controller
             // "Miền Trung 2 tour" mà bấm vào trang danh sách lại ra "0 tour phù
             // hợp" — con số một đằng, nội dung một nẻo.
             ->withCount([
-                'tours' => fn ($q) => $q->whereNull('tours.deleted_at')
-                    ->where('tours.status', 'published'),
+                // (tour bị ẩn vì mọi đợt đã quá hạn nộp visa cũng không đếm)
+                'tours' => fn ($q) => $q->whereNull('tours.deleted_at')->hienChoKhach(),
             ]);
 
         if (in_array($request->query('type'), ['domestic', 'abroad'], true)) {

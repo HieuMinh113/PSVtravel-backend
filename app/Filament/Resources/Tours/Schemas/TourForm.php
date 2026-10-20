@@ -18,6 +18,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 use Modules\Alliance\Models\AllianceTour;
 use Modules\Tour\Models\Tour;
+use Modules\Tour\Services\HanNopVisa;
 
 class TourForm
 {
@@ -144,9 +145,11 @@ class TourForm
                 TextInput::make('region')
                     ->label('Vùng / khu vực')
                     ->maxLength(255),
+                // Khớp danh sách "Hạn nộp visa theo nước" (nhân viên visa) → đợt quá hạn tự ẩn trên web
                 TextInput::make('country')
                     ->label('Quốc gia')
-                    ->helperText('Chỉ điền với tour nước ngoài')
+                    ->helperText(fn (Get $get): string => self::goiYHanVisaNuoc($get('type'), $get('country')))
+                    ->live(onBlur: true)
                     ->maxLength(255),
                 TextInput::make('departure_from')
                     ->label('Khởi hành từ')
@@ -370,5 +373,23 @@ class TourForm
                     ->visible(fn (): bool => (bool) auth()->user()?->can('ViewAny:AllianceDeparture'))
                     ->columnSpanFull(),
             ]);
+    }
+
+    /** Dưới ô Quốc gia: tour áp hạn nộp visa của nước nào, hay không khớp nước nào trong danh sách. */
+    private static function goiYHanVisaNuoc(?string $loai, ?string $quocGia): string
+    {
+        if ($loai !== 'abroad') {
+            return 'Chỉ điền với tour nước ngoài.';
+        }
+        $khop = HanNopVisa::nuocKhop($quocGia);
+        if ($khop) {
+            arsort($khop);
+
+            return 'Hạn nộp visa theo nước: '.array_key_first($khop).' — nộp trước ngày bay '.reset($khop).' ngày. Ngày khởi hành quá hạn tự ẩn trên website.';
+        }
+
+        return filled($quocGia)
+            ? '⚠ "'.$quocGia.'" chưa có trong danh sách "Hạn nộp visa theo nước" — ngày khởi hành của tour này KHÔNG tự ẩn theo hạn visa của nước (báo nhân viên visa thêm, hoặc ghi đúng tên nước).'
+            : 'Ghi tên nước (VD: Trung Quốc; nhiều nước: Pháp - Thụy Sĩ - Ý) để áp hạn nộp visa theo nước.';
     }
 }

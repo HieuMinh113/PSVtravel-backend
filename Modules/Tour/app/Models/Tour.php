@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Category\Models\Category;
 use App\Jobs\PingIndexNow;
+use Modules\Tour\Services\HanNopVisa;
 class Tour extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -21,6 +22,12 @@ class Tour extends Model
     // làm chậm thao tác lưu; chỉ ping ở môi trường thật để khỏi nhiễu khi seed.
     protected static function booted(): void
     {
+        // Đổi quốc gia / quy tắc visa / loại tour → tính lại hạn ẩn các đợt khởi hành
+        static::saved(function (self $tour) {
+            if ($tour->wasChanged(['country', 'visa_deadline_days', 'type'])) {
+                HanNopVisa::tinhLaiTour($tour);
+            }
+        });
         static::saved(function (self $tour) {
             if ($tour->status !== 'published' || ! app()->isProduction()) {
                 return;
@@ -130,6 +137,30 @@ class Tour extends Model
     public function scopePublished($query)
     {
         return $query->where('status', 'published');
+    }
+
+    /**
+     * Tour khách thấy trên website: đang hiển thị, và KHÔNG phải tour mà mọi đợt
+     * sắp tới còn nhận khách đều đã quá hạn nộp visa. Tour chưa có lịch khởi hành
+     * (bán theo yêu cầu) vẫn hiện như cũ.
+     */
+    public function scopeHienChoKhach($query)
+    {
+        return $query->where('tours.status', 'published')
+            ->where(fn ($q) => $q
+                ->whereHas('departures', fn ($d) => $d->hienTrenWeb())
+                ->orWhereDoesntHave('departures', fn ($d) => $d->where('status', 'open')->whereDate('start_date', '>=', today())));
+    }
+
+    /**
+     * Có đợt sắp tới còn nhận khách nhưng TẤT CẢ đều đã quá hạn nộp visa (tour
+     * đã ẩn khỏi danh sách) → trang tour báo "hết hạn nhận hồ sơ", mời liên hệ.
+     */
+    public function hetHanVisa(): bool
+    {
+        $sapToi = $this->departures->filter(fn ($d) => $d->status === 'open' && ! $d->start_date->lt(today()));
+
+        return $sapToi->isNotEmpty() && $sapToi->every(fn ($d) => $d->quaHanVisa($this));
     }
     public function getActivitylogOptions(): LogOptions
     {

@@ -48,11 +48,13 @@ class BookingForm
                         return [];
                     }
 
+                    // Đợt quá hạn nộp visa đã ẩn trên web, nhân viên vẫn tạo đơn được (trường hợp đặc biệt)
                     return TourDeparture::where('tour_id', $tourId)
+                        ->with('tour')
                         ->orderBy('start_date')
                         ->get()
                         ->mapWithKeys(fn ($d) => [
-                            $d->id => $d->start_date->format('d/m/Y').' (còn '.$d->seats_left.' chỗ)',
+                            $d->id => $d->start_date->format('d/m/Y').' (còn '.$d->seats_left.' chỗ)'.($d->quaHanVisa() ? ' · quá hạn nộp visa' : ''),
                         ])
                         ->toArray();
                 })

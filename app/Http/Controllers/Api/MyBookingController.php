@@ -17,7 +17,7 @@ class MyBookingController extends Controller
 
         $bookings = Booking::query()
             ->where('user_id', $userId) // chỉ đơn của chính mình
-            ->with(['tour:id,slug,name,cover_image,type,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
+            ->with(['tour:id,slug,name,cover_image,type,country,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
             ->latest('id')
             ->paginate(min((int) $request->query('per_page', 10), 30));
 

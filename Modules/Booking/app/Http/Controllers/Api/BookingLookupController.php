@@ -35,7 +35,7 @@ class BookingLookupController extends Controller
 
         $booking = Booking::query()
             ->where('booking_code', $ma)
-            ->with(['tour:id,slug,name,cover_image,type,duration_days,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
+            ->with(['tour:id,slug,name,cover_image,type,country,duration_days,visa_deadline_days', 'departure:id,start_date,visa_deadline'])
             ->first();
 
         // Trả về CÙNG một thông báo cho mọi trường hợp sai — không hé lộ

@@ -85,11 +85,15 @@ class HanNopVisaTest extends TestCase
         $rm()->callAction(TestAction::make('create')->table(), data: [
             'start_date' => '2026-12-15', 'visa_deadline' => '2026-12-20', 'seats_total' => 20, 'seats_left' => 20, 'status' => 'open',
         ])->assertHasFormErrors(['visa_deadline' => 'before']);
+        // Hạn riêng sớm hơn quy tắc tour (15/12 − 45 = 31/10) → lấy hạn riêng (luôn lấy hạn sớm nhất)
         $rm()->callAction(TestAction::make('create')->table(), data: [
-            'start_date' => '2026-12-15', 'visa_deadline' => '2026-11-25', 'seats_total' => 20, 'seats_left' => 20, 'status' => 'open',
+            'start_date' => '2026-12-15', 'visa_deadline' => '2026-10-25', 'seats_total' => 20, 'seats_left' => 20, 'status' => 'open',
         ])->assertHasNoFormErrors();
-        $this->assertSame('2026-11-25', TourDeparture::sole()->visa_deadline->toDateString());
-        $rm()->assertSee('25/11/2026')->assertSee('Hạn riêng');
+        $this->assertSame('2026-10-25', TourDeparture::sole()->visa_deadline->toDateString());
+        $rm()->assertSee('25/10/2026')->assertSee('Hạn riêng');
+        // Hạn riêng muộn hơn quy tắc tour → vẫn theo quy tắc tour (không nhận khách sau hạn)
+        TourDeparture::sole()->update(['visa_deadline' => '2026-11-25']);
+        $rm()->assertSee('31/10/2026')->assertSee('Theo tour: trước 45 ngày');
 
         // Tour trong nước: không hiện ô hạn visa
         $this->tour->update(['type' => 'domestic']);

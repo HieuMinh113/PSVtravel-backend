@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
 use Modules\Alliance\Models\AllianceDeparture;
 use Modules\Alliance\Services\DongBoLienMinh;
 use Modules\Tour\Models\TourDeparture;
+use Modules\Tour\Services\HanNopVisa;
 
 class DeparturesRelationManager extends RelationManager
 {
@@ -72,9 +73,13 @@ class DeparturesRelationManager extends RelationManager
                 ->native(false)
                 ->displayFormat('d/m/Y')
                 ->placeholder(fn (): string => $this->quyTacVisa() ? 'Theo quy tắc chung' : 'Không đặt')
-                ->helperText(fn (): string => $this->quyTacVisa()
+                ->helperText(fn (): string => ($this->quyTacVisa()
                     ? 'Để trống = '.$this->quyTacVisa().' (đặt ở thông tin tour).'
-                    : 'Tour chưa đặt quy tắc chung — để trống là đợt này không hiện hạn visa.')
+                    : 'Tour chưa đặt quy tắc chung.')
+                    .(($n = HanNopVisa::soNgayTheoNuoc($this->getOwnerRecord()->country)) && $this->getOwnerRecord()->type === 'abroad'
+                        ? " Hạn theo nước: trước ngày bay {$n} ngày."
+                        : '')
+                    .' Lấy hạn sớm nhất; qua hạn thì đợt tự ẩn trên website.')
                 ->before('start_date')
                 ->validationMessages(['before' => 'Hạn nộp visa phải trước ngày khởi hành.'])
                 ->visible(fn (?TourDeparture $record): bool => $this->getOwnerRecord()->type === 'abroad' || filled($record?->visa_deadline)),
@@ -192,11 +197,8 @@ class DeparturesRelationManager extends RelationManager
                     ->state(fn (TourDeparture $record) => $record->hanVisa($this->getOwnerRecord()))
                     ->date('d/m/Y')
                     ->placeholder('—')
-                    ->description(fn (TourDeparture $record): ?string => match (true) {
-                        filled($record->visa_deadline) => 'Hạn riêng',
-                        (bool) $this->quyTacVisa() => 'Theo quy tắc chung',
-                        default => null,
-                    })
+                    // hạn sớm nhất trong: hạn riêng / quy tắc của tour / hạn theo nước (nhân viên visa)
+                    ->description(fn (TourDeparture $record): ?string => HanNopVisa::nguonHan($record, $this->getOwnerRecord()))
                     ->color(fn (TourDeparture $record): ?string => match (true) {
                         ($n = TourDeparture::conNgay($record->hanVisa($this->getOwnerRecord()))) === null => null,
                         $n < 0 => 'danger',
@@ -204,7 +206,7 @@ class DeparturesRelationManager extends RelationManager
                         default => null,
                     })
                     ->tooltip(fn (TourDeparture $record): ?string => ($n = TourDeparture::conNgay($record->hanVisa($this->getOwnerRecord()))) === null
-                        ? null : ($n < 0 ? 'Đã qua hạn nộp visa' : "Còn {$n} ngày"))
+                        ? null : ($n < 0 ? 'Đã qua hạn nộp visa — đợt này đã ẩn trên website' : "Còn {$n} ngày, qua hạn thì đợt tự ẩn trên website"))
                     ->visible(fn (): bool => $this->getOwnerRecord()->type === 'abroad'),
                 TextColumn::make('price_override')
                     ->label('Giá riêng')
@@ -219,14 +221,17 @@ class DeparturesRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'closed' => 'Đã đóng',
-                        'full' => 'Hết chỗ',
+                    // Còn nhận nhưng quá hạn nộp visa → khách không thấy trên website
+                    ->formatStateUsing(fn (string $state, TourDeparture $record): string => match (true) {
+                        $state === 'closed' => 'Đã đóng',
+                        $state === 'full' => 'Hết chỗ',
+                        $record->quaHanVisa($this->getOwnerRecord()) => 'Ẩn trên web (quá hạn visa)',
                         default => 'Còn nhận',
                     })
-                    ->color(fn (string $state): string => match ($state) {
-                        'closed' => 'gray',
-                        'full' => 'danger',
+                    ->color(fn (string $state, TourDeparture $record): string => match (true) {
+                        $state === 'closed' => 'gray',
+                        $state === 'full' => 'danger',
+                        $record->quaHanVisa($this->getOwnerRecord()) => 'warning',
                         default => 'success',
                     }),
             ])

@@ -28,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\Modules\Visa\Models\VisaProvider::class, \Modules\Visa\Policies\VisaProviderPolicy::class);
         Gate::policy(\Modules\Visa\Models\VisaCase::class, \Modules\Visa\Policies\VisaCasePolicy::class);
         Gate::policy(\Modules\Visa\Models\VisaChecklist::class, \Modules\Visa\Policies\VisaChecklistPolicy::class);
+        Gate::policy(\Modules\Visa\Models\VisaDeadline::class, \Modules\Visa\Policies\VisaDeadlinePolicy::class);
         Gate::policy(\Modules\Category\Models\Category::class, \Modules\Category\Policies\CategoryPolicy::class);
         Gate::policy(\Modules\Guide\Models\Guide::class, \Modules\Guide\Policies\GuidePolicy::class);
         Gate::policy(\Modules\Guide\Models\GuideCountry::class, \Modules\Guide\Policies\GuideCountryPolicy::class);
