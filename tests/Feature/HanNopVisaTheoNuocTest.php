@@ -22,9 +22,9 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * Hạn nộp visa theo nước (nhân viên visa quản lý): "Trung Quốc 7 ngày", bay
- * ngày 22 → từ ngày 15 đợt đó tự ẩn trên website, khách không đặt online được;
- * tour mà mọi đợt sắp tới đều quá hạn thì ẩn khỏi danh sách.
+ * Hạn nộp visa theo nước + dạng visa (nhân viên visa quản lý): "Trung Quốc —
+ * visa đoàn 7 ngày", bay ngày 22 → từ ngày 15 đợt đó tự ẩn trên website, khách
+ * không đặt online được; tour mà mọi đợt sắp tới đều quá hạn thì ẩn khỏi danh sách.
  */
 class HanNopVisaTheoNuocTest extends TestCase
 {
@@ -65,16 +65,26 @@ class HanNopVisaTheoNuocTest extends TestCase
 
         Livewire::test(CreateVisaDeadline::class)
             ->fillForm(['country' => 'Trung Quốc', 'days' => 7])
-            ->assertSee('Áp dụng cho 1 tour: Tour bac-kinh')
+            ->assertSee('1 tour ghi quốc gia này: Tour bac-kinh (chưa chọn dạng visa)')
             ->call('create')
             ->assertHasNoFormErrors();
         $this->assertSame(7, VisaDeadline::sole()->days);
 
-        // Trùng tên kể cả khác dấu / chữ hoa
+        $this->assertSame('doan', VisaDeadline::sole()->kind); // mặc định visa đoàn
+
+        // Trùng nước + dạng visa kể cả khác dấu / chữ hoa
         Livewire::test(CreateVisaDeadline::class)
-            ->fillForm(['country' => 'trung quoc', 'days' => 10])
+            ->fillForm(['country' => 'trung quoc', 'kind' => 'doan', 'days' => 10])
             ->call('create')
             ->assertHasFormErrors(['country']);
+        // Cùng nước, dạng visa khác → được
+        Livewire::test(CreateVisaDeadline::class)
+            ->fillForm(['country' => 'Trung Quốc', 'kind' => 'le', 'days' => 10])
+            ->call('create')
+            ->assertHasNoFormErrors();
+        $this->assertSame(['doan' => 7, 'le' => 10], VisaDeadline::orderBy('kind')->pluck('days', 'kind')->all());
+        $this->get('/admin/visa-deadlines')->assertOk()->assertSee('Visa đoàn')->assertSee('Visa lẻ (dán hộ chiếu)');
+        VisaDeadline::where('kind', 'le')->delete();
         // Số ngày phải hợp lệ
         Livewire::test(CreateVisaDeadline::class)
             ->fillForm(['country' => 'Nhật Bản', 'days' => 0])
@@ -151,7 +161,7 @@ class HanNopVisaTheoNuocTest extends TestCase
 
         $this->assertSame('2026-11-10', $this->dot('2026-11-24', null, ['visa_deadline' => '2026-11-10'])->hanVisa()->toDateString());
         $this->assertSame('2026-11-15', $this->dot('2026-11-25', null, ['visa_deadline' => '2026-11-20'])->hanVisa()->toDateString());
-        $this->assertSame('Theo nước: Trung Quốc 7 ngày', HanNopVisa::nguonHan($this->dot('2026-12-22'), $this->tour->fresh()->forceFill(['visa_deadline_days' => 3])));
+        $this->assertSame('Theo nước: Trung Quốc · Visa đoàn 7 ngày', HanNopVisa::nguonHan($this->dot('2026-12-22'), $this->tour->fresh()->forceFill(['visa_deadline_days' => 3])));
     }
 
     public function test_ten_nuoc_khop_khong_dau_va_tour_nhieu_nuoc_lay_so_lon_nhat(): void
@@ -232,12 +242,64 @@ class HanNopVisaTheoNuocTest extends TestCase
 
         Livewire::test(DeparturesRelationManager::class, ['ownerRecord' => $this->tour, 'pageClass' => EditTour::class])
             ->assertSee('Ẩn trên web (quá hạn visa)')
-            ->assertSee('Theo nước: Trung Quốc 7 ngày')
+            ->assertSee('Theo nước: Trung Quốc · Visa đoàn 7 ngày')
             ->assertSee('Còn nhận');
 
         Livewire::test(EditTour::class, ['record' => $this->tour->getRouteKey()])
-            ->assertSee('Hạn nộp visa theo nước: Trung Quốc — nộp trước ngày bay 7 ngày')
+            ->assertSee('Hạn nộp visa theo nước: Trung Quốc · Visa đoàn — nộp trước ngày bay 7 ngày')
             ->fillForm(['country' => 'Mông Cổ'])
             ->assertSee('chưa có trong danh sách');
+    }
+
+    public function test_moi_dang_visa_mot_so_ngay_tour_chon_dang_nao_lay_dang_do(): void
+    {
+        VisaDeadline::create(['country' => 'Trung Quốc', 'kind' => 'doan', 'days' => 7]);
+        VisaDeadline::create(['country' => 'Trung Quốc', 'kind' => 'le', 'days' => 10]);
+        $dot = $this->dot('2026-11-22');
+
+        // Tour chưa chọn dạng → lấy số ngày lớn nhất (visa lẻ 10 ngày): hạn 11/11
+        $this->assertSame('2026-11-11', $dot->fresh()->visa_last_day->toDateString());
+
+        $this->tour->update(['visa_kind' => 'doan']);
+        $this->assertSame('2026-11-14', $dot->fresh()->visa_last_day->toDateString());
+        $this->assertSame('Theo nước: Trung Quốc · Visa đoàn 7 ngày', HanNopVisa::nguonHan($dot->fresh(), $this->tour->fresh()));
+
+        // Chọn dạng mà nước chưa có dòng → lấy số ngày lớn nhất cho an toàn
+        $this->tour->update(['visa_kind' => 'dien_tu']);
+        $this->assertSame('2026-11-11', $dot->fresh()->visa_last_day->toDateString());
+
+        // Tour nhiều nước: nước nào có đúng dạng thì lấy dạng đó, nước thiếu thì lấy số lớn nhất
+        VisaDeadline::create(['country' => 'Pháp', 'kind' => 'doan', 'days' => 20]);
+        VisaDeadline::create(['country' => 'Ý', 'kind' => 'le', 'days' => 30]);
+        $khop = HanNopVisa::nuocKhop('Pháp - Ý', 'doan');
+        $this->assertSame([['Ý', 'le', 30, true], ['Pháp', 'doan', 20, false]], array_map(fn ($d) => array_values($d), $khop));
+
+        // Trang tour ghi dạng visa cho khách
+        $this->tour->update(['visa_kind' => 'doan']);
+        $this->getJson('/api/v1/tours/bac-kinh')->assertOk()
+            ->assertJsonPath('data.visa_kind', 'doan')
+            ->assertJsonPath('data.visa_kind_label', 'Visa đoàn')
+            ->assertJsonPath('data.visa_kind_note', 'đi và về cùng đoàn');
+        $trongNuoc = $this->taoTour('ha-long', 'Việt Nam', ['type' => 'domestic', 'visa_kind' => 'doan']);
+        $this->getJson('/api/v1/tours/ha-long')->assertOk()->assertJsonPath('data.visa_kind', null);
+
+        // Trang sửa tour: chọn dạng visa, báo khi nước chưa có dòng dạng đó
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $nv = User::factory()->create();
+        foreach (['View', 'ViewAny', 'Update'] as $q) {
+            $nv->givePermissionTo(Permission::findOrCreate("{$q}:Tour", 'web'));
+        }
+        $this->actingAs($nv);
+        Livewire::test(EditTour::class, ['record' => $this->tour->getRouteKey()])
+            ->assertFormFieldExists('visa_kind')
+            ->fillForm(['visa_kind' => 'thong_hanh'])
+            ->assertSee('Trung Quốc chưa có dòng')
+            ->assertSee('Giấy thông hành')
+            ->fillForm(['visa_kind' => 'le'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame('le', $this->tour->fresh()->visa_kind);
+        $this->assertSame('2026-11-11', $dot->fresh()->visa_last_day->toDateString());
+        Livewire::test(EditTour::class, ['record' => $trongNuoc->getRouteKey()])->assertFormFieldHidden('visa_kind');
     }
 }

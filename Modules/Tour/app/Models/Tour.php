@@ -22,9 +22,9 @@ class Tour extends Model
     // làm chậm thao tác lưu; chỉ ping ở môi trường thật để khỏi nhiễu khi seed.
     protected static function booted(): void
     {
-        // Đổi quốc gia / quy tắc visa / loại tour → tính lại hạn ẩn các đợt khởi hành
+        // Đổi quốc gia / quy tắc visa / dạng visa / loại tour → tính lại hạn ẩn các đợt khởi hành
         static::saved(function (self $tour) {
-            if ($tour->wasChanged(['country', 'visa_deadline_days', 'type'])) {
+            if ($tour->wasChanged(['country', 'visa_deadline_days', 'visa_kind', 'type'])) {
                 HanNopVisa::tinhLaiTour($tour);
             }
         });
@@ -43,7 +43,7 @@ class Tour extends Model
 
     protected $fillable = [
         'slug', 'name', 'seo_title', 'type', 'region', 'country',
-        'duration_days', 'duration_nights', 'departure_from', 'visa_deadline_days',
+        'duration_days', 'duration_nights', 'departure_from', 'visa_deadline_days', 'visa_kind',
         'adult_price', 'child_price', 'infant_price', 'old_price',
         'tag', 'cover_image', 'video_url',
         'highlights', 'included', 'excluded',
@@ -167,7 +167,7 @@ class Tour extends Model
         return LogOptions::defaults()
             ->logOnly([
                 'name', 'slug', 'status', 'adult_price', 'child_price', 'infant_price',
-                'old_price', 'is_featured', 'type', 'visa_deadline_days',
+                'old_price', 'is_featured', 'type', 'visa_deadline_days', 'visa_kind',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()

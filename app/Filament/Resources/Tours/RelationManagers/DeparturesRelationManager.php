@@ -76,7 +76,7 @@ class DeparturesRelationManager extends RelationManager
                 ->helperText(fn (): string => ($this->quyTacVisa()
                     ? 'Để trống = '.$this->quyTacVisa().' (đặt ở thông tin tour).'
                     : 'Tour chưa đặt quy tắc chung.')
-                    .(($n = HanNopVisa::soNgayTheoNuoc($this->getOwnerRecord()->country)) && $this->getOwnerRecord()->type === 'abroad'
+                    .(($n = HanNopVisa::soNgayTheoNuoc($this->getOwnerRecord()->country, $this->getOwnerRecord()->visa_kind)) && $this->getOwnerRecord()->type === 'abroad'
                         ? " Hạn theo nước: trước ngày bay {$n} ngày."
                         : '')
                     .' Lấy hạn sớm nhất; qua hạn thì đợt tự ẩn trên website.')

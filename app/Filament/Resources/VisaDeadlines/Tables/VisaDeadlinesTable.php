@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VisaDeadlines\Tables;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
 use Modules\Tour\Services\HanNopVisa;
@@ -21,13 +22,19 @@ class VisaDeadlinesTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
+                TextColumn::make('kind')
+                    ->label('Dạng visa')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => VisaDeadline::tenDang($state))
+                    ->color(fn (string $state): string => $state === 'doan' ? 'info' : 'gray')
+                    ->sortable(),
                 TextColumn::make('days')
                     ->label('Nộp visa trước ngày bay')
                     ->formatStateUsing(fn (int $state) => "{$state} ngày")
                     ->description(fn (VisaDeadline $record) => 'VD bay 22/11 → ẩn trên web từ '.Carbon::create(2026, 11, 22)->subDays($record->days)->format('d/m'))
                     ->sortable(),
                 TextColumn::make('tour_ap_dung')
-                    ->label('Tour áp dụng')
+                    ->label('Tour ghi nước này')
                     ->state(fn (VisaDeadline $record) => count(HanNopVisa::tourTheoNuoc($record->country)))
                     ->tooltip(fn (VisaDeadline $record) => implode(', ', HanNopVisa::tourTheoNuoc($record->country)) ?: 'Chưa có tour nào ghi quốc gia này'),
                 TextColumn::make('note')
@@ -40,6 +47,9 @@ class VisaDeadlinesTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('country')
+            ->filters([
+                SelectFilter::make('kind')->label('Dạng visa')->options(VisaDeadline::DANG),
+            ])
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),

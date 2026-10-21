@@ -14,7 +14,7 @@ class ListVisaDeadlines extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Tour nước ngoài có ngày khởi hành mà hôm nay đã quá hạn nộp hồ sơ visa thì ngày đó tự ẩn trên website (khách không thấy, không đặt được). Ví dụ Trung Quốc 7 ngày: bay ngày 22 thì từ ngày 15 ẩn.';
+        return 'Tour nước ngoài có ngày khởi hành mà hôm nay đã quá hạn nộp hồ sơ visa thì ngày đó tự ẩn trên website (khách không thấy, không đặt được). Ví dụ Trung Quốc — visa đoàn 7 ngày: bay ngày 22 thì từ ngày 15 ẩn. Mỗi dạng visa của một nước là một dòng.';
     }
 
     protected function getHeaderActions(): array

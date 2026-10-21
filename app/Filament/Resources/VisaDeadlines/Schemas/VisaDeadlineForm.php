@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VisaDeadlines\Schemas;
 
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -22,12 +23,20 @@ class VisaDeadlineForm
                     ->live(onBlur: true)
                     ->required()
                     ->maxLength(100)
-                    // trùng cả khi khác dấu / chữ hoa ("trung quoc" = "Trung Quốc")
-                    ->rule(fn (?VisaDeadline $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
-                        if ($c = HanNopVisa::trungTen((string) $value, $record?->getKey())) {
-                            $fail("Nước này đã có trong danh sách (\"{$c}\").");
+                    // cùng nước + cùng dạng visa là trùng, kể cả khác dấu / chữ hoa ("trung quoc" = "Trung Quốc")
+                    ->rule(fn (?VisaDeadline $record, Get $get) => function (string $attribute, $value, \Closure $fail) use ($record, $get) {
+                        if ($c = HanNopVisa::trungTen((string) $value, $get('kind'), $record?->getKey())) {
+                            $fail("\"{$c}\" đã có dòng ".VisaDeadline::tenDang($get('kind')).' trong danh sách.');
                         }
                     }),
+                // Cùng một nước, mỗi dạng visa một số ngày (visa đoàn 7 ngày, visa lẻ 10 ngày…)
+                Select::make('kind')
+                    ->label('Dạng visa')
+                    ->options(VisaDeadline::DANG)
+                    ->default('doan')
+                    ->selectablePlaceholder(false)
+                    ->required()
+                    ->helperText('Tour chọn dạng visa ở trang sửa tour. Tour chưa chọn dạng, hoặc chọn dạng nước này chưa có, thì lấy số ngày lớn nhất của nước.'),
                 TextInput::make('days')
                     ->label('Số ngày nộp visa')
                     ->prefix('Trước ngày bay')
@@ -50,7 +59,7 @@ class VisaDeadlineForm
             ]);
     }
 
-    /** "Áp dụng cho 5 tour: …" — tour nước ngoài có ô Quốc gia khớp tên nước này. */
+    /** "2 tour ghi quốc gia này: Tour A (Visa đoàn), …" — tour nước ngoài có ô Quốc gia khớp tên nước này. */
     private static function tourKhop(string $nuoc): string
     {
         if (trim($nuoc) === '') {
@@ -58,7 +67,7 @@ class VisaDeadlineForm
         }
         $ds = HanNopVisa::tourTheoNuoc($nuoc);
 
-        return $ds ? 'Áp dụng cho '.count($ds).' tour: '.implode(', ', array_slice($ds, 0, 5)).(count($ds) > 5 ? '…' : '')
+        return $ds ? count($ds).' tour ghi quốc gia này: '.implode(', ', array_slice($ds, 0, 5)).(count($ds) > 5 ? '…' : '')
             : 'Chưa có tour nước ngoài nào ghi quốc gia này (kiểm tra ô "Quốc gia" của tour).';
     }
 }

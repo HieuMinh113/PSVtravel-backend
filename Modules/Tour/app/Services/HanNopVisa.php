@@ -15,8 +15,9 @@ use Modules\Visa\Models\VisaDeadline;
  *
  * Lấy hạn SỚM NHẤT trong ba nguồn, để không bao giờ nhận khách sau hạn của
  * bất kỳ bên nào:
- *  - Hạn theo nước (nhân viên visa đặt, "Trung Quốc 7 ngày"): bay 22 → từ ngày
- *    15 đã ẩn, hạn chót là ngày 14 (= ngày bay − N − 1). Chỉ áp cho tour nước ngoài.
+ *  - Hạn theo nước + dạng visa (nhân viên visa đặt, "Trung Quốc — visa đoàn 7
+ *    ngày"): bay 22 → từ ngày 15 đã ẩn, hạn chót là ngày 14 (= ngày bay − N − 1).
+ *    Chỉ áp cho tour nước ngoài.
  *  - Quy tắc của tour "nộp trước ngày khởi hành N ngày": hạn chót = ngày bay − N.
  *  - Hạn riêng của đợt (đối tác chốt ngày cụ thể).
  *
@@ -28,45 +29,67 @@ class HanNopVisa
     /** Khoá bộ nhớ tạm (kho "array": sống theo request; tiến trình chạy lâu nạp lại sau 1 phút). */
     private const KHOA = 'han_nop_visa_theo_nuoc';
 
-    /** Số ngày nộp visa theo danh sách cho ô "Quốc gia" của tour; nhiều nước thì lấy số lớn nhất. */
-    public static function soNgayTheoNuoc(?string $quocGia): ?int
+    /**
+     * Số ngày nộp visa theo danh sách cho tour: ô "Quốc gia" + dạng visa của tour.
+     * Nhiều nước thì lấy số lớn nhất.
+     */
+    public static function soNgayTheoNuoc(?string $quocGia, ?string $dang = null): ?int
     {
-        $khop = self::nuocKhop($quocGia);
+        $khop = self::nuocKhop($quocGia, $dang);
 
-        return $khop ? max($khop) : null;
+        return $khop ? $khop[0]['ngay'] : null;
     }
 
     /**
-     * Các nước trong danh sách khớp ô "Quốc gia" của tour ("Pháp - Thụy Sĩ - Ý" →
-     * từng nước), không phân biệt dấu / chữ hoa, bỏ phần trong ngoặc.
+     * Dòng hạn nộp áp cho từng nước trong ô "Quốc gia" của tour ("Pháp - Thụy Sĩ - Ý"
+     * → từng nước), không phân biệt dấu / chữ hoa, bỏ phần trong ngoặc.
      *
-     * @return array<string, int> tên nước trong danh sách => số ngày
+     * Mỗi nước: tour đã chọn dạng visa và nước có dòng đúng dạng đó → lấy dòng đó;
+     * tour chưa chọn dạng, hoặc nước chưa có dòng dạng đó → lấy dòng số ngày lớn
+     * nhất của nước (thà ẩn sớm còn hơn nhận khách trễ hạn).
+     *
+     * thieu_dang = tour đã chọn dạng visa mà nước chưa có dòng dạng đó.
+     *
+     * @return list<array{nuoc: string, dang: string, ngay: int, thieu_dang: bool}> số ngày giảm dần
      */
-    public static function nuocKhop(?string $quocGia): array
+    public static function nuocKhop(?string $quocGia, ?string $dang = null): array
     {
         if (! filled($quocGia)) {
             return [];
         }
-        $danhSach = Cache::store('array')->remember(self::KHOA, 60, fn () => VisaDeadline::query()->get(['country', 'days'])
-            ->mapWithKeys(fn (VisaDeadline $v) => [self::chuan($v->country) => ['ten' => $v->country, 'ngay' => $v->days]])
+        $danhSach = Cache::store('array')->remember(self::KHOA, 60, fn () => VisaDeadline::query()->get(['country', 'kind', 'days'])
+            ->groupBy(fn (VisaDeadline $v) => self::chuan($v->country))
+            ->map(fn ($nhom) => $nhom->sortByDesc('days')
+                ->mapWithKeys(fn (VisaDeadline $v) => [$v->kind => ['nuoc' => $v->country, 'dang' => $v->kind, 'ngay' => $v->days]])
+                ->all())
             ->all());
 
         $kq = [];
-        $phan = self::phanNuoc($quocGia);
-        foreach ($phan as $p) {
-            if ($p !== '' && isset($danhSach[$p])) {
-                $kq[$danhSach[$p]['ten']] = $danhSach[$p]['ngay'];
+        foreach (self::phanNuoc($quocGia) as $p) {
+            if (! isset($danhSach[$p]) || isset($kq[$p])) {
+                continue;
             }
+            $dung = filled($dang) ? ($danhSach[$p][$dang] ?? null) : null;
+            $kq[$p] = $dung
+                ? [...$dung, 'thieu_dang' => false]
+                : [...reset($danhSach[$p]), 'thieu_dang' => filled($dang)];
         }
+        usort($kq, fn ($a, $b) => $b['ngay'] <=> $a['ngay']);
 
         return $kq;
     }
 
+    /** "Trung Quốc · Visa đoàn" */
+    public static function tenDong(array $dong): string
+    {
+        return $dong['nuoc'].' · '.VisaDeadline::tenDang($dong['dang']);
+    }
+
     /**
-     * Tên các tour nước ngoài có ô "Quốc gia" khớp một nước (để nhân viên visa
-     * kiểm tra tên nước đã ghi đúng chưa).
+     * Tour nước ngoài có ô "Quốc gia" khớp một nước, kèm dạng visa của tour (để
+     * nhân viên visa kiểm tra tên nước đã ghi đúng chưa).
      *
-     * @return list<string>
+     * @return list<string> "Tour A (Visa đoàn)"
      */
     public static function tourTheoNuoc(string $nuoc): array
     {
@@ -75,17 +98,18 @@ class HanNopVisa
             return [];
         }
 
-        return Tour::query()->where('type', 'abroad')->whereNotNull('country')->orderBy('name')->get(['name', 'country'])
+        return Tour::query()->where('type', 'abroad')->whereNotNull('country')->orderBy('name')->get(['name', 'country', 'visa_kind'])
             ->filter(fn (Tour $t) => in_array($khoa, self::phanNuoc($t->country), true))
-            ->pluck('name')->values()->all();
+            ->map(fn (Tour $t) => $t->name.' ('.(VisaDeadline::tenDang($t->visa_kind) ?? 'chưa chọn dạng visa').')')
+            ->values()->all();
     }
 
-    /** Tên nước đã có trong danh sách trùng với $nuoc sau khi bỏ dấu / chữ hoa ("trung quoc" = "Trung Quốc"). */
-    public static function trungTen(string $nuoc, ?int $truId = null): ?string
+    /** Dòng đã có cùng nước (bỏ dấu / chữ hoa: "trung quoc" = "Trung Quốc") và cùng dạng visa. */
+    public static function trungTen(string $nuoc, ?string $dang, ?int $truId = null): ?string
     {
         $khoa = self::chuan($nuoc);
 
-        return VisaDeadline::query()->when($truId, fn ($q) => $q->whereKeyNot($truId))->pluck('country')
+        return VisaDeadline::query()->where('kind', $dang ?: 'doan')->when($truId, fn ($q) => $q->whereKeyNot($truId))->pluck('country')
             ->first(fn (string $c) => self::chuan($c) === $khoa);
     }
 
@@ -102,7 +126,7 @@ class HanNopVisa
         if ((int) $tour?->visa_deadline_days > 0) {
             $han[] = $dot->start_date->copy()->startOfDay()->subDays((int) $tour->visa_deadline_days);
         }
-        if ($tour?->type === 'abroad' && ($n = self::soNgayTheoNuoc($tour->country))) {
+        if ($tour?->type === 'abroad' && ($n = self::soNgayTheoNuoc($tour->country, $tour->visa_kind))) {
             $han[] = $dot->start_date->copy()->startOfDay()->subDays($n + 1);
         }
 
@@ -122,10 +146,9 @@ class HanNopVisa
         if ((int) $tour?->visa_deadline_days > 0 && $dot->start_date->copy()->subDays((int) $tour->visa_deadline_days)->isSameDay($han)) {
             return 'Theo tour: trước '.$tour->visa_deadline_days.' ngày';
         }
-        $khop = self::nuocKhop($tour?->country);
-        arsort($khop);
+        $khop = self::nuocKhop($tour?->country, $tour?->visa_kind);
 
-        return $khop ? 'Theo nước: '.array_key_first($khop).' '.reset($khop).' ngày' : null;
+        return $khop ? 'Theo nước: '.self::tenDong($khop[0]).' '.$khop[0]['ngay'].' ngày' : null;
     }
 
     /** Tính lại hạn chót các đợt của một tour (đổi quốc gia / quy tắc visa của tour). */
