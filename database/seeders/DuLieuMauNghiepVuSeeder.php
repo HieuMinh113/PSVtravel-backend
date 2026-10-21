@@ -176,7 +176,7 @@ class DuLieuMauNghiepVuSeeder extends Seeder
         // Tour Hàn Quốc, đợt còn 7 ngày là hết hạn nộp hồ sơ visa — thử hạn visa
         // ở trang xem đơn (admin), trang Tài khoản, Tra cứu đơn, email, phiếu PDF
         $tourHan = Tour::where('slug', 'han-quoc-seoul-nami-everland-5n4d')->first();
-        $dotHan = $tourHan?->departures()->whereDate('start_date', today()->addDays(32))->first();
+        $dotHan = $tourHan?->departures()->whereDate('start_date', today()->addDays(33))->first();
         if ($tourHan && $dotHan) {
             $don(['customer_email' => $khach?->email ?? 'khach5@example.com', 'tour_id' => $tourHan->id], [
                 'tour_departure_id' => $dotHan->id, 'user_id' => $khach?->id,

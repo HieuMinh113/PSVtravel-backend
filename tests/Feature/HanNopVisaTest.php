@@ -45,8 +45,9 @@ class HanNopVisaTest extends TestCase
 
     public function test_han_theo_quy_tac_chung_hoac_han_rieng_cua_dot(): void
     {
-        $this->assertSame('2026-11-15', $this->dot('2026-12-15')->hanVisa()->toDateString()); // 15/12 − 30 ngày
-        $this->assertSame('2026-11-20', $this->dot('2026-12-20', ['visa_deadline' => '2026-11-20'])->hanVisa()->toDateString());
+        // Trước 30 ngày: bay 15/12 → từ 15/11 ẩn, hạn chót 14/11 (cùng cách tính với danh sách visa theo nước)
+        $this->assertSame('2026-11-14', $this->dot('2026-12-15')->hanVisa()->toDateString());
+        $this->assertSame('2026-11-10', $this->dot('2026-12-20', ['visa_deadline' => '2026-11-10'])->hanVisa()->toDateString());
 
         $this->tour->update(['visa_deadline_days' => null]);
         $this->assertNull($this->dot('2026-12-25')->fresh()->hanVisa());
@@ -57,12 +58,12 @@ class HanNopVisaTest extends TestCase
     public function test_api_trang_tour_tra_han_visa_tung_dot(): void
     {
         $this->dot('2026-12-15');
-        $this->dot('2026-12-20', ['visa_deadline' => '2026-11-20']);
+        $this->dot('2026-12-20', ['visa_deadline' => '2026-11-10']);
 
         $r = $this->getJson('/api/v1/tours/seoul-nami')->assertOk();
         $this->assertSame(30, $r->json('data.visa_deadline_days'));
-        $this->assertSame(['2026-11-15', '2026-11-20'], array_column($r->json('data.departures'), 'visa_deadline'));
-        $this->assertSame('15/11/2026', $r->json('data.departures.0.visa_deadline_display'));
+        $this->assertSame(['2026-11-14', '2026-11-10'], array_column($r->json('data.departures'), 'visa_deadline'));
+        $this->assertSame('14/11/2026', $r->json('data.departures.0.visa_deadline_display'));
     }
 
     public function test_admin_dat_quy_tac_o_tour_va_han_rieng_o_lich_khoi_hanh(): void
@@ -85,7 +86,7 @@ class HanNopVisaTest extends TestCase
         $rm()->callAction(TestAction::make('create')->table(), data: [
             'start_date' => '2026-12-15', 'visa_deadline' => '2026-12-20', 'seats_total' => 20, 'seats_left' => 20, 'status' => 'open',
         ])->assertHasFormErrors(['visa_deadline' => 'before']);
-        // Hạn riêng sớm hơn quy tắc tour (15/12 − 45 = 31/10) → lấy hạn riêng (luôn lấy hạn sớm nhất)
+        // Hạn riêng sớm hơn quy tắc tour (bay 15/12, trước 45 ngày → hạn chót 30/10) → lấy hạn riêng (luôn lấy hạn sớm nhất)
         $rm()->callAction(TestAction::make('create')->table(), data: [
             'start_date' => '2026-12-15', 'visa_deadline' => '2026-10-25', 'seats_total' => 20, 'seats_left' => 20, 'status' => 'open',
         ])->assertHasNoFormErrors();
@@ -93,7 +94,7 @@ class HanNopVisaTest extends TestCase
         $rm()->assertSee('25/10/2026')->assertSee('Hạn riêng');
         // Hạn riêng muộn hơn quy tắc tour → vẫn theo quy tắc tour (không nhận khách sau hạn)
         TourDeparture::sole()->update(['visa_deadline' => '2026-11-25']);
-        $rm()->assertSee('31/10/2026')->assertSee('Theo tour: trước 45 ngày');
+        $rm()->assertSee('30/10/2026')->assertSee('Theo tour: trước 45 ngày');
 
         // Tour trong nước: không hiện ô hạn visa
         $this->tour->update(['type' => 'domestic']);
@@ -112,21 +113,21 @@ class HanNopVisaTest extends TestCase
 
         // Quan hệ chỉ nạp vài cột (như lúc gửi mail đặt tour) vẫn ra đúng hạn
         $don->load(['tour:id,name,duration_days', 'departure:id,start_date']);
-        $this->assertSame('2026-11-15', $don->hanNopVisa()->toDateString());
+        $this->assertSame('2026-11-14', $don->hanNopVisa()->toDateString());
         $html = (new BookingMail($don, BookingMail::XAC_NHAN))->render();
         $this->assertStringContainsString('Hạn nộp hồ sơ visa', $html);
-        $this->assertStringContainsString('15/11/2026', $html);
+        $this->assertStringContainsString('14/11/2026', $html);
 
         // Nhân viên mở đơn trong admin
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $nv = User::factory()->create();
         $nv->givePermissionTo(collect(['ViewAny:Booking', 'View:Booking'])->map(fn ($q) => Permission::findOrCreate($q, 'web')));
         $this->actingAs($nv)->get(BookingResource::getUrl('view', ['record' => $don]))
-            ->assertOk()->assertSee('Hạn nộp hồ sơ visa')->assertSee('15/11/2026')->assertSee('Còn 33 ngày');
+            ->assertOk()->assertSee('Hạn nộp hồ sơ visa')->assertSee('14/11/2026')->assertSee('Còn 32 ngày');
 
         Sanctum::actingAs($khach);
-        $this->getJson('/api/v1/auth/bookings')->assertOk()->assertJsonPath('data.0.visa_deadline', '15/11/2026');
+        $this->getJson('/api/v1/auth/bookings')->assertOk()->assertJsonPath('data.0.visa_deadline', '14/11/2026');
         $this->postJson('/api/v1/bookings/lookup', ['booking_code' => $don->booking_code, 'phone' => '0909000111'])
-            ->assertOk()->assertJsonPath('data.visa_deadline', '15/11/2026');
+            ->assertOk()->assertJsonPath('data.visa_deadline', '14/11/2026');
     }
 }

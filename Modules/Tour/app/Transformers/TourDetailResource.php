@@ -6,6 +6,7 @@ use App\Services\YouTube;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Tour\Models\Tour;
+use Modules\Tour\Services\HanNopVisa;
 use Modules\Visa\Models\VisaDeadline;
 
 class TourDetailResource extends JsonResource
@@ -24,8 +25,9 @@ class TourDetailResource extends JsonResource
             'duration_days' => $this->duration_days,
             'duration_nights' => $this->duration_nights,
             'departure_from' => $this->departure_from,
-            // Quy tắc chung "nộp hồ sơ visa trước ngày khởi hành N ngày" (null = không đặt)
-            'visa_deadline_days' => $this->visa_deadline_days,
+            // Số ngày "nộp hồ sơ visa trước ngày khởi hành N ngày" đang áp: theo danh sách
+            // visa theo nước hoặc số riêng của tour, lấy số lớn hơn (null = không có)
+            'visa_deadline_days' => HanNopVisa::soNgayNop($this->resource),
             // Dạng visa (visa đoàn / lẻ / điện tử / giấy thông hành) — ghi cho khách trên trang tour
             ...self::dangVisa($this->resource),
             'adult_price' => $this->adult_price,
@@ -122,13 +124,15 @@ class TourDetailResource extends JsonResource
 
     /**
      * visa_kind + tên + giải thích ngắn cho khách ("Visa đoàn", "đi và về cùng đoàn").
-     * Tour trong nước không trả (dạng visa chỉ có nghĩa với tour nước ngoài).
+     * Chỉ trả khi tour nước ngoài có nước trong danh sách visa — tour Thái Lan (miễn
+     * visa) lỡ chọn dạng visa cũng không ghi "Visa đoàn" cho khách.
      *
      * @return array{visa_kind: ?string, visa_kind_label: ?string, visa_kind_note: ?string}
      */
     public static function dangVisa(Tour $tour): array
     {
-        $dang = $tour->type === 'abroad' && isset(VisaDeadline::DANG[$tour->visa_kind ?? '']) ? $tour->visa_kind : null;
+        $dang = $tour->type === 'abroad' && isset(VisaDeadline::DANG[$tour->visa_kind ?? '']) && HanNopVisa::nuocKhop($tour->country) !== []
+            ? $tour->visa_kind : null;
 
         return [
             'visa_kind' => $dang,

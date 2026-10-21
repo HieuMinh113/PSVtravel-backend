@@ -7,6 +7,8 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Modules\Tour\Models\Tour;
+use Modules\Tour\Services\HanNopVisa;
+use Modules\Visa\Models\VisaDeadline;
 
 class TourInfolist
 {
@@ -34,9 +36,16 @@ class TourInfolist
                 TextEntry::make('departure_from')
                     ->label('Khởi hành từ')
                     ->placeholder('—'),
+                TextEntry::make('visa_kind')
+                    ->label('Dạng visa')
+                    ->formatStateUsing(fn (?string $state): ?string => VisaDeadline::tenDang($state))
+                    ->placeholder('Chưa chọn')
+                    ->visible(fn ($record): bool => $record?->type === 'abroad'),
+                // Số ngày đang áp: theo danh sách visa theo nước, hoặc số riêng của tour (lấy số lớn hơn)
                 TextEntry::make('visa_deadline_days')
                     ->label('Hạn nộp hồ sơ visa')
-                    ->formatStateUsing(fn ($state): string => 'Trước ngày khởi hành '.$state.' ngày')
+                    ->state(fn ($record): ?int => HanNopVisa::soNgayNop($record))
+                    ->formatStateUsing(fn ($state, $record): string => 'Trước ngày khởi hành '.$state.' ngày ('.HanNopVisa::nguonSoNgay($record).')')
                     ->placeholder('Không đặt')
                     ->visible(fn ($record): bool => $record?->type === 'abroad'),
                 TextEntry::make('duration_days')

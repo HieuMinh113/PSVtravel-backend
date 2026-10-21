@@ -19,8 +19,9 @@ use Modules\Tour\Models\TourItinerary;
  * điểm đến nối vào danh mục. Gọi từ DemoSeeder. Chạy lại không sinh trùng.
  *
  * Hạn nộp hồ sơ visa (tour nước ngoài): 'han_visa' = quy tắc "trước ngày
- * khởi hành N ngày"; phần tử thứ 4 của một đợt = hạn RIÊNG của đợt đó (số
- * ngày tính từ hôm nay). Số liệu chọn để thấy đủ: hạn còn xa, còn ≤ 7 ngày
+ * khởi hành N ngày" (từ ngày bay − N ẩn, hạn chót = ngày bay − N − 1); phần tử
+ * thứ 4 của một đợt = hạn RIÊNG của đợt đó (số ngày tính từ hôm nay, phải sớm
+ * hơn quy tắc mới có tác dụng). Số liệu chọn để thấy đủ: hạn còn xa, còn ≤ 7 ngày
  * (cam), đã qua (đỏ), hạn riêng; Singapore / Bali không đặt hạn (miễn visa).
  *
  * Giá, lịch trình là số liệu MẪU — không phải bảng giá thật của công ty.
@@ -207,7 +208,7 @@ class DuLieuMauTourSeeder extends Seeder
                 'diem_nhan' => ['Đảo Nami mùa thu', 'Công viên Everland', 'Mặc Hanbok tại cung Gyeongbok'],
                 'mo_ta' => 'Xứ sở kim chi mùa lá đỏ, mua sắm Myeongdong, trải nghiệm văn hoá Hàn.',
                 'lich' => ['HCM - Incheon', 'Đảo Nami - Seoul', 'Cung Gyeongbok - Myeongdong', 'Everland', 'Seoul - HCM'],
-                'dot' => [[18, 25, 6], [32, 25, 25], [46, 25, 25]],
+                'dot' => [[18, 25, 6], [33, 25, 25], [47, 25, 25]],
                 'han_visa' => 25, // đợt 1 đã qua hạn, đợt 2 còn 7 ngày, đợt 3 còn 21 ngày
                 'danh_gia' => [['Kiều Bảo Ngọc', 5, 'Nami đẹp như phim, HDV vui tính.'], ['Mạc Văn Tú', 4, 'Hơi lạnh nhưng rất đáng đi.']],
             ],
@@ -218,8 +219,8 @@ class DuLieuMauTourSeeder extends Seeder
                 'diem_nhan' => ['Núi Phú Sĩ - làng cổ Oshino Hakkai', 'Chùa Vàng Kinkakuji', 'Tàu cao tốc Shinkansen'],
                 'mo_ta' => 'Cung đường vàng Nhật Bản từ Tokyo hiện đại đến Kyoto cổ kính.',
                 'lich' => ['HCM - Tokyo', 'Tokyo - Asakusa - Ginza', 'Phú Sĩ - Oshino Hakkai', 'Shinkansen - Kyoto', 'Osaka - Lâu đài Osaka', 'Osaka - HCM'],
-                'dot' => [[30, 20, 12], [60, 20, 20, 40]],
-                'han_visa' => 45, // đợt 1 đã qua hạn; đợt 2 có hạn RIÊNG (còn 40 ngày)
+                'dot' => [[30, 20, 12], [60, 20, 20, 10]],
+                'han_visa' => 45, // đợt 1 đã qua hạn; đợt 2 có hạn RIÊNG sớm hơn quy tắc (còn 10 ngày)
             ],
             [
                 'slug' => 'trung-quoc-truong-gia-gioi-phuong-hoang-6n5d', 'ten' => 'Trung Quốc: Trương Gia Giới - Phượng Hoàng cổ trấn 6 ngày 5 đêm',
@@ -228,7 +229,7 @@ class DuLieuMauTourSeeder extends Seeder
                 'diem_nhan' => ['Thiên Môn Sơn - đường cáp treo dài nhất thế giới', 'Cầu kính Đại Hiệp Cốc', 'Phượng Hoàng cổ trấn về đêm'],
                 'mo_ta' => 'Núi non kỳ vĩ như phim Avatar và cổ trấn bên dòng Đà Giang.',
                 'lich' => ['HCM - Trương Gia Giới', 'Thiên Môn Sơn', 'Viên Gia Giới - Thiên Tử Sơn', 'Đại Hiệp Cốc - Phượng Hoàng', 'Phượng Hoàng cổ trấn', 'Trương Gia Giới - HCM'],
-                'dot' => [[21, 25, 17], [35, 25, 25]],
+                'dot' => [[22, 25, 17], [36, 25, 25]],
                 'han_visa' => 15, // đợt 1 còn 6 ngày, đợt 2 còn 20 ngày
             ],
             [

@@ -13,12 +13,15 @@ use Modules\Visa\Models\VisaDeadline;
  * Hạn chót nộp hồ sơ visa của một đợt khởi hành — qua hạn thì đợt tự ẩn trên
  * website (khách không thấy, không đặt được; admin vẫn thấy).
  *
- * Lấy hạn SỚM NHẤT trong ba nguồn, để không bao giờ nhận khách sau hạn của
+ * "Nộp trước ngày bay N ngày" ở mọi chỗ cùng một nghĩa: bay 22, N = 7 → từ ngày
+ * 15 (22 − 7) đã ẩn, hạn chót là ngày 14 (= ngày bay − N − 1).
+ *
+ * Lấy hạn SỚM NHẤT trong các nguồn, để không bao giờ nhận khách sau hạn của
  * bất kỳ bên nào:
- *  - Hạn theo nước + dạng visa (nhân viên visa đặt, "Trung Quốc — visa đoàn 7
- *    ngày"): bay 22 → từ ngày 15 đã ẩn, hạn chót là ngày 14 (= ngày bay − N − 1).
- *    Chỉ áp cho tour nước ngoài.
- *  - Quy tắc của tour "nộp trước ngày khởi hành N ngày": hạn chót = ngày bay − N.
+ *  - Số ngày của tour = số lớn hơn trong: danh sách theo nước + dạng visa (nhân
+ *    viên visa đặt, "Trung Quốc — visa đoàn 7 ngày", chỉ tour nước ngoài) và số
+ *    riêng của tour (đối tác yêu cầu nộp sớm hơn). Tour không chép số của danh
+ *    sách: danh sách đổi thì mọi tour tự theo.
  *  - Hạn riêng của đợt (đối tác chốt ngày cụ thể).
  *
  * Hạn chót được lưu sẵn vào tour_departures.visa_last_day để lọc bằng SQL (danh
@@ -113,6 +116,36 @@ class HanNopVisa
             ->first(fn (string $c) => self::chuan($c) === $khoa);
     }
 
+    /**
+     * Số ngày nộp hồ sơ visa đang áp cho tour (trước ngày bay N ngày): số lớn hơn
+     * trong danh sách theo nước + dạng visa và số riêng của tour. Null = không có.
+     */
+    public static function soNgayNop(?Tour $tour): ?int
+    {
+        $n = max((int) $tour?->visa_deadline_days, (int) self::soNgayDanhSach($tour));
+
+        return $n > 0 ? $n : null;
+    }
+
+    /** Số ngày theo danh sách "Hạn nộp visa theo nước" cho tour (chỉ tour nước ngoài). */
+    public static function soNgayDanhSach(?Tour $tour): ?int
+    {
+        return $tour?->type === 'abroad' ? self::soNgayTheoNuoc($tour->country, $tour->visa_kind) : null;
+    }
+
+    /** Số ngày đang áp lấy từ đâu: "theo danh sách: Trung Quốc · Visa đoàn" / "riêng của tour". */
+    public static function nguonSoNgay(?Tour $tour): ?string
+    {
+        $khop = $tour?->type === 'abroad' ? self::nuocKhop($tour->country, $tour->visa_kind) : [];
+        $rieng = (int) $tour?->visa_deadline_days;
+
+        return match (true) {
+            $khop && $khop[0]['ngay'] >= $rieng => 'theo danh sách: '.self::tenDong($khop[0]),
+            $rieng > 0 => 'riêng của tour',
+            default => null,
+        };
+    }
+
     /** Hạn chót nộp hồ sơ (ngày cuối còn hiện trên web) của một đợt; null = không có hạn. */
     public static function hanChot(TourDeparture $dot, ?Tour $tour): ?Carbon
     {
@@ -123,17 +156,14 @@ class HanNopVisa
         if ($dot->visa_deadline) {
             $han[] = $dot->visa_deadline->copy()->startOfDay();
         }
-        if ((int) $tour?->visa_deadline_days > 0) {
-            $han[] = $dot->start_date->copy()->startOfDay()->subDays((int) $tour->visa_deadline_days);
-        }
-        if ($tour?->type === 'abroad' && ($n = self::soNgayTheoNuoc($tour->country, $tour->visa_kind))) {
+        if ($n = self::soNgayNop($tour)) {
             $han[] = $dot->start_date->copy()->startOfDay()->subDays($n + 1);
         }
 
         return $han ? min($han) : null;
     }
 
-    /** Hạn chót đến từ đâu: "hạn riêng" / "theo tour: trước N ngày" / "theo nước: Trung Quốc 7 ngày". */
+    /** Hạn chót đến từ đâu: "hạn riêng" / "theo tour: trước N ngày" / "theo nước: Trung Quốc · Visa đoàn 7 ngày". */
     public static function nguonHan(TourDeparture $dot, ?Tour $tour): ?string
     {
         $han = self::hanChot($dot, $tour);
@@ -143,12 +173,12 @@ class HanNopVisa
         if ($dot->visa_deadline && $dot->visa_deadline->isSameDay($han)) {
             return 'Hạn riêng';
         }
-        if ((int) $tour?->visa_deadline_days > 0 && $dot->start_date->copy()->subDays((int) $tour->visa_deadline_days)->isSameDay($han)) {
-            return 'Theo tour: trước '.$tour->visa_deadline_days.' ngày';
+        $khop = $tour?->type === 'abroad' ? self::nuocKhop($tour->country, $tour->visa_kind) : [];
+        if ($khop && $khop[0]['ngay'] >= (int) $tour->visa_deadline_days) {
+            return 'Theo nước: '.self::tenDong($khop[0]).' '.$khop[0]['ngay'].' ngày';
         }
-        $khop = self::nuocKhop($tour?->country, $tour?->visa_kind);
 
-        return $khop ? 'Theo nước: '.self::tenDong($khop[0]).' '.$khop[0]['ngay'].' ngày' : null;
+        return (int) $tour?->visa_deadline_days > 0 ? 'Theo tour: trước '.$tour->visa_deadline_days.' ngày' : null;
     }
 
     /** Tính lại hạn chót các đợt của một tour (đổi quốc gia / quy tắc visa của tour). */

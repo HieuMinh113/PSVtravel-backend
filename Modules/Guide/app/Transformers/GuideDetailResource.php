@@ -5,6 +5,7 @@ namespace Modules\Guide\Transformers;
 use App\Services\YouTube;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Tour\Services\HanNopVisa;
 use Modules\Tour\Transformers\TourDetailResource;
 
 class GuideDetailResource extends JsonResource
@@ -75,6 +76,7 @@ class GuideDetailResource extends JsonResource
             'old_price' => $tour->old_price,
             'cover_image' => $this->anh($tour->cover_image),
             'het_han_visa' => $tour->hetHanVisa(),
+            'visa_deadline_days' => HanNopVisa::soNgayNop($tour),
             ...TourDetailResource::dangVisa($tour),
             'next_start_date' => $dauTien?->start_date?->format('d/m/Y'),
             'next_seats_left' => $dauTien?->seats_left,

@@ -67,18 +67,15 @@ class DeparturesRelationManager extends RelationManager
                     },
                 ]),
             // Hạn nộp visa riêng của đợt này (đối tác chốt ngày cụ thể). Trống =
-            // theo quy tắc chung của tour "trước ngày khởi hành N ngày".
+            // theo số ngày chung của tour (danh sách visa theo nước / số riêng của tour).
             DatePicker::make('visa_deadline')
                 ->label('Hạn nộp hồ sơ visa (riêng đợt này)')
                 ->native(false)
                 ->displayFormat('d/m/Y')
                 ->placeholder(fn (): string => $this->quyTacVisa() ? 'Theo quy tắc chung' : 'Không đặt')
                 ->helperText(fn (): string => ($this->quyTacVisa()
-                    ? 'Để trống = '.$this->quyTacVisa().' (đặt ở thông tin tour).'
-                    : 'Tour chưa đặt quy tắc chung.')
-                    .(($n = HanNopVisa::soNgayTheoNuoc($this->getOwnerRecord()->country, $this->getOwnerRecord()->visa_kind)) && $this->getOwnerRecord()->type === 'abroad'
-                        ? " Hạn theo nước: trước ngày bay {$n} ngày."
-                        : '')
+                    ? 'Để trống = '.$this->quyTacVisa().'.'
+                    : 'Tour chưa có hạn nộp visa chung.')
                     .' Lấy hạn sớm nhất; qua hạn thì đợt tự ẩn trên website.')
                 ->before('start_date')
                 ->validationMessages(['before' => 'Hạn nộp visa phải trước ngày khởi hành.'])
@@ -131,12 +128,13 @@ class DeparturesRelationManager extends RelationManager
         ]);
     }
 
-    /** "trước ngày khởi hành 30 ngày" — quy tắc chung của tour, null nếu chưa đặt */
+    /** "trước ngày khởi hành 14 ngày (theo danh sách: Trung Quốc · Visa đoàn)" — số ngày chung của tour, null nếu không có */
     private function quyTacVisa(): ?string
     {
-        $n = (int) $this->getOwnerRecord()->visa_deadline_days;
+        $tour = $this->getOwnerRecord();
+        $n = HanNopVisa::soNgayNop($tour);
 
-        return $n > 0 ? "trước ngày khởi hành {$n} ngày" : null;
+        return $n ? "trước ngày khởi hành {$n} ngày (".HanNopVisa::nguonSoNgay($tour).')' : null;
     }
 
     /** @var array<string,AllianceDeparture>|null ngày => ngày đi trong sheet (nạp 1 lần cho cả bảng) */

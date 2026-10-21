@@ -4,6 +4,7 @@ namespace Modules\Tour\Services\NhapTour;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Modules\Tour\Services\HanNopVisa;
 use Normalizer;
 
 /**
@@ -237,12 +238,15 @@ class PhanTichChuongTrinh
         if ($lichTrinh && $soNgay && count($lichTrinh) !== $soNgay) {
             $this->canhBao[] = 'Lịch trình có '.count($lichTrinh)." ngày nhưng thời gian tour ghi {$soNgay} ngày — kiểm tra lại.";
         }
-        // Ngày gần quá, không còn kịp nộp hồ sơ visa — vẫn tạo, nhưng báo để đóng bán nếu cần
+        // Ngày gần quá, không còn kịp nộp hồ sơ visa — vẫn tạo, nhưng báo để đóng bán nếu cần.
+        // Số ngày: số lớn hơn giữa chương trình ghi và danh sách visa theo nước; trước N
+        // ngày = từ ngày bay − N đã ẩn (xem HanNopVisa)
         $hanVisa = $this->hanVisa($toanVan);
-        $quaHanVisa = $hanVisa && $nuoc ? collect($dot)->filter(fn ($d) => Carbon::parse($d['ngay'])->subDays($hanVisa)->lt(today()))
+        $soNgayVisa = max((int) $hanVisa, (int) ($nuoc ? HanNopVisa::soNgayTheoNuoc($nuoc) : 0));
+        $quaHanVisa = $soNgayVisa && $nuoc ? collect($dot)->filter(fn ($d) => Carbon::parse($d['ngay'])->subDays($soNgayVisa)->lte(today()))
             ->map(fn ($d) => Carbon::parse($d['ngay'])->format('d/m'))->values() : collect();
         if ($quaHanVisa->isNotEmpty()) {
-            $this->canhBao[] = $quaHanVisa->count()." ngày khởi hành đã quá hạn nộp hồ sơ visa (trước {$hanVisa} ngày): "
+            $this->canhBao[] = $quaHanVisa->count()." ngày khởi hành đã quá hạn nộp hồ sơ visa (trước {$soNgayVisa} ngày): "
                 .$quaHanVisa->implode(', ').' — vẫn được tạo nhưng tự ẩn trên website (khách không đặt được).';
         }
         if (! $nuoc && ! preg_match('/\b(việt nam)\b/iu', $toanVan)) {

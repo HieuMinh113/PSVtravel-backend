@@ -15,6 +15,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Modules\Alliance\Models\AllianceTour;
 use Modules\Tour\Models\Tour;
@@ -146,11 +147,20 @@ class TourForm
                 TextInput::make('region')
                     ->label('Vùng / khu vực')
                     ->maxLength(255),
-                // Khớp danh sách "Hạn nộp visa theo nước" (nhân viên visa) → đợt quá hạn tự ẩn trên web
+                // Khớp danh sách "Hạn nộp visa theo nước" (nhân viên visa) → đợt quá hạn tự ẩn trên web.
+                // Gợi ý tên nước trong danh sách khi gõ, vẫn gõ tự do được (tour nhiều nước, nước miễn visa).
                 TextInput::make('country')
                     ->label('Quốc gia')
-                    ->helperText(fn (Get $get): string => self::goiYHanVisaNuoc($get('type'), $get('country'), $get('visa_kind')))
+                    ->datalist(fn (): array => VisaDeadline::query()->distinct()->orderBy('country')->pluck('country')->all())
+                    ->helperText(fn (Get $get): string => self::goiYHanVisaNuoc($get('type'), $get('country')))
                     ->live(onBlur: true)
+                    // Nước có dòng "Visa đoàn" mà tour chưa chọn dạng visa → tự chọn Visa đoàn
+                    ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
+                        if ($get('type') === 'abroad' && blank($get('visa_kind'))
+                            && collect(HanNopVisa::nuocKhop($state, 'doan'))->contains('thieu_dang', false)) {
+                            $set('visa_kind', 'doan');
+                        }
+                    })
                     ->maxLength(255),
                 TextInput::make('departure_from')
                     ->label('Khởi hành từ')
@@ -163,8 +173,10 @@ class TourForm
                     ->helperText('Lấy đúng hạn nộp của dạng này trong "Hạn nộp visa theo nước". Khách thấy dạng visa trên trang tour (VD: Visa đoàn — đi và về cùng đoàn).')
                     ->live()
                     ->visible(fn (Get $get): bool => $get('type') === 'abroad'),
-                // Hạn nộp hồ sơ visa — quy tắc chung cho mọi ngày khởi hành.
-                // Ngày nào đối tác chốt hạn riêng thì đặt trong "Lịch khởi hành".
+                // Hạn nộp hồ sơ visa cho mọi ngày khởi hành. Mặc định theo danh sách
+                // "Hạn nộp visa theo nước" (quốc gia + dạng visa) — hiện sẵn, không lưu
+                // vào tour, danh sách đổi thì tour tự theo. Ô này chỉ để đặt số RIÊNG khi
+                // tour phải nộp sớm hơn. Ngày nào đối tác chốt hạn riêng thì đặt trong "Lịch khởi hành".
                 TextInput::make('visa_deadline_days')
                     ->label('Hạn nộp hồ sơ visa')
                     ->prefix('Trước ngày khởi hành')
@@ -173,8 +185,9 @@ class TourForm
                     ->integer()
                     ->minValue(1)
                     ->maxValue(180)
-                    ->placeholder('VD: 30')
-                    ->helperText('Áp dụng cho mọi ngày khởi hành; ngày nào có hạn riêng thì đặt ở bảng "Lịch khởi hành" bên dưới. Để trống nếu tour không cần visa. Khách thấy hạn này trên trang tour, trong email và phiếu xác nhận.')
+                    ->placeholder(fn (Get $get): string => ($n = HanNopVisa::soNgayTheoNuoc($get('country'), $get('visa_kind'))) ? "{$n} — theo danh sách visa" : 'VD: 30')
+                    ->helperText(fn (Get $get): string => self::goiYHanNopVisa($get('country'), $get('visa_kind'), $get('visa_deadline_days')))
+                    ->live(onBlur: true)
                     ->visible(fn (Get $get): bool => $get('type') === 'abroad'),
 
                 TextInput::make('duration_days')
@@ -385,21 +398,44 @@ class TourForm
     }
 
     /** Dưới ô Quốc gia: tour áp hạn nộp visa của nước nào, hay không khớp nước nào trong danh sách. */
-    private static function goiYHanVisaNuoc(?string $loai, ?string $quocGia, ?string $dang = null): string
+    private static function goiYHanVisaNuoc(?string $loai, ?string $quocGia): string
     {
         if ($loai !== 'abroad') {
             return 'Chỉ điền với tour nước ngoài.';
         }
-        $khop = HanNopVisa::nuocKhop($quocGia, $dang);
+        $khop = HanNopVisa::nuocKhop($quocGia);
         if ($khop) {
-            $thieu = collect($khop)->where('thieu_dang', true)->pluck('nuoc')->implode(', ');
-
-            return 'Hạn nộp visa theo nước: '.HanNopVisa::tenDong($khop[0]).' — nộp trước ngày bay '.$khop[0]['ngay'].' ngày. Ngày khởi hành quá hạn tự ẩn trên website.'
-                .($thieu !== '' ? ' ⚠ '.$thieu.' chưa có dòng "'.VisaDeadline::tenDang($dang).'" — đang lấy số ngày lớn nhất của nước.' : '');
+            return 'Khớp danh sách "Hạn nộp visa theo nước": '.collect($khop)->pluck('nuoc')->implode(', ').'. Số ngày nộp hiện ở ô "Hạn nộp hồ sơ visa".';
         }
 
         return filled($quocGia)
             ? '⚠ "'.$quocGia.'" chưa có trong danh sách "Hạn nộp visa theo nước" — ngày khởi hành của tour này KHÔNG tự ẩn theo hạn visa của nước (báo nhân viên visa thêm, hoặc ghi đúng tên nước).'
             : 'Ghi tên nước (VD: Trung Quốc; nhiều nước: Pháp - Thụy Sĩ - Ý) để áp hạn nộp visa theo nước.';
+    }
+
+    /**
+     * Gợi ý ở ô "Hạn nộp hồ sơ visa": số ngày đang áp lấy từ danh sách visa theo nước
+     * hay số riêng của tour; số riêng không sớm hơn danh sách thì báo là không có tác dụng.
+     */
+    private static function goiYHanNopVisa(?string $quocGia, ?string $dang, $rieng): string
+    {
+        $rieng = (int) $rieng;
+        // "bay 22/11 → ẩn trên web từ 08/11"
+        $vd = fn (int $n): string => ' (VD bay 22/11 → ẩn trên web từ '.Carbon::create(2026, 11, 22)->subDays($n)->format('d/m').')';
+        $khop = HanNopVisa::nuocKhop($quocGia, $dang);
+        if (! $khop) {
+            return ($rieng > 0 ? "Áp dụng cho mọi ngày khởi hành{$vd($rieng)}." : 'Nước này chưa có trong danh sách "Hạn nộp visa theo nước": điền số ngày nếu tour cần visa, để trống nếu không cần.')
+                .' Ngày nào có hạn riêng thì đặt ở bảng "Lịch khởi hành".';
+        }
+        $ds = $khop[0];
+        $theoDs = HanNopVisa::tenDong($ds).' '.$ds['ngay'].' ngày';
+        $thieu = collect($khop)->where('thieu_dang', true)->pluck('nuoc')->implode(', ');
+        $canhBaoDang = $thieu !== '' ? ' ⚠ '.$thieu.' chưa có dòng "'.VisaDeadline::tenDang($dang).'" — đang lấy số ngày lớn nhất của nước.' : '';
+
+        return match (true) {
+            $rieng > $ds['ngay'] => "Đang áp số riêng của tour: {$rieng} ngày — sớm hơn danh sách ({$theoDs}){$vd($rieng)}.",
+            $rieng > 0 => "⚠ Số riêng {$rieng} ngày không sớm hơn danh sách ({$theoDs}) nên không có tác dụng — hạn vẫn theo danh sách. Xoá số này cho gọn.",
+            default => "Đang theo danh sách \"Hạn nộp visa theo nước\": {$theoDs}{$vd($ds['ngay'])}. Chỉ điền khi tour phải nộp sớm hơn.",
+        }.$canhBaoDang;
     }
 }
