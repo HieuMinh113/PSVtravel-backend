@@ -4,9 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Modules\Tour\Services\HanNopVisa;
 
 /**
- * Tính lại hạn chót nộp visa đã lưu sẵn (tour_departures.visa_last_day) sau khi
- * thống nhất cách tính: số ngày riêng của tour cũng "từ ngày bay − N ẩn" như danh
- * sách visa theo nước (trước đây hạn chót muộn hơn 1 ngày).
+ * Tính hạn chót nộp visa cho mọi đợt đang có (tour_departures.visa_last_day) —
+ * chạy sau khi đã đủ cột / bảng (2026_10_26, 2026_10_27). Cũng là lần tính lại
+ * theo cách tính thống nhất: số ngày riêng của tour cũng "từ ngày bay − N ẩn"
+ * như danh sách visa theo nước (trước đây hạn chót muộn hơn 1 ngày).
  */
 return new class extends Migration
 {

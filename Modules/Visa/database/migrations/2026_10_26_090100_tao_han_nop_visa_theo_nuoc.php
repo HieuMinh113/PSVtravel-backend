@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Tour\Services\HanNopVisa;
 use Modules\Visa\Database\Seeders\QuyenVisaSeeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -18,19 +17,24 @@ return new class extends Migration
 
     public function up(): void
     {
-        Schema::create('visa_deadlines', function (Blueprint $table) {
-            $table->id();
-            $table->string('country', 100)->unique();
-            $table->unsignedSmallInteger('days');
-            $table->string('note', 500)->nullable();
-            $table->timestamps();
-        });
+        // (lần chạy trước lỗi giữa chừng mà bảng vẫn còn thì không tạo lại)
+        if (! Schema::hasTable('visa_deadlines')) {
+            Schema::create('visa_deadlines', function (Blueprint $table) {
+                $table->id();
+                $table->string('country', 100)->unique();
+                $table->unsignedSmallInteger('days');
+                $table->string('note', 500)->nullable();
+                $table->timestamps();
+            });
+        }
 
         // Quyền cho vai trò visa, admin, super_admin (QuyenVisaSeeder đã có các quyền này)
         (new QuyenVisaSeeder)->run();
 
-        // Tính hạn chót cho các đợt đang có (quy tắc visa của tour / hạn riêng của đợt)
-        HanNopVisa::tinhLaiTatCa();
+        // KHÔNG tính hạn chót cho các đợt đang có ở đây: mã tính hạn hiện tại đọc
+        // cả cột dạng visa (thêm ở migration 2026_10_27) — chạy ở đây trên máy có
+        // sẵn tour là lỗi "column kind does not exist" (đã xảy ra khi triển khai
+        // 21/10/2026). Việc tính được làm ở migration 2026_10_28, khi đã đủ cột.
     }
 
     public function down(): void
