@@ -27,7 +27,7 @@ return [
             'pages' => true,
             'widgets' => true,
             'resources' => true,
-            'custom_permissions' => false,
+            'custom_permissions' => true,
         ],
     ],
 
@@ -252,7 +252,14 @@ return [
     |
     */
 
-    'custom_permissions' => [],
+    // Quyền đặc biệt không gắn với một trang: hiện ở thẻ riêng trong màn hình
+    // Vai trò để tích được (trước đây không có ô → lưu vai trò là bị xoá mất).
+    'custom_permissions' => [
+        'Approve:Payment' => 'Duyệt khoản thu (đã nhận tiền)',
+        'ViewAll:Booking' => 'Xem mọi đơn, đổi người phụ trách',
+        'ViewAll:Attendance' => 'Quản lý chấm công mọi người',
+        'ViewAll:VisaCase' => 'Xem mọi hồ sơ visa, giao hồ sơ',
+    ],
 
     /*
     |--------------------------------------------------------------------------

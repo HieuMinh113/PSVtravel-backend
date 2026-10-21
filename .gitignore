@@ -25,3 +25,8 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# File dump CSDL (có dữ liệu khách) không bao giờ được đưa lên git — bản sao lưu
+# nằm ở /opt/psvtravel/backups (scripts/sao-luu-csdl.sh)
+*.sql
+*.sql.gz

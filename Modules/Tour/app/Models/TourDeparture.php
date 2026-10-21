@@ -5,7 +5,9 @@ namespace Modules\Tour\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Modules\Booking\Models\Booking;
 use Modules\Tour\Services\HanNopVisa;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -53,6 +55,21 @@ class TourDeparture extends Model
 
             $dot->status = $dot->seats_left > 0 ? 'open' : 'full';
         });
+
+        // Còn đơn (chưa huỷ) thì không xoá được: xoá thì đơn của khách mất ngày đi,
+        // hạn visa, số chỗ. Muốn ngừng bán thì đóng đợt.
+        static::deleting(fn (TourDeparture $dot) => ! $dot->conDon());
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    /** Có đơn chưa huỷ đặt đợt này (kể cả đơn đã hoàn thành). */
+    public function conDon(): bool
+    {
+        return $this->bookings()->where('status', '!=', 'cancelled')->exists();
     }
 
     public function tour(): BelongsTo

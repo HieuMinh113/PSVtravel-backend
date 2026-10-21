@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Booking\Exceptions\KhongDuCho;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -88,6 +90,17 @@ class Booking extends Model
             }
         });
 
+        // Đơn ĐÃ XÁC NHẬN (đã trừ chỗ) mà sửa số khách / đổi đợt khởi hành → trả
+        // chỗ cho đợt cũ, trừ chỗ đợt mới. Trước đây không động tới số chỗ: huỷ
+        // đơn sau đó hoàn chỗ theo số mới vào đợt mới (đợt 10 chỗ thành 15), đợt
+        // cũ mất chỗ vĩnh viễn. Không đủ chỗ thì báo lỗi, không lưu.
+        static::updating(function (Booking $booking) {
+            if ($booking->getOriginal('status') === 'confirmed' && $booking->status === 'confirmed'
+                && $booking->isDirty(['tour_departure_id', 'adults', 'children'])) {
+                $booking->doiChoDaGiu();
+            }
+        });
+
         static::saving(function (Booking $booking) {
             // Chốt đơn: ghi ai xác nhận, lúc nào (tháng tính hoa hồng). Tạo
             // thẳng ở trạng thái "Đã xác nhận" thì người tạo là người xác nhận.
@@ -96,6 +109,13 @@ class Booking extends Model
                 $booking->confirmed_by ??= auth()->id();
             }
             $booking->assigned_to ??= $booking->confirmed_by;
+
+            // Đổi tổng tiền (thêm / bớt khách...) → tính lại "đã trả đủ chưa" theo số
+            // đã thu; trước đây đơn đã trả đủ thêm khách vẫn ghi "Đã trả", khách
+            // không được nhắc đóng phần thiếu. Đơn mới: tự tính khi có khoản thu.
+            if ($booking->exists && $booking->isDirty('total_price')) {
+                $booking->payment_status = self::trangThaiThanhToan((int) $booking->paid_total, (int) $booking->total_price);
+            }
 
             // Tiền cọc = tổng × tỷ lệ, làm tròn nghìn đồng
             $booking->deposit_amount = $booking->deposit_percent
@@ -112,6 +132,58 @@ class Booking extends Model
             // Đổi hạn → được báo chuông lại theo ngày mới
             if ($booking->isDirty('remind_on')) {
                 $booking->remind_notified_at = null;
+            }
+        });
+    }
+
+    /** unpaid / partial / paid theo số đã thu so với tổng tiền đơn. */
+    public static function trangThaiThanhToan(int $daThu, int $tong): string
+    {
+        return match (true) {
+            $daThu <= 0 => 'unpaid',
+            $daThu >= $tong => 'paid',
+            default => 'partial',
+        };
+    }
+
+    /**
+     * Đơn đã xác nhận đổi số khách / đợt: trả chỗ đã giữ cho đợt cũ, trừ chỗ
+     * đợt mới. Kiểm tra đủ chỗ TRƯỚC rồi mới ghi; thiếu thì ném KhongDuCho.
+     */
+    private function doiChoDaGiu(): void
+    {
+        $dotCu = $this->getOriginal('tour_departure_id');
+        $khachCu = (int) $this->getOriginal('adults') + (int) $this->getOriginal('children');
+        $dotMoi = $this->tour_departure_id;
+        $khachMoi = (int) $this->adults + (int) $this->children;
+
+        DB::transaction(function () use ($dotCu, $khachCu, $dotMoi, $khachMoi) {
+            $dot = TourDeparture::whereKey(array_filter([$dotCu, $dotMoi]))->lockForUpdate()->get()->keyBy('id');
+            // id đợt => số chỗ cộng thêm (âm = trừ)
+            $doi = [];
+            if ($dotCu && $dot->has($dotCu)) {
+                $doi[$dotCu] = $khachCu;
+            }
+            if ($dotMoi && $dot->has($dotMoi)) {
+                $doi[$dotMoi] = ($doi[$dotMoi] ?? 0) - $khachMoi;
+            }
+            foreach ($doi as $id => $soCho) {
+                $d = $dot[$id];
+                if ((int) $d->seats_left + $soCho < 0) {
+                    $con = (int) $d->seats_left + ($id == $dotCu ? $khachCu : 0);
+
+                    throw new KhongDuCho('Đợt '.$d->start_date->format('d/m/Y')." chỉ còn {$con} chỗ, không đủ cho {$khachMoi} khách.");
+                }
+            }
+            foreach ($doi as $id => $soCho) {
+                if ($soCho === 0) {
+                    continue;
+                }
+                $d = $dot[$id];
+                $con = (int) $d->seats_left + $soCho;
+                // không vượt tổng số chỗ của đợt (số liệu cũ đã lệch thì cũng không đẩy lệch thêm)
+                $d->seats_left = $d->seats_total > 0 ? min($con, (int) $d->seats_total) : $con;
+                $d->save(); // tự chuyển "Còn nhận" / "Hết chỗ"
             }
         });
     }

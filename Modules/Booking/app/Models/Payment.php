@@ -73,11 +73,7 @@ class Payment extends Model
             ->where('status', 'success')
             ->sum('amount');
 
-        $trangThai = match (true) {
-            $daThu <= 0 => 'unpaid',
-            $daThu >= $booking->total_price => 'paid',
-            default => 'partial',
-        };
+        $trangThai = Booking::trangThaiThanhToan((int) $daThu, (int) $booking->total_price);
 
         $booking->forceFill(['payment_status' => $trangThai, 'paid_total' => (int) $daThu])->saveQuietly();
     }

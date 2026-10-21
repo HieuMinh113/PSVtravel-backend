@@ -259,7 +259,18 @@ class DeparturesRelationManager extends RelationManager
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    // Đợt còn đơn (chưa huỷ): không cho xoá, mời đóng đợt
+                    ->before(function (TourDeparture $record, DeleteAction $action): void {
+                        if ($record->conDon()) {
+                            Notification::make()
+                                ->title('Không xoá được ngày khởi hành này')
+                                ->body('Ngày '.$record->start_date->format('d/m/Y').' đang có đơn đặt tour. Muốn ngừng bán thì sửa trạng thái thành "Đã đóng".')
+                                ->danger()
+                                ->send();
+                            $action->cancel();
+                        }
+                    }),
             ]);
     }
 }

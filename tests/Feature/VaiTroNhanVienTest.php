@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\Bookings\Pages\ListBookings;
 use App\Filament\Resources\Bookings\Pages\ViewBooking;
 use App\Filament\Resources\Bookings\RelationManagers\PaymentsRelationManager;
+use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -14,6 +15,7 @@ use Modules\Booking\Models\Booking;
 use Modules\Booking\Models\Payment;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourDeparture;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -145,5 +147,60 @@ class VaiTroNhanVienTest extends TestCase
         $kt = $this->nguoi('ke_toan');
         $this->assertTrue($kt->can('duyet', $p));
         $this->assertFalse($kt->can('update', $cuaHoa));
+    }
+
+    /** Người quản lý vai trò (không dùng super_admin vì bị bắt bật 2FA). */
+    private function nguoiSuaVaiTro(): User
+    {
+        $u = User::factory()->create();
+        foreach (['ViewAny', 'View', 'Create', 'Update'] as $q) {
+            $u->givePermissionTo(Permission::findOrCreate("{$q}:Role", 'web'));
+        }
+
+        return $u;
+    }
+
+    public function test_luu_vai_tro_khong_lam_mat_quyen_dac_biet(): void
+    {
+        $this->actingAs($this->nguoiSuaVaiTro());
+        $kt = Role::findByName('ke_toan', 'web');
+        // Quyền không có ô trên màn hình (điểm bản đồ) cũng phải giữ nguyên
+        $kt->givePermissionTo(Permission::findOrCreate('Create:GuideSpot', 'web'));
+        $truoc = $kt->fresh()->permissions->pluck('name')->sort()->values()->all();
+        $this->assertContains('Approve:Payment', $truoc);
+
+        // Mở ra, không đổi gì, bấm Lưu
+        Livewire::test(EditRole::class, ['record' => $kt->getRouteKey()])->call('save')->assertHasNoFormErrors();
+        $this->assertSame($truoc, $kt->fresh()->permissions->pluck('name')->sort()->values()->all());
+
+        // Quyền đặc biệt có ô ở thẻ riêng → bỏ tích được
+        Livewire::test(EditRole::class, ['record' => $kt->getRouteKey()])
+            ->assertSee('Duyệt Khoản Thu')
+            ->fillForm(['custom_permissions_tab' => ['ViewAll:Booking', 'ViewAll:Attendance']])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $sau = $kt->fresh()->permissions->pluck('name');
+        $this->assertNotContains('Approve:Payment', $sau);
+        $this->assertContains('ViewAll:Booking', $sau);
+        $this->assertContains('Create:GuideSpot', $sau);
+        $this->assertContains('ViewAny:Booking', $sau);
+    }
+
+    public function test_migration_tra_lai_quyen_dac_biet_da_bi_xoa(): void
+    {
+        $kt = Role::findByName('ke_toan', 'web');
+        $admin = Role::findOrCreate('admin', 'web');
+        $kt->revokePermissionTo(['Approve:Payment', 'ViewAll:Booking', 'ViewAll:Attendance']);
+        $sale = Role::findByName('sale', 'web');
+
+        (require database_path('migrations/2026_10_29_090000_tra_lai_quyen_dac_biet.php'))->up();
+
+        foreach (['Approve:Payment', 'ViewAll:Booking', 'ViewAll:Attendance'] as $q) {
+            $this->assertTrue($kt->fresh()->hasPermissionTo($q), $q);
+            $this->assertTrue($admin->fresh()->hasPermissionTo($q), $q);
+        }
+        $this->assertTrue($admin->fresh()->hasPermissionTo('ViewAll:VisaCase'));
+        $this->assertFalse($kt->fresh()->hasPermissionTo('ViewAll:VisaCase'));
+        $this->assertFalse($sale->fresh()->hasPermissionTo('Approve:Payment'));
     }
 }

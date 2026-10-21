@@ -41,7 +41,9 @@ class BookingForm
 
             Select::make('tour_departure_id')
                 ->label('Đợt khởi hành')
-                ->helperText('Có thể để trống, nhân viên chọn sau')
+                ->helperText(fn (?Booking $record): string => $record?->status === 'confirmed'
+                    ? 'Đơn đã xác nhận: đổi đợt hoặc số khách thì hệ thống tự trả chỗ cho đợt cũ và trừ chỗ đợt mới.'
+                    : 'Có thể để trống, nhân viên chọn sau')
                 ->options(function (Get $get): array {
                     $tourId = $get('tour_id');
                     if (! $tourId) {
@@ -156,7 +158,9 @@ class BookingForm
                 ])
                 ->default('unpaid')
                 ->required()
-                ->disabledOn('edit')
+                // luôn tự tính từ khoản thu (tạo đơn chọn "Đã trả" mà chưa có khoản thu nào là sai số liệu)
+                ->disabled()
+                ->dehydrated(false)
                 ->helperText('Tự tính từ các khoản đã thu ở tab Thanh toán'),
 
             TextInput::make('deposit_percent')

@@ -61,7 +61,7 @@ class GuideApiController extends Controller
         //
         // Đặt LUOT_XEM_CACH_NHAU_PHUT=0 trong .env để tắt hẳn khi cần kiểm thử
         // (một máy bấm nhiều lần vẫn tính từng lượt).
-        $cachNhauPhut = (int) env('LUOT_XEM_CACH_NHAU_PHUT', 60);
+        $cachNhauPhut = (int) config('guide.luot_xem_cach_nhau_phut', 60);
 
         if ($cachNhauPhut < 1) {
             $guide->increment('view_count');
