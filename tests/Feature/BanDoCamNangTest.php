@@ -161,6 +161,47 @@ class BanDoCamNangTest extends TestCase
         $this->get('/admin/ban-do-quoc-gia')->assertForbidden();
     }
 
+    public function test_vai_tro_duoc_cap_quyen_thanh_pho_thi_them_duoc_diem(): void
+    {
+        // Màn hình phân quyền vai trò chỉ có Cẩm nang, Bản đồ: Quốc gia, Bản đồ: Thành phố
+        // (điểm không có trang riêng nên không có ô "GuideSpot" để tích)
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $mkt = Role::findByName('marketing', 'web');
+        foreach (['Guide', 'GuideCountry', 'GuideCity'] as $m) {
+            foreach (['ViewAny', 'View', 'Create', 'Update', 'Delete'] as $q) {
+                $mkt->givePermissionTo(Permission::findOrCreate("{$q}:{$m}", 'web'));
+            }
+        }
+        $this->assertFalse($mkt->hasPermissionTo('Create:GuideSpot'));
+        $u = User::factory()->create()->assignRole('marketing');
+        $this->actingAs($u);
+
+        $tq = GuideCountry::create(['code' => 'CHN', 'name' => 'Trung Quốc', 'slug' => 'trung-quoc']);
+        $sh = GuideCity::create(['guide_country_id' => $tq->id, 'name' => 'Thượng Hải', 'slug' => 'thuong-hai', 'lat' => 31.23, 'lng' => 121.47]);
+        $this->get('/admin/ban-do-thanh-pho/'.$sh->id.'/edit')->assertOk();
+        // mục "Điểm trên bản đồ" (nạp sau khi trang mở) hiện cho vai trò này
+        $this->assertTrue(SpotsRelationManager::canViewForRecord($sh, EditGuideCity::class));
+
+        $bai = $this->bai('ben-thuong-hai');
+        Livewire::test(SpotsRelationManager::class, ['ownerRecord' => $sh, 'pageClass' => EditGuideCity::class])
+            ->assertActionVisible(TestAction::make('create')->table())
+            ->callAction(TestAction::make('create')->table(), data: [
+                'name' => 'Bến Thượng Hải', 'type' => 'tham_quan', 'guide_id' => $bai->id, 'lat' => 31.24, 'lng' => 121.49, 'status' => 'published',
+            ])
+            ->assertHasNoFormErrors();
+        $diem = $sh->spots()->sole();
+        $this->assertTrue($u->can('update', $diem) && $u->can('delete', $diem));
+
+        // Chỉ được XEM thành phố: thấy danh sách điểm nhưng không thêm / sửa được
+        $xem = User::factory()->create();
+        $xem->givePermissionTo(Permission::findOrCreate('ViewAny:GuideCity', 'web'), Permission::findOrCreate('View:GuideCity', 'web'));
+        $this->assertTrue($xem->can('viewAny', GuideSpot::class));
+        $this->assertFalse($xem->can('create', GuideSpot::class));
+        $this->assertFalse($xem->can('update', $diem));
+        // Không có quyền bản đồ: không thấy điểm
+        $this->assertFalse(User::factory()->create()->assignRole('sale')->can('viewAny', GuideSpot::class));
+    }
+
     private function nguoiSuaBanDo(): User
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
