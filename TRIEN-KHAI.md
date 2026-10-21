@@ -487,6 +487,7 @@ Script tự làm 8 việc theo đúng thứ tự:
 |---|---|---|
 | 0 | Sao lưu cơ sở dữ liệu | Có |
 | 1 | Lấy mã nguồn mới của **cả hai** repo | Có |
+| 1b–1c | Cài thư viện PHP và cập nhật cơ sở dữ liệu cho khớp mã mới (để bước 2 gọi API không lỗi) | Có |
 | 2 | Đóng lại ảnh Docker (gồm build frontend, 5–8 phút) | **Có** |
 | 3 | Bật thông báo bảo trì | Không |
 | 4 | Cài thư viện PHP | Không |

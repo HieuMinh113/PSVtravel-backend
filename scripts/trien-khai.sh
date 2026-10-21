@@ -84,6 +84,16 @@ echo "==> 1b   Cài thư viện PHP cho khớp mã mới"
 $COMPOSE exec -T -e COMPOSER_ALLOW_SUPERUSER=1 app composer install --no-dev --optimize-autoloader --no-interaction \
     || echo "   (chưa cài được, bước 4 sẽ cài lại)"
 
+# Cùng lý do: mã mới đang chạy thì cấu trúc cơ sở dữ liệu phải mới theo NGAY,
+# không đợi tới bước 5. Bước 2 build frontend gọi API của chính mã mới này; bản
+# có thêm cột / bảng mà chưa migrate thì API trả 500 và build dừng — đã xảy ra
+# ngày 21/10/2026 (thiếu cột tour_departures.visa_last_day), website lỗi danh
+# sách tour cho tới khi chạy migrate tay. Bước 5 vẫn giữ: lần này chưa chạy được
+# thì tới đó chạy lại.
+echo "==> 1c   Cập nhật cấu trúc cơ sở dữ liệu cho khớp mã mới"
+$COMPOSE exec -T app php artisan migrate --force \
+    || echo "   (chưa cập nhật được, bước 5 sẽ chạy lại)"
+
 echo "==> 2/8  Đóng lại ảnh Docker"
 # CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
 #
