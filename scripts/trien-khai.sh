@@ -96,9 +96,11 @@ $COMPOSE exec -T app php artisan migrate --force \
 
 # Bộ nhớ đệm đường dẫn / cấu hình (bootstrap/cache, ngoài git) vẫn là của bản
 # CŨ từ lần "optimize" trước: đường dẫn API mới thêm trả 404 cho tới bước 7.
-# Bước 2 build frontend gọi đúng các đường dẫn đó (VD /tours-sitemap cho
-# sitemap.xml) — 404 thì build dừng. Xoá đi để mã mới đọc thẳng file nguồn;
-# bước 7 tạo lại bộ đệm. Chỉ xoá file, không tạo file thuộc root.
+# Bước 2 build frontend gọi đúng các đường dẫn đó (VD /tours-sitemap,
+# /guides-sitemap): 404 thì build vẫn xong nhưng sitemap.xml dựng ra thiếu hết
+# tour và bài cẩm nang, giữ nguyên như vậy tới lần dựng lại sau 1 giờ. Xoá đi
+# để mã mới đọc thẳng file nguồn; bước 7 tạo lại bộ đệm. Chỉ xoá file, không
+# tạo file thuộc root.
 echo "==> 1d   Bỏ bộ nhớ đệm đường dẫn / cấu hình của bản cũ"
 $COMPOSE exec -T app php artisan route:clear || true
 $COMPOSE exec -T app php artisan config:clear || true
