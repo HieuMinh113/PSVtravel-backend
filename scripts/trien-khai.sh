@@ -94,6 +94,15 @@ echo "==> 1c   Cập nhật cấu trúc cơ sở dữ liệu cho khớp mã mớ
 $COMPOSE exec -T app php artisan migrate --force \
     || echo "   (chưa cập nhật được, bước 5 sẽ chạy lại)"
 
+# Bộ nhớ đệm đường dẫn / cấu hình (bootstrap/cache, ngoài git) vẫn là của bản
+# CŨ từ lần "optimize" trước: đường dẫn API mới thêm trả 404 cho tới bước 7.
+# Bước 2 build frontend gọi đúng các đường dẫn đó (VD /tours-sitemap cho
+# sitemap.xml) — 404 thì build dừng. Xoá đi để mã mới đọc thẳng file nguồn;
+# bước 7 tạo lại bộ đệm. Chỉ xoá file, không tạo file thuộc root.
+echo "==> 1d   Bỏ bộ nhớ đệm đường dẫn / cấu hình của bản cũ"
+$COMPOSE exec -T app php artisan route:clear || true
+$COMPOSE exec -T app php artisan config:clear || true
+
 echo "==> 2/8  Đóng lại ảnh Docker"
 # CHƯA bật thông báo bảo trì ở bước này — và đây là điểm mấu chốt.
 #
