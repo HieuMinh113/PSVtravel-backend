@@ -7,6 +7,7 @@ use Modules\Guide\Http\Controllers\Api\GuideMapApiController;
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('guides', [GuideApiController::class, 'index']);
     Route::get('guides-slugs', [GuideApiController::class, 'slugs']);
+    Route::get('guides-sitemap', [GuideApiController::class, 'sitemap']);
     Route::get('guides/{slug}', [GuideApiController::class, 'show']);
 
     // Bản đồ cẩm nang: quả địa cầu → nước → thành phố → điểm → bài viết

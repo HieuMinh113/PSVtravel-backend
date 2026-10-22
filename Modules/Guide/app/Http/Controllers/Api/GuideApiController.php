@@ -78,6 +78,17 @@ class GuideApiController extends Controller
         return response()->json(['view_count' => $guide->view_count]);
     }
 
+    // GET /api/v1/guides-sitemap — MỌI bài đang hiển thị cho sitemap.xml (danh sách
+    // bài chỉ trả tối đa 30 bài mỗi trang, sitemap sẽ sót bài cũ)
+    public function sitemap()
+    {
+        return response()->json([
+            'data' => Guide::query()->dangHienThi()->orderBy('id')->get(['slug', 'updated_at'])
+                ->map(fn (Guide $g) => ['slug' => $g->slug, 'updated_at' => $g->updated_at?->toIso8601String()])
+                ->values(),
+        ]);
+    }
+
     // GET /api/v1/guides-slugs — cho generateStaticParams của Next
     public function slugs()
     {

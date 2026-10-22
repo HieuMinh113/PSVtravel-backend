@@ -52,6 +52,18 @@ class TourApiController extends Controller
         return new TourDetailResource($tour);
     }
 
+    // GET /api/v1/tours-sitemap — MỌI tour đang hiển thị cho sitemap.xml: không giới
+    // hạn 50 như danh sách, và gồm cả tour tạm ẩn khỏi danh sách vì mọi đợt đã quá
+    // hạn nộp visa (trang tour vẫn mở được, có đợt mới là bán lại).
+    public function sitemap()
+    {
+        return response()->json([
+            'data' => Tour::query()->published()->orderBy('id')->get(['slug', 'type', 'updated_at'])
+                ->map(fn (Tour $t) => ['slug' => $t->slug, 'type' => $t->type, 'updated_at' => $t->updated_at?->toIso8601String()])
+                ->values(),
+        ]);
+    }
+
     // GET /api/v1/tours-slugs  — cho generateStaticParams của Next
     public function slugs()
     {
