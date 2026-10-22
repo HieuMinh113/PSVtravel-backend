@@ -44,7 +44,9 @@ class Banner extends Model
         return $query->where('status', 'published')
             ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', now()))
             ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', now()))
-            ->orderBy('sort_order');
+            // Cùng "Thứ tự" thì banner tạo trước đứng trước — thiếu tiêu chí phụ
+            // này Postgres trả thứ tự ngẫu nhiên, banner đầu đổi mỗi lần dựng trang
+            ->orderBy('sort_order')->orderBy('id');
     }
 
     public function getActivitylogOptions(): LogOptions

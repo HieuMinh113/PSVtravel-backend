@@ -13,9 +13,13 @@ class BannerInfolist
     {
         return $schema
             ->components([
-                TextEntry::make('title'),
+                TextEntry::make('title')
+                    ->label('Tên banner'),
+                // Dòng phụ không còn hiện trên web (banner hiện nguyên ảnh) — chỉ còn
+                // trên banner cũ đã nhập
                 TextEntry::make('subtitle')
-                    ->placeholder('-'),
+                    ->label('Dòng phụ (cũ, không còn hiện)')
+                    ->visible(fn ($record) => filled($record?->subtitle)),
                 ImageEntry::make('image'),
                 ImageEntry::make('image_mobile')
                     ->placeholder('-'),

@@ -29,7 +29,7 @@ class BannersTable
                     ->formatStateUsing(fn (?string $state): string => Banner::VI_TRI[$state] ?? 'Banner khuyến mãi (trang chủ)')
                     ->color(fn (?string $state): string => $state === 'promo' || $state === null ? 'warning' : 'info'),
                 TextColumn::make('title')
-                    ->label('Tiêu đề')
+                    ->label('Tên banner')
                     ->placeholder('— ảnh vòng xoay —')
                     ->searchable()
                     ->wrap(),

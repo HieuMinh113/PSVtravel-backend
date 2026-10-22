@@ -26,13 +26,11 @@ class BannerForm
                     ->columnSpanFull(),
 
                 TextInput::make('title')
-                    ->label('Tiêu đề')
-                    // Ảnh vòng xoay chỉ là ảnh trang trí, không hiện chữ nên không bắt buộc
+                    ->label('Tên banner')
+                    // Banner hiện nguyên ảnh, không đè chữ: tên chỉ dùng làm chữ mô tả
+                    // ảnh (alt) cho Google và người khiếm thị
+                    ->helperText('Không hiện lên ảnh — dùng làm chữ mô tả ảnh cho Google. VD: Tour Bắc Kinh – Thượng Hải 6N5Đ No Shopping')
                     ->required(fn (Get $get): bool => $get('position') === 'promo')
-                    ->visible(fn (Get $get): bool => $get('position') === 'promo')
-                    ->maxLength(255),
-                TextInput::make('subtitle')
-                    ->label('Dòng phụ')
                     ->visible(fn (Get $get): bool => $get('position') === 'promo')
                     ->maxLength(255),
 
@@ -43,7 +41,7 @@ class BannerForm
                         default => 'Ảnh vòng xoay',
                     })
                     ->helperText(fn (Get $get): string => match ($get('position')) {
-                        'promo' => 'Nên dùng ảnh ngang, khoảng 1920×700',
+                        'promo' => 'Ảnh hiện NGUYÊN tấm (không cắt), web không đè chữ lên ảnh — thiết kế sẵn chữ, giá, nút trên ảnh. Ảnh ngang đúng 1920×700 là vừa khung nhất. Nhiều banner thì tự chuyển 5 giây/lần.',
                         'popup' => 'Poster bật lên giữa màn hình, hiện NGUYÊN tấm theo đúng tỉ lệ ảnh (không cắt), tự thu vừa màn hình. Poster dọc nhiều chữ vẫn đọc đủ. Nên dùng ảnh dọc ~800×1000 trở lên cho nét.',
                         default => 'Ảnh sẽ hiện trong khung vuông nhỏ. Nên cắt VUÔNG khoảng 600×600, chủ thể nằm giữa. Mỗi trang nên có 8–12 ảnh.',
                     })
@@ -54,7 +52,9 @@ class BannerForm
                     ->columnSpanFull(),
                 FileUpload::make('image_mobile')
                     ->label(fn (Get $get): string => $get('position') === 'popup' ? 'Ảnh poster (điện thoại)' : 'Ảnh banner (điện thoại)')
-                    ->helperText('Để trống thì dùng chung ảnh máy tính. Nên dùng ảnh dọc hơn, khoảng 800×1000')
+                    ->helperText(fn (Get $get): string => $get('position') === 'popup'
+                        ? 'Để trống thì dùng chung ảnh máy tính. Nên dùng ảnh dọc, khoảng 800×1000'
+                        : 'Để trống thì điện thoại hiện ảnh máy tính thu nhỏ (chữ nhỏ, khó đọc). Nên dùng ảnh dọc 800×1000 — khung điện thoại theo tỉ lệ này.')
                     ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
                     ->directory('banners')
                     ->disk('public')
