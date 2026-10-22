@@ -4,6 +4,7 @@ namespace Modules\Booking\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\BookingMail;
+use App\Services\NguonKhach;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -65,7 +66,9 @@ class BookingApiController extends Controller
             + ($donGiaTreEm !== null ? ($data['children'] ?? 0) * $donGiaTreEm : 0);
 
         // Khách tự đặt: chưa ai phụ trách, người bấm Xác nhận sẽ nhận
-        $booking = (new Booking)->forceFill(['source' => 'web'])->fill([
+        // Kênh khách đến (TikTok, Google, ChatGPT…) — website gửi kèm, phân loại lại ở server
+        $nguon = NguonKhach::tuDuLieu($request->input('nguon'));
+        $booking = (new Booking)->forceFill(['source' => 'web', 'kenh' => $nguon['kenh'], 'utm' => $nguon['utm']])->fill([
             'tour_id' => $tour->id,
             'tour_departure_id' => $departure?->id,
             'user_id' => auth('sanctum')->id(),

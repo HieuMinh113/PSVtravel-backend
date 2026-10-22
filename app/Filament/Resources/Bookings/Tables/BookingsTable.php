@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Bookings\Tables;
 
 use App\Filament\Resources\Bookings\Actions\NhacDongTienAction;
 use App\Filament\Resources\Bookings\Actions\PhieuXacNhanAction;
+use App\Filament\Support\KenhKhach;
 use App\Mail\BookingMail;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -114,6 +115,7 @@ class BookingsTable
                     ->placeholder('—')
                     ->tooltip(fn (Booking $record): ?string => $record->cancel_reason)
                     ->toggleable(),
+                KenhKhach::cot(),
                 TextColumn::make('created_at')
                     ->label('Ngày đặt')
                     ->dateTime('d/m/Y H:i')
@@ -121,6 +123,7 @@ class BookingsTable
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
+                KenhKhach::boLoc(),
                 SelectFilter::make('status')
                     ->label('Trạng thái đơn')
                     ->options([

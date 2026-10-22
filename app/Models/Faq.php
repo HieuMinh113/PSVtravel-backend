@@ -14,6 +14,8 @@ class Faq extends Model
         'huy-tour' => 'Đổi / huỷ tour',
         'visa' => 'Visa & giấy tờ',
         'dat-tour' => 'Đặt tour',
+        // Hiện ở trang Team building / Du lịch công ty (kèm dữ liệu FAQ cho Google)
+        'doanh-nghiep' => 'Doanh nghiệp / Team building',
         'chung' => 'Chung',
     ];
 

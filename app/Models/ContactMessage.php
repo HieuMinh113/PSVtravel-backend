@@ -24,12 +24,13 @@ class ContactMessage extends Model
 
     protected $fillable = [
         'name', 'phone', 'email', 'subject', 'source', 'message', 'meta',
-        'status', 'admin_note', 'handled_by', 'handled_at', 'ip',
+        'status', 'admin_note', 'handled_by', 'handled_at', 'ip', 'kenh', 'utm',
     ];
 
     protected $casts = [
         'handled_at' => 'datetime',
         'meta' => 'array',
+        'utm' => 'array',
     ];
 
     public function handledBy(): BelongsTo

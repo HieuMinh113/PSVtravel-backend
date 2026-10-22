@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContactMessage;
+use App\Services\NguonKhach;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,6 +47,7 @@ class ContactController extends Controller
                 'subject' => $data['subject'] ?? null,
                 'message' => $data['message'],
                 'ip' => $request->ip(),
+                ...NguonKhach::tuDuLieu($request->input('nguon')),
             ]);
         }
 
@@ -116,6 +118,7 @@ class ContactController extends Controller
                 'message' => $message,
                 'meta' => $meta ?: null,
                 'ip' => $request->ip(),
+                ...NguonKhach::tuDuLieu($request->input('nguon')),
             ]);
         }
 

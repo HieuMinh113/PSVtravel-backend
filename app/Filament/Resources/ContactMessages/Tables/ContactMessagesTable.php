@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ContactMessages\Tables;
 
+use App\Filament\Support\KenhKhach;
 use App\Models\ContactMessage;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -58,6 +59,7 @@ class ContactMessagesTable
                     ->label('Người xử lý')
                     ->placeholder('—')
                     ->toggleable(),
+                KenhKhach::cot(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
@@ -67,6 +69,7 @@ class ContactMessagesTable
                 SelectFilter::make('source')
                     ->label('Nguồn')
                     ->options(ContactMessage::NGUON),
+                KenhKhach::boLoc(),
                 TrashedFilter::make()->label('Đã xoá'),
             ])
             ->recordActions([

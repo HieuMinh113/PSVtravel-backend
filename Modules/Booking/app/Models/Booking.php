@@ -59,6 +59,8 @@ class Booking extends Model
     }
 
     protected $casts = [
+        // Nguồn khách (App\Services\NguonKhach): chiến dịch, mã clip, tên miền giới thiệu
+        'utm' => 'array',
         'adults' => 'integer',
         'children' => 'integer',
         'unit_price_adult' => 'integer',
