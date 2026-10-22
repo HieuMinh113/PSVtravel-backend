@@ -64,6 +64,43 @@ class TourApiController extends Controller
         ]);
     }
 
+    // GET /api/v1/tours-bang-gia — bảng giá MỌI tour khách đặt được, cho /pricing.md
+    // và /llms.txt của website (AI đọc giá không cần chạy JavaScript). Cùng điều kiện
+    // với danh sách nhưng không giới hạn 50 tour; mỗi tour kèm 3 đợt gần nhất.
+    public function bangGia()
+    {
+        $tours = Tour::query()->hienChoKhach()
+            ->with(['departures' => fn ($q) => $q->hienTrenWeb()->orderBy('start_date')])
+            ->orderBy('type')->orderBy('sort_order')->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => $tours->map(fn (Tour $t) => [
+                'slug' => $t->slug,
+                'name' => $t->name,
+                'type' => $t->type,
+                'region' => $t->region,
+                'country' => $t->country,
+                'duration_days' => $t->duration_days,
+                'duration_nights' => $t->duration_nights,
+                'departure_from' => $t->departure_from,
+                'adult_price' => $t->adult_price,
+                'child_price' => $t->child_price,
+                'tag' => $t->tag,
+                'visa_kind_label' => TourDetailResource::dangVisa($t)['visa_kind_label'],
+                'departure_count' => $t->departures->count(),
+                'departures' => $t->departures->take(3)->map(fn ($d) => [
+                    'start_date' => $d->start_date->format('Y-m-d'),
+                    'price' => $d->price_override ?? $t->adult_price,
+                    'price_child' => $d->child_price_override ?? $t->child_price,
+                    // Ngày cuối nhận hồ sơ visa của đợt (null = tour không cần visa)
+                    'visa_deadline' => $d->hanVisa($t)?->format('Y-m-d'),
+                ])->values(),
+                'updated_at' => $t->updated_at?->toIso8601String(),
+            ])->values(),
+        ]);
+    }
+
     // GET /api/v1/tours-slugs  — cho generateStaticParams của Next
     public function slugs()
     {
