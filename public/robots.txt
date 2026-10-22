@@ -1,2 +1,8 @@
+# Tên miền API + trang quản trị: không cho máy tìm kiếm quét, TRỪ ảnh tải lên
+# (ảnh tour, bài viết được website và dữ liệu gửi Google trỏ tới /storage/).
+# Trang cho khách ở https://psvtravel.com
 User-agent: *
-Disallow:
+Allow: /storage/
+Disallow: /
+
+Sitemap: https://psvtravel.com/sitemap.xml

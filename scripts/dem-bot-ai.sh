@@ -70,10 +70,12 @@ function laTrang(d,    goc) {
 function nhomMa(m) { return m ~ /^404|^410/ ? "404" : (m ~ /^429|^503/ ? "429_503" : (m ~ /^5/ ? "5xx" : "khac")) }
 {
     # Dạng combined: IP - - [thời gian] "GET /duong-dan HTTP/1.1" mã bytes "giới thiệu" "trình duyệt"
-    if (split($0, q, "\"") < 7) next
+    if ((nq = split($0, q, "\"")) < 7) next
     split(q[2], yc, " "); duong = yc[2]
     split(q[3], sau, " "); ma = sau[1]
     ref = q[4]; ua = q[6]
+    # Tên miền ở cuối dòng (nhật ký từ 10/2026); lượt vào API ghi kèm "api:"
+    mien = (nq >= 10 && q[10] ~ /^api\./) ? "api:" : ""
     if (match($0, /\[[^]]+\]/)) tg = substr($0, RSTART + 1, 17); else tg = ""
 
     for (i = 1; i <= n; i++) {
@@ -83,7 +85,7 @@ function nhomMa(m) { return m ~ /^404|^410/ ? "404" : (m ~ /^429|^503/ ? "429_50
                 loi[b]++
                 if (index(CHI_TIET, "|" b "|")) {
                     loiNhom[b, nhomMa(ma)]++
-                    dl = duong; if (length(dl) > 90) dl = substr(dl, 1, 90) "…"
+                    dl = mien duong; if (length(dl) > 90) dl = substr(dl, 1, 90) "…"
                     trangLoi[ma "  " dl]++
                 }
             }

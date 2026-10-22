@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AboutImageController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DestinationController;
+use App\Http\Controllers\Api\LinkCuController;
 use App\Http\Controllers\Api\SeasonPageController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
@@ -72,6 +73,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('destinations', [DestinationController::class, 'index']);
     Route::get('destinations-slugs', [DestinationController::class, 'slugs']);
     Route::get('destinations/{slug}', [DestinationController::class, 'show']);
+    Route::get('link-cu', LinkCuController::class);
     Route::get('season-pages', [SeasonPageController::class, 'index']);
     Route::get('season-pages/{slug}', [SeasonPageController::class, 'show']);
     Route::get('faqs', [FaqController::class, 'index']);
