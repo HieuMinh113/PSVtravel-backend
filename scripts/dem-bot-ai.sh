@@ -56,8 +56,18 @@ BEGIN {
     LOAI["Bytespider"] = "ByteDance / TikTok"
     LOAI["CCBot"] = "Common Crawl (dữ liệu nhiều AI dùng)"
     THEO_YEU_CAU = "|ChatGPT-User|Perplexity-User|Claude-User|meta-externalfetcher|MistralAI-User|"
+    # Bot theo dõi mã lỗi chi tiết (máy tìm kiếm + AI quan trọng)
+    CHI_TIET = "|Googlebot|bingbot|OAI-SearchBot|ChatGPT-User|GPTBot|PerplexityBot|Perplexity-User|Claude-User|Claude-SearchBot|ClaudeBot|Applebot|"
     split("chatgpt.com|chat.openai.com|perplexity.ai|gemini.google.com|copilot.microsoft.com|claude.ai|chat.deepseek.com|meta.ai", AIREF, "|")
 }
+# Lượt MỞ TRANG (không tính ảnh, tệp tĩnh, gọi API, tải ngầm _rsc của Next)
+function laTrang(d,    goc) {
+    if (d ~ /_rsc=/ || d ~ /^\/(_next|api|storage)\//) return 0
+    goc = d; sub(/\?.*/, "", goc)
+    if (goc ~ /\.(png|jpe?g|webp|gif|svg|ico|css|js|woff2?|map|xml)$/) return 0
+    return goc != "/robots.txt"
+}
+function nhomMa(m) { return m ~ /^404|^410/ ? "404" : (m ~ /^429|^503/ ? "429_503" : (m ~ /^5/ ? "5xx" : "khac")) }
 {
     # Dạng combined: IP - - [thời gian] "GET /duong-dan HTTP/1.1" mã bytes "giới thiệu" "trình duyệt"
     if (split($0, q, "\"") < 7) next
@@ -69,13 +79,31 @@ BEGIN {
     for (i = 1; i <= n; i++) {
         if (index(ua, BOT[i])) {
             b = BOT[i]; dem[b]++; cuoi[b] = tg
-            if (ma !~ /^[23]/) loi[b]++
-            if (index(THEO_YEU_CAU, "|" b "|")) trang[duong]++
+            if (ma !~ /^[23]/) {
+                loi[b]++
+                if (index(CHI_TIET, "|" b "|")) {
+                    loiNhom[b, nhomMa(ma)]++
+                    dl = duong; if (length(dl) > 90) dl = substr(dl, 1, 90) "…"
+                    trangLoi[ma "  " dl]++
+                }
+            }
+            if (duong == "/robots.txt") robots[b]++
+            if (index(THEO_YEU_CAU, "|" b "|") && laTrang(duong)) trang[duong]++
             break
         }
     }
-    if (ua !~ /[Bb]ot|[Ss]pider|[Cc]rawl/ && ref != "-") {
-        for (j in AIREF) if (index(ref, AIREF[j])) { khach[AIREF[j]]++; trangKhach[duong]++ }
+    # Người thật bấm link PSV trong câu trả lời của AI: chỉ lượt mở trang; đếm
+    # cả số người khác nhau (IP + trình duyệt) — một người mở 3 trang là 3 lượt
+    if (ua !~ /[Bb]ot|[Ss]pider|[Cc]rawl/ && laTrang(duong)) {
+        nguon = ""
+        for (j in AIREF) if (index(ref, AIREF[j])) nguon = AIREF[j]
+        if (nguon == "" && duong ~ /utm_source=chatgpt\.com/) nguon = "chatgpt.com"
+        if (nguon != "") {
+            khach[nguon]++
+            ai = $1 "|" ua
+            if (!((nguon, ai) in daThay)) { daThay[nguon, ai] = 1; nguoi[nguon]++ }
+            dk = duong; sub(/[?&]_rsc=[^&]*/, "", dk); trangKhach[dk]++
+        }
     }
 }
 END {
@@ -86,15 +114,32 @@ END {
     for (i = 1; i <= n; i++) { b = BOT[i]; if (dem[b]) { co = 1; printf "%-22s %8d %8d  %-17s  %s\n", b, dem[b], loi[b], cuoi[b], LOAI[b] } }
     if (!co) print "   (không thấy bot nào — nhật ký trống hoặc nginx vừa được tạo lại)"
 
+    printf "\n== Lỗi bot gặp (mã 404 = trang không có, 429/503 = bị chặn vì gửi quá nhanh / bảo trì, 5xx = lỗi máy chủ)\n"
+    print "Bot                         404  429/503      5xx     khác"
+    co = 0
+    for (i = 1; i <= n; i++) {
+        b = BOT[i]
+        if (index(CHI_TIET, "|" b "|") && loi[b]) {
+            co = 1
+            printf "%-22s %8d %8d %8d %8d\n", b, loiNhom[b, "404"], loiNhom[b, "429_503"], loiNhom[b, "5xx"], loiNhom[b, "khac"]
+        }
+    }
+    if (!co) print "   (không có lỗi)"
+    if (co) {
+        printf "\n   Đường dẫn lỗi nhiều nhất (máy tìm kiếm + AI):\n"
+        for (k in trangLoi) printf "%6d  %s\n", trangLoi[k], k | "sort -rn | head -20"
+        close("sort -rn | head -20")
+    }
+
     printf "\n== Trang AI mở khi đang trả lời người dùng (nhiều nhất)\n"
     co = 0
     for (d in trang) { co = 1; printf "%6d  %s\n", trang[d], d | "sort -rn | head -15" }
     close("sort -rn | head -15")
     if (!co) print "   (chưa có — PSV chưa được AI mở ra để trả lời trong khoảng này)"
 
-    printf "\n== Khách bấm link PSV từ trợ lý AI\n"
+    printf "\n== Khách bấm link PSV từ trợ lý AI (chỉ lượt mở trang)\n"
     co = 0
-    for (k in khach) { co = 1; printf "%6d  %s\n", khach[k], k }
+    for (k in khach) { co = 1; printf "%6d lượt mở trang, %d người  %s\n", khach[k], nguoi[k], k }
     if (!co) print "   (chưa có lượt nào)"
     if (co) { printf "   Trang khách vào:\n"; for (d in trangKhach) printf "%6d  %s\n", trangKhach[d], d | "sort -rn | head -10"; close("sort -rn | head -10") }
     print ""
