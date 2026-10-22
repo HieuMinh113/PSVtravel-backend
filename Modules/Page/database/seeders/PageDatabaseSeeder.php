@@ -38,6 +38,7 @@ class PageDatabaseSeeder extends Seeder
             ['key' => 'facebook', 'label' => 'Facebook', 'group' => 'social', 'type' => 'url'],
             ['key' => 'instagram', 'label' => 'Instagram', 'group' => 'social', 'type' => 'url'],
             ['key' => 'zalo', 'label' => 'Zalo', 'group' => 'social', 'type' => 'text'],
+            ['key' => 'messenger', 'label' => 'Messenger (link m.me/… hoặc tên trang Facebook)', 'group' => 'social', 'type' => 'text'],
             ['key' => 'youtube', 'label' => 'YouTube', 'group' => 'social', 'type' => 'url'],
             ['key' => 'tiktok', 'label' => 'TikTok', 'group' => 'social', 'type' => 'url'],
             ['key' => 'footer_intro', 'label' => 'Giới thiệu ngắn (chân trang)', 'group' => 'contact', 'type' => 'textarea', 'value' => 'Đồng hành cùng bạn trên mọi hành trình — từ những bãi biển Việt Nam trong xanh đến những vùng đất mới lạ khắp thế giới.'],
