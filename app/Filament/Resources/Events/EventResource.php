@@ -26,9 +26,9 @@ class EventResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
     protected static ?string $modelLabel = 'gói sự kiện';
-    protected static ?string $pluralModelLabel = 'Sự kiện & Team Building';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 25;
+    protected static ?string $pluralModelLabel = 'Sự kiện & team building';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 50;
 
     public static function form(Schema $schema): Schema
     {

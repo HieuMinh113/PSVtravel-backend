@@ -25,8 +25,8 @@ class PromotionResource extends Resource
     protected static ?string $recordTitleAttribute = 'title';
     protected static ?string $modelLabel = 'ưu đãi';
     protected static ?string $pluralModelLabel = 'Khuyến mãi';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 30;
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

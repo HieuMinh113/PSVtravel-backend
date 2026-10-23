@@ -26,8 +26,8 @@ class MomentResource extends Resource
     protected static ?string $recordTitleAttribute = 'caption';
     protected static ?string $modelLabel = 'khoảnh khắc';
     protected static ?string $pluralModelLabel = 'Khoảnh khắc du khách';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 40;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 70;
     public static function form(Schema $schema): Schema
     {
         return MomentForm::configure($schema);

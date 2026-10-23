@@ -26,8 +26,8 @@ class TeamMemberResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'thành viên';
     protected static ?string $pluralModelLabel = 'Đội ngũ';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 55;
+    protected static string|\UnitEnum|null $navigationGroup = 'Giới thiệu công ty';
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {

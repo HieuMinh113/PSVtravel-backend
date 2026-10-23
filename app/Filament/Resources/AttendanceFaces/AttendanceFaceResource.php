@@ -28,9 +28,9 @@ class AttendanceFaceResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Khuôn mặt nhân viên';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Chấm công';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nhân sự';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 50;
 
     protected static ?string $slug = 'khuon-mat-nhan-vien';
 

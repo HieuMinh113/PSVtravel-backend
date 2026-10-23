@@ -25,8 +25,8 @@ class EventReviewResource extends Resource
     protected static ?string $recordTitleAttribute = 'customer_name';
     protected static ?string $modelLabel = 'đánh giá sự kiện';
     protected static ?string $pluralModelLabel = 'Đánh giá sự kiện';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 26;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 60;
 
     public static function form(Schema $schema): Schema
     {

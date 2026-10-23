@@ -46,9 +46,9 @@ class GuideCityResource extends Resource
 
     protected static ?string $navigationLabel = 'Bản đồ: Thành phố & điểm';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
 
-    protected static ?int $navigationSort = 22;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'ban-do-thanh-pho';
 

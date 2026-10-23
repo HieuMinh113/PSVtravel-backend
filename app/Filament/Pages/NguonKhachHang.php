@@ -28,13 +28,13 @@ class NguonKhachHang extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMegaphone;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
 
     protected static ?string $navigationLabel = 'Nguồn khách';
 
     protected static ?string $title = 'Nguồn khách theo kênh & chiến dịch';
 
-    protected static ?int $navigationSort = 31;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $slug = 'nguon-khach';
 

@@ -29,7 +29,7 @@ class SettingResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Hệ thống';
 
-    protected static ?int $navigationSort = 99;
+    protected static ?int $navigationSort = 30;
 
     // Cấu hình do hệ thống quy định — chỉ sửa giá trị, không thêm không xoá
     public static function canCreate(): bool

@@ -27,7 +27,7 @@ class VisaCountryResource extends Resource
     protected static ?string $modelLabel = 'quốc gia visa';
     protected static ?string $pluralModelLabel = 'Visa theo quốc gia';
     protected static string|\UnitEnum|null $navigationGroup = 'Visa';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

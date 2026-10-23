@@ -30,13 +30,13 @@ class TaoLinkChienDich extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
 
     protected static ?string $navigationLabel = 'Tạo link chiến dịch';
 
     protected static ?string $title = 'Tạo link chiến dịch';
 
-    protected static ?int $navigationSort = 32;
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $slug = 'tao-link-chien-dich';
 

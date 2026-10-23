@@ -48,9 +48,9 @@ class GuideCountryResource extends Resource
 
     protected static ?string $navigationLabel = 'Bản đồ: Quốc gia';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'ban-do-quoc-gia';
 

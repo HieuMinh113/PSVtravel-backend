@@ -25,13 +25,13 @@ class CauHinhChamCong extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Chấm công';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nhân sự';
 
     protected static ?string $navigationLabel = 'Cấu hình chấm công';
 
     protected static ?string $title = 'Cấu hình chấm công';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $slug = 'cau-hinh-cham-cong';
 

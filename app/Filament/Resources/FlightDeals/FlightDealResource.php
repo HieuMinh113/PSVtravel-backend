@@ -26,8 +26,8 @@ class FlightDealResource extends Resource
     protected static ?string $recordTitleAttribute = 'to_city';
     protected static ?string $modelLabel = 'chặng bay';
     protected static ?string $pluralModelLabel = 'Chặng bay ưu đãi';
-    protected static string|\UnitEnum|null $navigationGroup = 'Vé máy bay';
-    protected static ?int $navigationSort = 20; 
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 90; 
 
     public static function form(Schema $schema): Schema
     {

@@ -25,8 +25,8 @@ class PartnerResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'đối tác';
     protected static ?string $pluralModelLabel = 'Đối tác';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 70;
+    protected static string|\UnitEnum|null $navigationGroup = 'Giới thiệu công ty';
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

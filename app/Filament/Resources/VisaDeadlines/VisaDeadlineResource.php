@@ -34,7 +34,7 @@ class VisaDeadlineResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Visa';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {

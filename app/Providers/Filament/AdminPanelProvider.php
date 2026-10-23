@@ -3,24 +3,32 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\XacThucApp;
+use App\Filament\Pages\HuongDan;
+use App\Filament\Pages\TongQuan;
 use App\Filament\Widgets\DonMoiNhatWidget;
+use App\Filament\Widgets\LoiTatWidget;
 use App\Filament\Widgets\TongQuanWidget;
+use App\Filament\Widgets\ViecCanLamWidget;
 use App\Http\Controllers\Admin\DocLinkBanDoController;
 use App\Http\Controllers\Admin\NhipThongBaoController;
 use App\Http\Controllers\Admin\TaiMaQrTourController;
 use App\Http\Controllers\Admin\TaiTepUngTuyenController;
 use App\Http\Middleware\BatBuoc2faQuanTri;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Filament\Actions\Action;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Resources\Resource;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -33,6 +41,10 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
+        // Tên mục viết hoa chữ đầu như câu thường ("Khoảnh khắc du khách"), không
+        // viết hoa từng chữ — Filament mặc định viết hoa mọi chữ của nhãn model
+        Resource::titleCaseModelLabel(false);
+
         return $panel
             ->default()
             ->id('admin')
@@ -41,6 +53,9 @@ class AdminPanelProvider extends PanelProvider
             // config('app.name'). Neu .env tren may nao do con APP_NAME=Laravel
             // thi trang quan tri van hien dung "PSV Travel".
             ->brandName('PSV Travel')
+            ->brandLogo(asset('images/psv-logo.png'))
+            ->brandLogoHeight('2.25rem')
+            ->favicon(asset('favicon.ico'))
             ->login()
             // Trang Hồ sơ (menu người dùng góc phải): nơi bật / tắt 2FA, xem lại
             // mã khôi phục, đổi mật khẩu.
@@ -60,8 +75,35 @@ class AdminPanelProvider extends PanelProvider
                 isRequired: true,
             )
             ->multiFactorAuthenticationRequiredMiddlewareName(BatBuoc2faQuanTri::class)
+            // Xanh PSV (giống website) cho nút, mục đang chọn. Vàng chỉ còn dùng cho
+            // "chờ xử lý", đỏ cho lỗi / quá hạn — màu mang nghĩa, không trang trí
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::hex('#0169A9'),
+                'gray' => Color::Slate,
+            ])
+            // Cùng phông với website, dấu tiếng Việt rõ hơn Inter mặc định. Tệp
+            // phông lưu ngay trong public/fonts (không tải từ dịch vụ ngoài)
+            ->font('Be Vietnam Pro', url: asset('fonts/be-vietnam-pro/be-vietnam-pro.css'), provider: LocalFontProvider::class)
+            ->maxContentWidth(Width::ScreenTwoExtraLarge)
+            ->sidebarCollapsibleOnDesktop()
+            // Thứ tự nhóm theo việc làm hằng ngày. Nhóm ít dùng thu gọn sẵn (bấm
+            // để mở, trình duyệt nhớ lựa chọn). Nhóm không có mục nào người xem
+            // được phép mở thì tự ẩn.
+            ->navigationGroups([
+                NavigationGroup::make('Bán hàng'),
+                NavigationGroup::make('Tour & điều hành'),
+                NavigationGroup::make('Visa'),
+                NavigationGroup::make('Marketing'),
+                NavigationGroup::make('Nội dung website')->collapsed(),
+                NavigationGroup::make('Giới thiệu công ty')->collapsed(),
+                NavigationGroup::make('Nhân sự'),
+                NavigationGroup::make('Hệ thống')->collapsed(),
+            ])
+            ->userMenuItems([
+                Action::make('huongDan')
+                    ->label('Hướng dẫn sử dụng')
+                    ->icon(Heroicon::OutlinedQuestionMarkCircle)
+                    ->url(fn (): string => HuongDan::getUrl()),
             ])
             // Chuông thông báo góc phải: báo động liên minh (có chỗ trở lại,
             // sắp hết chỗ, sheet lỗi...). Hỏi lại mỗi 30 giây.
@@ -70,13 +112,14 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
-                Dashboard::class,
+                TongQuan::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 TongQuanWidget::class,
+                ViecCanLamWidget::class,
+                LoiTatWidget::class,
                 DonMoiNhatWidget::class,
-                AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -90,7 +133,12 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->plugins([
-                FilamentShieldPlugin::make(),
+                FilamentShieldPlugin::make()
+                    ->navigationGroup('Hệ thống')
+                    ->navigationSort(20)
+                    ->navigationLabel('Vai trò')
+                    ->modelLabel('vai trò')
+                    ->pluralModelLabel('Vai trò'),
             ])
             ->authMiddleware([
                 Authenticate::class,
@@ -119,6 +167,10 @@ class AdminPanelProvider extends PanelProvider
                     ->name('ung-tuyen.tep');
             })
             ->renderHook(PanelsRenderHook::BODY_END, fn () => auth()->check() ? view('filament.thong-bao.nhip') : '')
-            ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.thong-bao.nut-tieng'));
+            ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.thong-bao.nut-tieng'))
+            // Nút "Hướng dẫn" luôn thấy trên thanh trên cùng
+            ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => auth()->check() ? view('filament.nut-huong-dan') : '')
+            // Tinh chỉnh nhỏ không cần dựng lại CSS: chữ số đều cột, logo nền tối
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn () => view('filament.giao-dien'));
     }
 }

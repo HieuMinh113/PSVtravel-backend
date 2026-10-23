@@ -26,9 +26,9 @@ class RedirectResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Chuyển hướng link cũ';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Hệ thống';
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
 
-    protected static ?int $navigationSort = 92;
+    protected static ?int $navigationSort = 70;
 
     public static function form(Schema $schema): Schema
     {

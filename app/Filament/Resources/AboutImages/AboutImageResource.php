@@ -25,8 +25,8 @@ class AboutImageResource extends Resource
     protected static ?string $recordTitleAttribute = 'caption';
     protected static ?string $modelLabel = 'hình ảnh';
     protected static ?string $pluralModelLabel = 'Hình ảnh Về chúng tôi';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 45;
+    protected static string|\UnitEnum|null $navigationGroup = 'Giới thiệu công ty';
+    protected static ?int $navigationSort = 30;
 
     public static function form(Schema $schema): Schema
     {

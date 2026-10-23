@@ -24,7 +24,7 @@ class ContactMessageResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'tin liên hệ';
     protected static ?string $pluralModelLabel = 'Tin liên hệ';
-    protected static string|\UnitEnum|null $navigationGroup = 'Kinh doanh';
+    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
     protected static ?int $navigationSort = 20;
 
     // Tin do khách gửi từ website — không ai tạo tay trong admin

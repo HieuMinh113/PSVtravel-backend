@@ -25,8 +25,8 @@ class FaqResource extends Resource
     protected static ?string $recordTitleAttribute = 'question';
     protected static ?string $modelLabel = 'câu hỏi';
     protected static ?string $pluralModelLabel = 'Câu hỏi thường gặp';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 60;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 80;
 
     public static function form(Schema $schema): Schema
     {

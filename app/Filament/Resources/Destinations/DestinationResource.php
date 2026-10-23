@@ -25,8 +25,8 @@ class DestinationResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'điểm đến';
     protected static ?string $pluralModelLabel = 'Điểm đến';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 35;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {

@@ -39,10 +39,10 @@ class JobApplicationResource extends Resource
 
     protected static ?string $slug = 'ho-so-ung-tuyen';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nhân sự';
 
     // Ngay dưới "Tuyển dụng"
-    protected static ?int $navigationSort = 66;
+    protected static ?int $navigationSort = 20;
 
     public static function canCreate(): bool
     {

@@ -40,13 +40,13 @@ class ChamCong extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFingerPrint;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Chấm công';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?string $navigationLabel = 'Chấm công';
 
     protected static ?string $title = 'Chấm công';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = -1;
 
     protected static ?string $slug = 'cham-cong';
 

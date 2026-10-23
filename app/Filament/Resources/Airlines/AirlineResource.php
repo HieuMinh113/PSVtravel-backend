@@ -26,8 +26,8 @@ class AirlineResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'hãng bay';
     protected static ?string $pluralModelLabel = 'Hãng bay';
-    protected static string|\UnitEnum|null $navigationGroup = 'Vé máy bay';
-    protected static ?int $navigationSort = 10;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 100;
 
     public static function form(Schema $schema): Schema
     {

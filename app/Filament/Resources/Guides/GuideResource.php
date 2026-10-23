@@ -27,8 +27,8 @@ class GuideResource extends Resource
     protected static ?string $recordTitleAttribute = 'title';
     protected static ?string $modelLabel = 'bài cẩm nang';
     protected static ?string $pluralModelLabel = 'Cẩm nang';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 20;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

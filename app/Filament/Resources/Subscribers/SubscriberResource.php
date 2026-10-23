@@ -23,8 +23,8 @@ class SubscriberResource extends Resource
     protected static ?string $recordTitleAttribute = 'email';
     protected static ?string $modelLabel = 'email đăng ký';
     protected static ?string $pluralModelLabel = 'Đăng ký nhận ưu đãi';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 75;
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
+    protected static ?int $navigationSort = 60;
 
     public static function form(Schema $schema): Schema
     {

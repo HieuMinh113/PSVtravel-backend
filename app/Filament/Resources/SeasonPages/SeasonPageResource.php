@@ -25,8 +25,8 @@ class SeasonPageResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $modelLabel = 'trang theo mùa/dịp';
     protected static ?string $pluralModelLabel = 'Trang theo mùa/dịp';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 36;
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
+    protected static ?int $navigationSort = 50;
 
     public static function form(Schema $schema): Schema
     {

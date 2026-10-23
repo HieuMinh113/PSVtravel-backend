@@ -30,7 +30,7 @@ class BannerResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Banner trang chủ';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
+    protected static string|\UnitEnum|null $navigationGroup = 'Marketing';
 
     protected static ?int $navigationSort = 30;
 

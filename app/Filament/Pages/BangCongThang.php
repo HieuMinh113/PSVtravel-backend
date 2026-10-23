@@ -35,13 +35,13 @@ class BangCongThang extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTableCells;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Chấm công';
+    protected static string|\UnitEnum|null $navigationGroup = 'Nhân sự';
 
     protected static ?string $navigationLabel = 'Bảng công tháng';
 
     protected static ?string $title = 'Bảng công tháng';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $slug = 'bang-cong-thang';
 

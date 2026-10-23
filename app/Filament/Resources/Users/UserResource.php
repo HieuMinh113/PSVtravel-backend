@@ -30,7 +30,7 @@ class UserResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Hệ thống';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

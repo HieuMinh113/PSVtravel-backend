@@ -27,7 +27,7 @@ class ActivityResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Hệ thống';
 
-    protected static ?int $navigationSort = 95;
+    protected static ?int $navigationSort = 40;
 
     // Nhật ký chỉ để đọc — không ai được tạo thêm bản ghi thủ công
     public static function canCreate(): bool

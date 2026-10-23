@@ -25,8 +25,8 @@ class JobPostingResource extends Resource
     protected static ?string $recordTitleAttribute = 'title';
     protected static ?string $modelLabel = 'tin tuyển dụng';
     protected static ?string $pluralModelLabel = 'Tuyển dụng';
-    protected static string|\UnitEnum|null $navigationGroup = 'Nội dung';
-    protected static ?int $navigationSort = 65;
+    protected static string|\UnitEnum|null $navigationGroup = 'Nhân sự';
+    protected static ?int $navigationSort = 10;
 
     public static function form(Schema $schema): Schema
     {

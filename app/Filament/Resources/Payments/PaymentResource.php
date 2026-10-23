@@ -29,7 +29,7 @@ class PaymentResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
 
-    protected static ?int $navigationSort = 25;
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $slug = 'khoan-thu';
 

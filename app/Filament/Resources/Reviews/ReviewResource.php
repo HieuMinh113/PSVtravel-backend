@@ -27,7 +27,26 @@ class ReviewResource extends Resource
     protected static ?string $modelLabel = 'đánh giá';
     protected static ?string $pluralModelLabel = 'Đánh giá';
     protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 50;
+
+    protected static ?string $navigationLabel = 'Đánh giá tour';
+
+    public static function getNavigationBadge(): ?string
+    {
+        $so = Review::where('status', 'pending')->count();
+
+        return $so ? (string) $so : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Đánh giá của khách chờ duyệt';
+    }
 
     public static function form(Schema $schema): Schema
     {

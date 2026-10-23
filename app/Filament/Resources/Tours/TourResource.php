@@ -31,7 +31,7 @@ class TourResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Tour';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Bán hàng';
+    protected static string|\UnitEnum|null $navigationGroup = 'Tour & điều hành';
 
     protected static ?int $navigationSort = 10;
 
