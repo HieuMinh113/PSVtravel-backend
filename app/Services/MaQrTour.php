@@ -4,6 +4,7 @@ namespace App\Services;
 
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
+use Illuminate\Support\Carbon;
 use Modules\Tour\Models\Tour;
 use Modules\Tour\Models\TourQrScan;
 
@@ -77,7 +78,13 @@ class MaQrTour
 
     public function svg(Tour $tour): string
     {
-        $m = $this->maTran(self::duongDan($tour));
+        return $this->svgTuNoiDung(self::duongDan($tour));
+    }
+
+    /** Mã QR (SVG, có logo) cho một nội dung bất kỳ — VD link chiến dịch có utm */
+    public function svgTuNoiDung(string $noiDung): string
+    {
+        $m = $this->maTran($noiDung);
         $n = count($m);
         [$batDau, $rong] = $this->oLogo($n);
         $tong = $n + 2 * self::VIEN;
@@ -90,6 +97,7 @@ class MaQrTour
             while ($x < $n) {
                 if (! $m[$y][$x] || $this->trongLogo($x, $y, $batDau, $rong)) {
                     $x++;
+
                     continue;
                 }
                 $dau = $x;
@@ -117,7 +125,12 @@ class MaQrTour
     /** PNG vuông khoảng $canhPx điểm ảnh (làm tròn theo số ô để nét sắc). */
     public function png(Tour $tour, int $canhPx = 1200): string
     {
-        $m = $this->maTran(self::duongDan($tour));
+        return $this->pngTuNoiDung(self::duongDan($tour), $canhPx);
+    }
+
+    public function pngTuNoiDung(string $noiDung, int $canhPx = 1200): string
+    {
+        $m = $this->maTran($noiDung);
         $n = count($m);
         [$batDau, $rong] = $this->oLogo($n);
         $tong = $n + 2 * self::VIEN;
@@ -178,7 +191,7 @@ class MaQrTour
     /**
      * Thống kê lượt quét của một tour.
      *
-     * @return array{tong:int,hom_nay:int,bay_ngay:int,ba_muoi_ngay:int,dien_thoai:int,gan_nhat:?\Illuminate\Support\Carbon}
+     * @return array{tong:int,hom_nay:int,bay_ngay:int,ba_muoi_ngay:int,dien_thoai:int,gan_nhat:?Carbon}
      */
     public static function thongKe(Tour $tour): array
     {
@@ -190,7 +203,7 @@ class MaQrTour
             'bay_ngay' => $q()->where('scanned_at', '>=', now()->subDays(7))->count(),
             'ba_muoi_ngay' => $q()->where('scanned_at', '>=', now()->subDays(30))->count(),
             'dien_thoai' => $q()->where('thiet_bi', 'dien_thoai')->count(),
-            'gan_nhat' => $q()->max('scanned_at') ? \Illuminate\Support\Carbon::parse($q()->max('scanned_at')) : null,
+            'gan_nhat' => $q()->max('scanned_at') ? Carbon::parse($q()->max('scanned_at')) : null,
         ];
     }
 }
