@@ -68,7 +68,9 @@ class LinkCuTest extends TestCase
             '/tour_nuoc_ngoai/song-sanh-dao-ngoc-phu-quoc-3n2d' => [301, '/tour-trong-nuoc/phu-quoc-3n2d'],
             // Chỉ trùng "5N4Đ" / chỉ trùng "Trung Quốc": không đủ chắc → đã gỡ, không chuyển nhầm
             '/tour_nuoc_ngoai/bali-5n4d-new-2023' => [410, null],
-            '/product/trung-quoc-truong-gia-gioi' => [410, null], // chung "giới" với Thế Giới Cổ Tích, khác nơi
+            // Chung "giới" với Thế Giới Cổ Tích nhưng khác nơi: KHÔNG sang tour Cửu Trại Câu,
+            // về danh sách tour Trung Quốc đang bán
+            '/product/trung-quoc-truong-gia-gioi' => [301, '/tour-nuoc-ngoai?q='.rawurlencode('Trung Quốc')],
             // Tour đã ẩn không được dùng
             '/tour/da-lat-ngan-hoa' => [410, null],
         ];
@@ -87,7 +89,7 @@ class LinkCuTest extends TestCase
             '/nhat-ban' => [301, '/diem-den/nhat-ban'],              // điểm đến có trang riêng
             '/australia' => [301, '/tour-nuoc-ngoai'],
             '/my' => [301, '/tour-nuoc-ngoai'],                      // Mỹ — không dính "Mỹ Tho"
-            '/my-tho' => [301, '/tour-trong-nuoc'],                  // nơi chỉ có trong tên tour
+            '/my-tho' => [301, '/tour-trong-nuoc?q='.rawurlencode('Mỹ Tho')], // chưa có danh mục: lọc theo tên nơi                  // nơi chỉ có trong tên tour
             '/da-nang' => [301, '/tour-trong-nuoc'],
             '/cua-hang' => [301, '/tour-nuoc-ngoai'],
             '/ve-bay' => [301, '/ve-may-bay'],
@@ -113,6 +115,7 @@ class LinkCuTest extends TestCase
         $tq = $this->tour('thanhdo-cuutraicau', 'Thành Đô - Cửu Trại Câu - Gia Cơ Sơn', 'abroad', ['duration_days' => 6, 'duration_nights' => 5]);
         $chauAu = $this->tour('phap-thuy-sy-y-vatican-10n9d', 'Pháp - Thụy Sỹ - Ý - Vatican 10N9Đ', 'abroad', ['duration_days' => 10, 'duration_nights' => 9]);
         $bac = $this->tour('tphcm-ha-noi-ha-long-sapa', 'TP.HCM - Hà Nội - Hạ Long - Ninh Bình - Sapa', 'domestic');
+        $this->tour('da-lat-3n2d', 'ĐÀ LẠT – Thành phố ngàn hoa 3N2Đ', 'domestic', ['duration_days' => 3, 'duration_nights' => 2]);
         $this->bai('kinh-nghiem-du-lich-nhat-ban-6-ngay-5-dem', 'Cẩm nang du lịch Nhật Bản 6 ngày 5 đêm từ A-Z');
         $this->bai('di-du-lich-trung-quoc-mang-gi', 'Đi du lịch Trung Quốc nên chuẩn bị gì, mang gì?');
         $this->bai('kinh-nghiem-du-lich-cuu-trai-cau-thanh-do', 'Kinh nghiệm du lịch Cửu Trại Câu Thành Đô – thiên đường hạ giới');
@@ -122,9 +125,11 @@ class LinkCuTest extends TestCase
         $danhMuc('trung-quoc', 'abroad', [$tq]);
         $danhMuc('mien-nam', 'domestic', [$bac]);
         $danhMuc('chau-au', 'abroad', []); // không có tour → không chuyển vào danh mục rỗng
-        foreach (['dai-loan' => 'published', 'han-quoc' => 'published', 'my' => 'published', 'uc' => 'hidden'] as $slug => $tt) {
+        foreach (['dai-loan' => 'published', 'my' => 'published', 'uc' => 'hidden'] as $slug => $tt) {
             VisaCountry::create(['name' => $slug, 'slug' => $slug, 'status' => $tt, 'price' => 1_000_000]);
         }
+        // Đường dẫn trang visa không phải tên nước trơn: khớp theo tên
+        VisaCountry::create(['name' => 'Hàn Quốc', 'slug' => 'visa-han-quoc-du-lich', 'status' => 'published', 'price' => 1_000_000]);
 
         $cases = [
             // Trước đây khớp nhầm: cùng "cẩm nang… từ A–Z" / "chuẩn bị gì" / "thiên đường hạ giới" nhưng KHÁC NƠI
@@ -136,18 +141,23 @@ class LinkCuTest extends TestCase
             '/tour_nuoc_ngoai/ha-noi-vinh-ha-long-4-ngay-3-dem' => [301, '/tour-trong-nuoc/tphcm-ha-noi-ha-long-sapa'],
             '/tour/du-lich-trung-quoc-6n5d-thanh-do-cuu-trai-cau-lac-son' => [301, '/tour-nuoc-ngoai/thanhdo-cuutraicau'],
             // Tour cũ không còn tour tương tự → danh mục đúng nước / vùng; danh mục rỗng thì 410
-            '/tour_nuoc_ngoai/nhat-ban-nagoya-toyohashi-tokyo-narita-6n5d-tet-2023' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
+            // Chưa có danh mục Nhật Bản / Đà Lạt nhưng có tour đang bán → lọc theo tên nơi
+            '/tour_nuoc_ngoai/nhat-ban-nagoya-toyohashi-tokyo-narita-6n5d-tet-2023' => [301, '/tour-nuoc-ngoai?q='.rawurlencode('Nhật Bản')],
+            '/tour_nuoc_ngoai/da-lat-4n3d-a-little-paris-of-vietnam' => [301, '/tour-trong-nuoc?q='.rawurlencode('ĐÀ LẠT')],
+            '/kinh-nghiem-du-lich-da-lat' => [301, '/tour-trong-nuoc?q='.rawurlencode('ĐÀ LẠT')],
             '/tour_nuoc_ngoai/sai-gon-my-tho-ben-tre-can-tho-cho-noi-con-son-can-nha-mau-tim' => [301, '/tour-trong-nuoc?category=mien-nam'],
             '/tour_nuoc_ngoai/tour-bac-au-phan-lan-thuy-dien-nauy-dan-mach-2023' => [410, null],
             // Nơi ví von / lạc vùng không phải nơi của tour
             '/tour_nuoc_ngoai/nam-du-2n2d-vinh-ha-long-o-phuong-nam' => [301, '/tour-trong-nuoc?category=mien-nam'],
             '/tour_nuoc_ngoai/phu-quy-2n2d-bali-cua-viet-nam' => [301, '/tour-trong-nuoc?category=mien-nam'],
             '/tour_nuoc_ngoai/du-lich-han-quoc-mua-thu-seoul-everland-dao-nami-tu-ha-noi-gia-tot' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
-            '/nhat-ban' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
+            '/nhat-ban' => [301, '/tour-nuoc-ngoai?q='.rawurlencode('Nhật Bản')],
+            '/han-quoc' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'], // không tour Hàn đang bán → danh mục vùng
             '/mien-tay' => [301, '/tour-trong-nuoc?category=mien-nam'],
             '/chau-au' => [301, '/tour-nuoc-ngoai'],
             // Chủ đề
             '/visa-du-lich-dai-loan' => [301, '/lam-visa/dai-loan'],
+            '/ho-so-visa-han-quoc' => [301, '/lam-visa/visa-han-quoc-du-lich'],
             '/thu-tuc-tham-than-nhan-dai-loan' => [301, '/lam-visa/dai-loan'],
             '/visa-chau-my' => [301, '/lam-visa/my'],
             '/visa-du-lich-uc' => [301, '/lam-visa'],               // trang visa Úc đang ẩn

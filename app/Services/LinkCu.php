@@ -408,8 +408,9 @@ class LinkCu
             foreach (self::noiTrong($slug, true) as $n) {
                 // Nơi là vùng (Châu Âu, Châu Mỹ) mà không có trang visa riêng → nước đầu tiên của vùng có trang
                 foreach ([$n, self::NOI_NUOC_NGOAI[$n] ?? null, ...(self::VUNG[$n] ?? [])] as $c) {
-                    if ($c !== null && in_array($c, $nuoc, true)) {
-                        return ['ma' => 301, 'toi' => "/lam-visa/{$c}"];
+                    $trang = $c === null ? null : array_search(true, array_map(fn ($khoa) => str_contains($khoa, "-{$c}-"), $nuoc), true);
+                    if ($trang !== null && $trang !== false) {
+                        return ['ma' => 301, 'toi' => "/lam-visa/{$trang}"];
                     }
                 }
             }
@@ -539,6 +540,15 @@ class LinkCu
                 }
             }
         }
+        // Chưa có danh mục riêng nhưng có tour đang bán đi nơi / nước đó →
+        // danh sách tour lọc theo tên nơi (/tour-nuoc-ngoai?q=Nhật Bản)
+        foreach ($noi as $n) {
+            foreach (array_unique([$n, self::NOI_NUOC_NGOAI[$n] ?? $n]) as $c) {
+                if ($kq = self::timTourTheoNoi($c)) {
+                    return $kq;
+                }
+            }
+        }
         if ($theoVung) {
             foreach ($noi as $n) {
                 $nuoc = self::NOI_NUOC_NGOAI[$n] ?? $n;
@@ -553,23 +563,65 @@ class LinkCu
         return null;
     }
 
-    /** @return list<string> đường dẫn các nước có trang làm visa */
+    /**
+     * Các nước có trang làm visa: [đường dẫn => "-đường-dẫn--tên-không-dấu-"].
+     * So cả tên vì đường dẫn có thể là "visa-han-quoc", "han-quoc-visa"…
+     *
+     * @return array<string, string>
+     */
     private static function nuocVisa(): array
     {
-        return once(fn () => VisaCountry::query()->dangHienThi()->pluck('slug')->all());
+        return once(fn () => VisaCountry::query()->dangHienThi()->get(['slug', 'name'])
+            ->mapWithKeys(fn ($v) => [$v->slug => "-{$v->slug}--".Str::slug((string) $v->name).'-'])->all());
     }
 
-    /** Tour đang hiển thị: slug, loại, chuỗi từ khoá (slug + tên không dấu + "5n4d") */
+    /**
+     * Tour đang bán có nhắc nơi này → danh sách tour lọc theo tên nơi, viết có
+     * dấu đúng như trong tên tour (ô tìm kiếm so khớp theo tên có dấu).
+     */
+    private static function timTourTheoNoi(string $noi): ?array
+    {
+        $co = self::tours()->filter(fn ($t) => in_array($noi, $t['noi'], true));
+        $ten = $co->map(fn ($t) => self::tenNoiTrong($t['name'], $noi))->filter()->first();
+        if (! $ten) {
+            return null;
+        }
+        $loai = $co->countBy('type')->sortDesc()->keys()->first();
+
+        return ['ma' => 301, 'toi' => ($loai === 'domestic' ? '/tour-trong-nuoc' : '/tour-nuoc-ngoai').'?q='.rawurlencode($ten)];
+    }
+
+    /** "Tour Nhật Bản: Osaka - Kyoto" + "nhat-ban" → "Nhật Bản" (đoạn gốc trong tên); không có thì null */
+    private static function tenNoiTrong(string $ten, string $noi): ?string
+    {
+        preg_match_all('/[\p{L}\p{N}]+/u', $ten, $m, PREG_OFFSET_CAPTURE);
+        $tu = $m[0];
+        for ($i = 0; $i < count($tu); $i++) {
+            for ($dai = 1; $dai <= 3 && $i + $dai <= count($tu); $dai++) {
+                $dau = $tu[$i][1];
+                $cuoi = $tu[$i + $dai - 1][1] + strlen($tu[$i + $dai - 1][0]);
+                $doan = substr($ten, $dau, $cuoi - $dau);
+                $s = Str::slug($doan);
+                if ((self::DONG_NGHIA[$s] ?? $s) === $noi) {
+                    return $doan;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Tour đang hiển thị: slug, tên, loại, chuỗi từ khoá (slug + tên không dấu + "5n4d"), các nơi nhắc tới */
     private static function tours(): Collection
     {
         return once(fn () => Tour::query()->published()->orderBy('sort_order')->orderBy('id')
             ->get(['slug', 'name', 'type', 'duration_days', 'duration_nights'])
-            ->map(fn (Tour $t) => [
-                'slug' => $t->slug,
-                'type' => $t->type,
-                'chuoi' => $t->slug.'-'.Str::slug((string) $t->name)
-                    .($t->duration_days ? "-{$t->duration_days}n".((int) $t->duration_nights).'d' : ''),
-            ]));
+            ->map(function (Tour $t) {
+                $chuoi = $t->slug.'-'.Str::slug((string) $t->name)
+                    .($t->duration_days ? "-{$t->duration_days}n".((int) $t->duration_nights).'d' : '');
+
+                return ['slug' => $t->slug, 'name' => (string) $t->name, 'type' => $t->type, 'chuoi' => $chuoi, 'noi' => self::noiTrong($chuoi)];
+            }));
     }
 
     private static function duongDanTour(array $t): string
