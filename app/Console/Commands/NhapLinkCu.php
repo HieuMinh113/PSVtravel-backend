@@ -16,17 +16,23 @@ use Illuminate\Console\Command;
  *
  *   ... | docker compose -f docker-compose.prod.yml exec -T app php artisan psv:link-cu
  *   docker compose -f docker-compose.prod.yml exec -T app php artisan psv:link-cu --xem < danh-sach.txt
+ *   docker compose -f docker-compose.prod.yml exec -T app php artisan psv:link-cu --khop-lai
  */
 class NhapLinkCu extends Command
 {
     protected $signature = 'psv:link-cu
         {tep? : Tệp danh sách (bỏ trống thì đọc từ đầu vào chuẩn)}
-        {--xem : Chỉ xem kết quả khớp, không lưu}';
+        {--xem : Chỉ xem kết quả khớp, không lưu}
+        {--khop-lai : Khớp lại mọi dòng máy đã lưu (sau khi cập nhật bộ khớp / thêm tour), dòng nhân viên sửa giữ nguyên}';
 
     protected $description = 'Khớp danh sách link của website cũ sang trang mới (lưu vào bảng chuyển hướng)';
 
     public function handle(): int
     {
+        if ($this->option('khop-lai')) {
+            return $this->khopLai();
+        }
+
         $tep = $this->argument('tep');
         if ($tep !== null && ! is_readable($tep)) {
             $this->error("Không đọc được tệp {$tep}");
@@ -91,6 +97,29 @@ class NhapLinkCu extends Command
             $this->line("Bỏ qua {$boQua} đường dẫn ảnh / feed / link bot dò bừa (website tự trả 410 hoặc 404).");
         }
         $this->line($xem ? 'Chế độ --xem: CHƯA lưu gì.' : 'Đã lưu — xem / sửa ở Hệ thống → Chuyển hướng link cũ.');
+
+        return self::SUCCESS;
+    }
+
+    private function khopLai(): int
+    {
+        $doi = [];
+        Redirect::query()->where('source', 'tu_dong')->chunkById(200, function ($ds) use (&$doi) {
+            foreach ($ds as $r) {
+                $truoc = $r->status_code === 301 ? '→ '.$r->new_path : ($r->status_code === 410 ? 'đã gỡ (410)' : 'CHƯA KHỚP');
+                LinkCu::khopLai($r);
+                $sau = ! $r->exists ? 'bỏ (không phải trang)' : ($r->status_code === 301 ? '→ '.$r->new_path : ($r->status_code === 410 ? 'đã gỡ (410)' : 'CHƯA KHỚP'));
+                if ($truoc !== $sau) {
+                    $doi[] = [$r->hits, $r->old_path, $truoc, $sau];
+                }
+            }
+        });
+        usort($doi, fn ($a, $b) => $b[0] <=> $a[0]);
+
+        if ($doi) {
+            $this->table(['Lượt', 'Link cũ', 'Trước', 'Bây giờ'], $doi);
+        }
+        $this->info('Đã khớp lại — '.count($doi).' link đổi trang đích.');
 
         return self::SUCCESS;
     }

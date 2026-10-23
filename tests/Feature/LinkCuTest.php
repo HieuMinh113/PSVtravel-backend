@@ -13,8 +13,10 @@ use App\Services\LinkCu;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Modules\Category\Models\Category;
 use Modules\Guide\Models\Guide;
 use Modules\Tour\Models\Tour;
+use Modules\Visa\Models\VisaCountry;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -102,6 +104,77 @@ class LinkCuTest extends TestCase
         }
         $this->assertDatabaseHas('redirects', ['old_path' => '/top-5-dia-diem-du-lich-khong-the-bo-qua-tai-viet-nam', 'status_code' => 404]);
         $this->assertSame('1', RedirectResource::getNavigationBadge());
+    }
+
+    /** Các trường hợp lấy từ lần chạy thử trên máy chủ thật (10/2026) */
+    public function test_khong_khop_nham_noi_khac_va_ve_danh_muc_dung_noi(): void
+    {
+        $nhat = $this->tour('cung-duong-vang-nhat-ban', 'Cung đường vàng Nhật Bản: Osaka - Phú Sĩ - Nagoya - Kyoto', 'abroad', ['duration_days' => 6, 'duration_nights' => 5]);
+        $tq = $this->tour('thanhdo-cuutraicau', 'Thành Đô - Cửu Trại Câu - Gia Cơ Sơn', 'abroad', ['duration_days' => 6, 'duration_nights' => 5]);
+        $chauAu = $this->tour('phap-thuy-sy-y-vatican-10n9d', 'Pháp - Thụy Sỹ - Ý - Vatican 10N9Đ', 'abroad', ['duration_days' => 10, 'duration_nights' => 9]);
+        $bac = $this->tour('tphcm-ha-noi-ha-long-sapa', 'TP.HCM - Hà Nội - Hạ Long - Ninh Bình - Sapa', 'domestic');
+        $this->bai('kinh-nghiem-du-lich-nhat-ban-6-ngay-5-dem', 'Cẩm nang du lịch Nhật Bản 6 ngày 5 đêm từ A-Z');
+        $this->bai('di-du-lich-trung-quoc-mang-gi', 'Đi du lịch Trung Quốc nên chuẩn bị gì, mang gì?');
+        $this->bai('kinh-nghiem-du-lich-cuu-trai-cau-thanh-do', 'Kinh nghiệm du lịch Cửu Trại Câu Thành Đô – thiên đường hạ giới');
+        $danhMuc = fn (string $slug, string $loai, array $tours) => Category::create(['type' => $loai, 'name' => $slug, 'slug' => $slug, 'status' => 'published'])
+            ->tours()->attach(array_map(fn ($t) => $t->id, $tours));
+        $danhMuc('dong-bac-a', 'abroad', [$nhat]);
+        $danhMuc('trung-quoc', 'abroad', [$tq]);
+        $danhMuc('mien-nam', 'domestic', [$bac]);
+        $danhMuc('chau-au', 'abroad', []); // không có tour → không chuyển vào danh mục rỗng
+        foreach (['dai-loan' => 'published', 'han-quoc' => 'published', 'my' => 'published', 'uc' => 'hidden'] as $slug => $tt) {
+            VisaCountry::create(['name' => $slug, 'slug' => $slug, 'status' => $tt, 'price' => 1_000_000]);
+        }
+
+        $cases = [
+            // Trước đây khớp nhầm: cùng "cẩm nang… từ A–Z" / "chuẩn bị gì" / "thiên đường hạ giới" nhưng KHÁC NƠI
+            '/cam-nang-du-lich-dai-loan-tu-a-z' => [404, null],
+            '/ban-can-chuan-bi-gi-khi-di-du-lich-han-quoc' => [404, null],
+            '/kham-pha-thien-duong-ha-gioi-truong-gia-gioi' => [301, '/tour-nuoc-ngoai?category=trung-quoc'],
+            // Vẫn khớp đúng
+            '/tour_nuoc_ngoai/chau-au-4-nuoc-10n9d-phap-thuy-si-y-vatican' => [301, '/tour-nuoc-ngoai/phap-thuy-sy-y-vatican-10n9d'],
+            '/tour_nuoc_ngoai/ha-noi-vinh-ha-long-4-ngay-3-dem' => [301, '/tour-trong-nuoc/tphcm-ha-noi-ha-long-sapa'],
+            '/tour/du-lich-trung-quoc-6n5d-thanh-do-cuu-trai-cau-lac-son' => [301, '/tour-nuoc-ngoai/thanhdo-cuutraicau'],
+            // Tour cũ không còn tour tương tự → danh mục đúng nước / vùng; danh mục rỗng thì 410
+            '/tour_nuoc_ngoai/nhat-ban-nagoya-toyohashi-tokyo-narita-6n5d-tet-2023' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
+            '/tour_nuoc_ngoai/sai-gon-my-tho-ben-tre-can-tho-cho-noi-con-son-can-nha-mau-tim' => [301, '/tour-trong-nuoc?category=mien-nam'],
+            '/tour_nuoc_ngoai/tour-bac-au-phan-lan-thuy-dien-nauy-dan-mach-2023' => [410, null],
+            // Nơi ví von / lạc vùng không phải nơi của tour
+            '/tour_nuoc_ngoai/nam-du-2n2d-vinh-ha-long-o-phuong-nam' => [301, '/tour-trong-nuoc?category=mien-nam'],
+            '/tour_nuoc_ngoai/phu-quy-2n2d-bali-cua-viet-nam' => [301, '/tour-trong-nuoc?category=mien-nam'],
+            '/tour_nuoc_ngoai/du-lich-han-quoc-mua-thu-seoul-everland-dao-nami-tu-ha-noi-gia-tot' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
+            '/nhat-ban' => [301, '/tour-nuoc-ngoai?category=dong-bac-a'],
+            '/mien-tay' => [301, '/tour-trong-nuoc?category=mien-nam'],
+            '/chau-au' => [301, '/tour-nuoc-ngoai'],
+            // Chủ đề
+            '/visa-du-lich-dai-loan' => [301, '/lam-visa/dai-loan'],
+            '/thu-tuc-tham-than-nhan-dai-loan' => [301, '/lam-visa/dai-loan'],
+            '/visa-chau-my' => [301, '/lam-visa/my'],
+            '/visa-du-lich-uc' => [301, '/lam-visa'],               // trang visa Úc đang ẩn
+            '/huong-dan-chi-tiet-thu-tuc-xin-visa-chau-au' => [301, '/lam-visa'],
+            '/truong-phong-visa-ho-chieu-02-nhan-vien' => [301, '/tuyen-dung'],
+            '/tuyen-dung-nhan-su-2022' => [301, '/tuyen-dung'],
+            '/chuyen-cung-cap-ve-may-bay-doan-booking-seri-ve-le-trong-va-ngoai-nuoc' => [301, '/ve-may-bay'],
+            '/dich-vu-to-chuc-teambuiliding-cho-cong-ty-va-doanh-nghiep' => [301, '/team-building'],
+            '/quoc-gia' => [301, '/tour-nuoc-ngoai'],
+            '/tinh-thanh-pho' => [301, '/tour-trong-nuoc'],
+            '/chinh-sach-bao-mat-thong-tin' => [301, '/chinh-sach-bao-mat'],
+            '/apple-app-site-association' => [404, null],
+        ];
+        foreach ($cases as $cu => [$ma, $toi]) {
+            $this->assertSame(['ma' => $ma, 'toi' => $toi], LinkCu::tra($cu), $cu);
+        }
+        $this->assertDatabaseMissing('redirects', ['old_path' => '/apple-app-site-association']);
+
+        // Dòng máy đã lưu bằng bộ khớp cũ → lệnh khớp lại sửa, dòng không phải trang thì bỏ
+        Redirect::query()->where('old_path', '/ban-can-chuan-bi-gi-khi-di-du-lich-han-quoc')
+            ->update(['status_code' => 301, 'new_path' => '/cam-nang/di-du-lich-trung-quoc-mang-gi']);
+        Redirect::create(['old_path' => '/apple-app-site-association', 'status_code' => 404]);
+        Redirect::create(['old_path' => '/visa-chau-a', 'status_code' => 404, 'source' => 'tay']);
+        $this->artisan('psv:link-cu', ['--khop-lai' => true])->assertSuccessful()->expectsOutputToContain('2 link đổi trang đích');
+        $this->assertDatabaseHas('redirects', ['old_path' => '/ban-can-chuan-bi-gi-khi-di-du-lich-han-quoc', 'status_code' => 404, 'new_path' => null]);
+        $this->assertDatabaseMissing('redirects', ['old_path' => '/apple-app-site-association']);
+        $this->assertDatabaseHas('redirects', ['old_path' => '/visa-chau-a', 'status_code' => 404]); // nhân viên đặt: giữ nguyên
     }
 
     public function test_tep_wordpress_va_link_do_bua_khong_luu(): void
