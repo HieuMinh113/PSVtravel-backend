@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChuanHoaNoiDung;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,7 +14,7 @@ use Spatie\Activitylog\Support\LogOptions;
 // năng gọn.
 class Event extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use ChuanHoaNoiDung, LogsActivity, SoftDeletes;
 
     // Đối tượng phù hợp của gói
     public const DOI_TUONG = [
@@ -58,5 +59,11 @@ class Event extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('event');
+    }
+
+    /** Ô nội dung soạn bằng RichEditor: tự sửa link, thu nhỏ ảnh khi lưu (ChuanHoaNoiDung) */
+    public function truongNoiDung(): array
+    {
+        return ['description'];
     }
 }

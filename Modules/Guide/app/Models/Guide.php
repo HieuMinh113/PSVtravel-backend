@@ -2,6 +2,7 @@
 
 namespace Modules\Guide\Models;
 
+use App\Models\Concerns\ChuanHoaNoiDung;
 use App\Models\TeamMember;
 use App\Models\User;
 use App\Services\DoiDuongDan;
@@ -15,7 +16,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 class Guide extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use ChuanHoaNoiDung, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'title', 'seo_title', 'slug', 'excerpt', 'content', 'cover_image', 'video_url',
@@ -79,5 +80,11 @@ class Guide extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('guide');
+    }
+
+    /** Ô nội dung soạn bằng RichEditor: tự sửa link, thu nhỏ ảnh khi lưu (ChuanHoaNoiDung) */
+    public function truongNoiDung(): array
+    {
+        return ['content'];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Guides\Tables;
 
+use App\Services\KiemTraSeoBai;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -13,9 +14,19 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Modules\Guide\Models\Guide;
 
 class GuidesTable
 {
+    /** @var array<int, list<array{muc: string, noi_dung: string}>> */
+    private static array $goiY = [];
+
+    /** Gợi ý SEO, tính một lần mỗi bài mỗi lượt tải bảng */
+    private static function goiY(Guide $g): array
+    {
+        return self::$goiY[spl_object_id($g)] ??= KiemTraSeoBai::goiY($g);
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -25,6 +36,19 @@ class GuidesTable
                     ->label('Tiêu đề')
                     ->searchable()
                     ->wrap(),
+                // Số gợi ý SEO (chi tiết khi rê chuột / mở bài): đỏ = nên sửa ngay
+                TextColumn::make('seo')
+                    ->label('SEO')
+                    ->state(fn (Guide $record): int => count(self::goiY($record)))
+                    ->formatStateUsing(fn (int $state): string => $state === 0 ? 'Đạt' : "{$state} gợi ý")
+                    ->badge()
+                    ->color(fn (Guide $record): string => match (true) {
+                        collect(self::goiY($record))->contains('muc', 'loi') => 'danger',
+                        self::goiY($record) !== [] => 'warning',
+                        default => 'success',
+                    })
+                    ->tooltip(fn (Guide $record): ?string => self::goiY($record)
+                        ? implode("\n", array_map(fn ($g) => '• '.$g['noi_dung'], self::goiY($record))) : null),
                 TextColumn::make('category')
                     ->label('Chuyên mục')
                     ->badge()

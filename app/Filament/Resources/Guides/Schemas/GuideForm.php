@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Guides\Schemas;
 
 use App\Models\TeamMember;
+use App\Services\KiemTraSeoBai;
 use App\Services\TepTaiLen;
 use App\Services\YouTube;
 use Filament\Forms\Components\DateTimePicker;
@@ -11,8 +12,13 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
+use Modules\Guide\Models\Guide;
 
 class GuideForm
 {
@@ -20,16 +26,48 @@ class GuideForm
     {
         return $schema
             ->components([
+                // Gợi ý SEO tính trên dữ liệu đã lưu (lưu xong tải lại trang để cập nhật)
+                Section::make('Gợi ý SEO')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->description('Tính theo dữ liệu đã lưu — sửa xong bấm Lưu rồi tải lại trang để xem lại.')
+                    ->collapsible()
+                    ->columnSpanFull()
+                    ->visible(fn (string $operation): bool => $operation === 'edit')
+                    ->schema([
+                        View::make('filament.tour-goi-y-seo')
+                            ->viewData(fn (?Guide $record): array => [
+                                'goiY' => $record ? KiemTraSeoBai::goiY($record) : [],
+                                'tieuDe' => $record ? KiemTraSeoBai::tieuDeGoogle($record) : '',
+                                'dat' => 'Bài đủ các mục SEO cơ bản.',
+                            ]),
+                    ]),
+
                 TextInput::make('title')
                     ->label('Tiêu đề')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Gõ tiêu đề xong tự điền đường dẫn (chỉ khi viết bài mới —
+                    // đổi đường dẫn bài đã đăng là đổi link khách đang dùng)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (string $operation, $state, Set $set) {
+                        if ($operation === 'create') {
+                            $set('slug', Str::slug((string) $state));
+                        }
+                    }),
                 TextInput::make('slug')
                     ->label('Đường dẫn (slug)')
-                    ->helperText('Không dấu, viết thường')
+                    ->helperText(fn (string $operation, ?Guide $record): string => 'Tự điền theo tiêu đề. Chỉ gồm chữ thường không dấu, số và dấu gạch ngang (kinh-nghiem-du-lich-osaka).'
+                        .($operation === 'edit' && $record?->status === 'published' ? ' Bài đang hiện trên web: đổi đường dẫn thì link cũ tự chuyển sang link mới (301).' : ''))
                     ->required()
                     ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Trước đây ô này nhận mọi thứ — có bài lưu nguyên tiêu đề làm
+                    // đường dẫn (/cam-nang/Tempura Nhật Bản: Nguồn Gốc…)
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::slug((string) $state))
+                    ->rule('regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/')
+                    ->validationMessages([
+                        'regex' => 'Đường dẫn chỉ được gồm chữ thường không dấu, số và dấu gạch ngang. VD: kinh-nghiem-du-lich-osaka',
+                    ]),
 
                 // Tiêu đề hiện trên Google (thẻ <title>). Google cắt cụt tiêu đề
                 // dài hơn ~70 ký tự thành "…", công cụ audit SEO báo lỗi "Long
@@ -96,7 +134,9 @@ class GuideForm
 
                 Textarea::make('excerpt')
                     ->label('Tóm tắt')
-                    ->helperText('Đoạn ngắn hiện ở danh sách bài viết')
+                    ->helperText('Hiện ở danh sách bài viết và làm mô tả dưới tiêu đề trên Google — nên 120–160 ký tự, có từ khoá chính.')
+                    ->live(debounce: 500)
+                    ->hint(fn (?string $state): string => mb_strlen((string) $state).' ký tự')
                     ->rows(3)
                     ->maxLength(500)
                     ->columnSpanFull(),

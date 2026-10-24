@@ -248,6 +248,17 @@ class HuongDan extends Page
                         'luu_y' => 'Chỉ ghi thông tin THẬT người đó đồng ý công khai (ảnh, số năm, nơi đã đi). Google và ChatGPT đánh giá cao bài có người viết thật, có kinh nghiệm.',
                     ],
                     [
+                        'tieu_de' => 'Gợi ý SEO khi viết bài cẩm nang',
+                        'o_dau' => 'Nội dung website → Cẩm nang',
+                        'buoc' => [
+                            'Cột **SEO** ở danh sách bài: "Đạt" (xanh), vàng = nên có, đỏ = nên sửa ngay. Mở bài: khung **Gợi ý SEO** trên cùng ghi rõ từng việc.',
+                            'Chèn ảnh: sau khi tải ảnh lên, điền ô **Văn bản thay thế (alt text)** — tả ảnh có gì (VD "Phố Dotonbori Osaka về đêm"). Ảnh đã chèn: bấm vào ảnh → nút ghim **Đính kèm tệp** → sửa ô đó.',
+                            '**Tóm tắt** là đoạn hiện dưới tiêu đề trên Google: viết 120–160 ký tự.',
+                            'Link sang trang của công ty: dán link nào cũng được (có www hay không) — bấm Lưu là tự đổi về link chuẩn. Ảnh to cũng tự thu nhỏ sau khi lưu.',
+                        ],
+                        'luu_y' => 'Đường dẫn (slug) chỉ gồm chữ thường không dấu và gạch ngang — form tự điền theo tiêu đề khi viết bài mới.',
+                    ],
+                    [
                         'tieu_de' => 'Mã QR cho từng tour',
                         'o_dau' => 'Tour & điều hành → Tour → nút Mã QR',
                         'buoc' => ['Tải PNG / SVG để in tờ rơi, poster. Đổi tên tour thì mã đã in vẫn quét được; xem được số lượt quét.'],

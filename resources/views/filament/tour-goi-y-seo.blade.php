@@ -1,4 +1,4 @@
-{{-- Khung "Gợi ý SEO" đầu form sửa tour (App\Services\KiemTraSeoTour) --}}
+{{-- Khung "Gợi ý SEO" đầu form sửa tour / bài cẩm nang (App\Services\KiemTraSeoTour, KiemTraSeoBai) --}}
 <div style="display:flex;flex-direction:column;gap:.6rem">
     <div style="font-size:.85rem">
         <span style="opacity:.7">Tiêu đề trên Google:</span>
@@ -15,7 +15,7 @@
     @empty
         <div style="display:flex;gap:.5rem;align-items:center;font-size:.875rem">
             <x-filament::badge color="success" size="sm">Đạt</x-filament::badge>
-            <span>Tour đủ các mục SEO cơ bản.</span>
+            <span>{{ $dat ?? 'Tour đủ các mục SEO cơ bản.' }}</span>
         </div>
     @endforelse
 </div>

@@ -2,6 +2,7 @@
 
 namespace Modules\Page\Models;
 
+use App\Models\Concerns\ChuanHoaNoiDung;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -9,7 +10,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 class Page extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use ChuanHoaNoiDung, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'slug', 'title', 'meta_title', 'meta_description',
@@ -33,5 +34,11 @@ class Page extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('page');
+    }
+
+    /** Ô nội dung soạn bằng RichEditor: tự sửa link, thu nhỏ ảnh khi lưu (ChuanHoaNoiDung) */
+    public function truongNoiDung(): array
+    {
+        return ['body'];
     }
 }

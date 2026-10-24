@@ -2,6 +2,7 @@
 
 namespace Modules\Visa\Models;
 
+use App\Models\Concerns\ChuanHoaNoiDung;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -9,7 +10,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 class VisaCountry extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use ChuanHoaNoiDung, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name', 'slug', 'flag_image', 'visa_type', 'price',
@@ -36,5 +37,11 @@ class VisaCountry extends Model
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('visa_country');
+    }
+
+    /** Ô nội dung soạn bằng RichEditor: tự sửa link, thu nhỏ ảnh khi lưu (ChuanHoaNoiDung) */
+    public function truongNoiDung(): array
+    {
+        return ['description'];
     }
 }
