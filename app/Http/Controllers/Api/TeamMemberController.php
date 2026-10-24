@@ -10,6 +10,9 @@ class TeamMemberController extends Controller
     // GET /api/v1/team-members — đội ngũ đang hiển thị (để trang Về chúng tôi dựng)
     public function index()
     {
+        // Ai có trang tác giả (có bài cẩm nang đã đăng) thì trang Về chúng tôi gắn link
+        $coTrang = TeamMember::query()->coTrangTacGia()->pluck('id')->all();
+
         $members = TeamMember::query()
             ->dangHienThi()
             ->orderBy('sort_order')
@@ -22,6 +25,7 @@ class TeamMemberController extends Controller
                 'email' => $m->email,
                 'photo' => $this->anh($m->photo),
                 'bio' => $m->bio,
+                'author_slug' => in_array($m->id, $coTrang, true) ? $m->slug : null,
             ]);
 
         return response()->json(['data' => $members]);

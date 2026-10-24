@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\TeamMembers\Tables;
 
+use App\Models\TeamMember;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -32,6 +34,12 @@ class TeamMembersTable
                     ->label('Email')
                     ->placeholder('—')
                     ->toggleable(),
+                // Số bài cẩm nang đã đăng đứng tên người này (có ≥ 1 bài thì có trang tác giả)
+                TextColumn::make('bai_viet_count')
+                    ->label('Bài cẩm nang')
+                    ->counts(['baiViet' => fn ($q) => $q->dangHienThi()])
+                    ->badge()
+                    ->color(fn (int $state): string => $state > 0 ? 'success' : 'gray'),
                 TextColumn::make('status')
                     ->label('Trạng thái')
                     ->badge()
@@ -53,6 +61,12 @@ class TeamMembersTable
                 TrashedFilter::make()->label('Đã xoá'),
             ])
             ->recordActions([
+                Action::make('trangTacGia')
+                    ->label('Trang tác giả')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->visible(fn (TeamMember $record): bool => $record->status === 'published' && filled($record->slug) && $record->bai_viet_count > 0)
+                    ->url(fn (TeamMember $record): string => rtrim((string) config('app.frontend_url', 'https://psvtravel.com'), '/').'/tac-gia/'.$record->slug)
+                    ->openUrlInNewTab(),
                 ViewAction::make(),
                 EditAction::make(),
             ])

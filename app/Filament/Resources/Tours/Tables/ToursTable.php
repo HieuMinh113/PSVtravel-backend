@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tours\Tables;
 
+use App\Services\KiemTraSeoTour;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -16,12 +17,24 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Category\Models\Category;
+use Modules\Tour\Models\Tour;
 
 class ToursTable
 {
+    /** @var array<int, list<array{muc: string, noi_dung: string}>> */
+    private static array $goiY = [];
+
+    /** Gợi ý SEO, tính một lần mỗi tour mỗi lượt tải bảng */
+    private static function goiY(Tour $t): array
+    {
+        return self::$goiY[spl_object_id($t)] ??= KiemTraSeoTour::goiY($t);
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
+            // Cột SEO cần lịch trình + danh mục: nạp sẵn, khỏi mỗi dòng một truy vấn
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['itineraries:id,tour_id', 'categories:id,name']))
             ->columns([
                 ImageColumn::make('cover_image')
                     ->label('Ảnh'),
@@ -29,6 +42,19 @@ class ToursTable
                     ->label('Tên tour')
                     ->searchable()
                     ->sortable(),
+                // Số gợi ý SEO (chi tiết khi rê chuột / mở tour): đỏ = nên sửa ngay
+                TextColumn::make('seo')
+                    ->label('SEO')
+                    ->state(fn (Tour $record): int => count(self::goiY($record)))
+                    ->formatStateUsing(fn (int $state): string => $state === 0 ? 'Đạt' : "{$state} gợi ý")
+                    ->badge()
+                    ->color(fn (Tour $record): string => match (true) {
+                        collect(self::goiY($record))->contains('muc', 'loi') => 'danger',
+                        self::goiY($record) !== [] => 'warning',
+                        default => 'success',
+                    })
+                    ->tooltip(fn (Tour $record): ?string => self::goiY($record)
+                        ? implode("\n", array_map(fn ($g) => '• '.$g['noi_dung'], self::goiY($record))) : null),
                 // Danh mục tour (Miền Trung, Hàn Quốc…) — một tour có thể nằm ở nhiều danh mục
                 TextColumn::make('categories.name')
                     ->label('Danh mục')

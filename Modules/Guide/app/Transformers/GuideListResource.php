@@ -2,6 +2,7 @@
 
 namespace Modules\Guide\Transformers;
 
+use App\Http\Resources\TacGiaResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,7 +16,8 @@ class GuideListResource extends JsonResource
             'excerpt' => $this->excerpt,
             'cover_image' => $this->anh($this->cover_image),
             'category' => $this->category,
-            'author_name' => $this->whenLoaded('author', fn () => $this->author?->name),
+            'author_name' => TacGiaResource::tomTat($this->relationLoaded('tacGia') ? $this->tacGia : null)['name']
+                ?? ($this->relationLoaded('author') ? $this->author?->name : null),
             'view_count' => $this->view_count,
             'published_at' => $this->published_at?->format('Y-m-d'),
         ];

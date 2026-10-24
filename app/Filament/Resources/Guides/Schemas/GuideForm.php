@@ -2,13 +2,16 @@
 
 namespace App\Filament\Resources\Guides\Schemas;
 
+use App\Models\TeamMember;
+use App\Services\TepTaiLen;
+use App\Services\YouTube;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
 
 class GuideForm
@@ -51,10 +54,20 @@ class GuideForm
                     ])
                     ->searchable(),
                 Select::make('author_id')
-                    ->label('Tác giả')
+                    ->label('Người nhập bài (tài khoản admin)')
                     ->relationship('author', 'name')
+                    ->default(fn () => auth()->id())
                     ->searchable()
                     ->preload(),
+                // Tác giả hiện trên bài + trang giới thiệu tác giả (Google tin bài
+                // có người viết thật, có kinh nghiệm hơn bài không rõ ai viết)
+                Select::make('team_member_id')
+                    ->label('Tác giả hiện trên bài')
+                    ->relationship('tacGia', 'name', fn ($query) => $query->where('status', 'published'))
+                    ->default(fn () => TeamMember::query()->dangHienThi()->where('user_id', auth()->id())->value('id'))
+                    ->searchable()
+                    ->preload()
+                    ->helperText('Chọn người trong Giới thiệu công ty → Đội ngũ. Bài sẽ có khung "Về tác giả" và link tới trang giới thiệu người đó. Để trống thì chỉ ghi tên người nhập bài.'),
 
                 Select::make('tour_id')
                     ->label('Gắn tour để đặt')
@@ -66,7 +79,7 @@ class GuideForm
 
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
-                    ->image()->acceptedFileTypes(\App\Services\TepTaiLen::ANH)
+                    ->image()->acceptedFileTypes(TepTaiLen::ANH)
                     ->directory('guides')
                     ->disk('public')
                     ->columnSpanFull(),
@@ -78,7 +91,7 @@ class GuideForm
                     ->placeholder('https://www.youtube.com/watch?v=...')
                     ->helperText('Video minh hoạ cho bài (VD: clip review chuyến đi). Hiện ngay dưới đoạn mở bài. Để trống nếu không có.')
                     ->maxLength(255)
-                    ->rules([\App\Services\YouTube::quyTac()])
+                    ->rules([YouTube::quyTac()])
                     ->columnSpanFull(),
 
                 Textarea::make('excerpt')

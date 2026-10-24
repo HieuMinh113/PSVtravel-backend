@@ -2,9 +2,9 @@
 
 namespace Modules\Guide\Http\Controllers\Api;
 
-use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Modules\Guide\Models\Guide;
 use Modules\Guide\Transformers\GuideDetailResource;
 use Modules\Guide\Transformers\GuideListResource;
@@ -16,7 +16,7 @@ class GuideApiController extends Controller
     {
         $query = Guide::query()
             ->dangHienThi()
-            ->with('author:id,name');
+            ->with(['author:id,name', 'tacGia']);
 
         if ($cat = $request->query('category')) {
             $query->where('category', $cat);
@@ -34,7 +34,7 @@ class GuideApiController extends Controller
     {
         $guide = Guide::query()
             ->dangHienThi()
-            ->with(['author:id,name', 'tour.departures', 'spots.city.country', 'mapCities.country'])
+            ->with(['author:id,name', 'tacGia', 'tour.departures', 'spots.city.country', 'mapCities.country'])
             ->where('slug', $slug)
             ->firstOrFail();
 

@@ -228,6 +228,26 @@ class HuongDan extends Page
                         ],
                     ],
                     [
+                        'tieu_de' => 'Gợi ý SEO khi nhập tour',
+                        'o_dau' => 'Tour & điều hành → Tour',
+                        'buoc' => [
+                            'Cột **SEO** ở danh sách tour: "Đạt" (xanh), số gợi ý vàng = nên có, đỏ = nên sửa ngay. Rê chuột để xem chi tiết.',
+                            'Mở tour: khung **Gợi ý SEO** trên cùng cho biết tiêu đề Google sẽ hiện và từng việc cần làm (tiêu đề bị cắt, thiếu lịch trình, đường dẫn dính chữ…).',
+                            'Sửa xong bấm Lưu rồi tải lại trang để xem lại.',
+                            'Đổi **Đường dẫn (slug)** của tour (hoặc bài cẩm nang) đang hiện trên web: khoảng 1 phút sau link cũ tự chuyển sang link mới (xem ở Marketing → Chuyển hướng link cũ, người đặt "Đổi đường dẫn"). Vẫn nên đặt đúng ngay từ đầu.',
+                        ],
+                    ],
+                    [
+                        'tieu_de' => 'Bài cẩm nang có tác giả',
+                        'o_dau' => 'Giới thiệu công ty → Đội ngũ',
+                        'buoc' => [
+                            'Mở người viết bài → phần **Trang tác giả**: số năm kinh nghiệm, chuyên về, những nơi đã dẫn tour, giới thiệu đầy đủ, tài khoản admin của người đó.',
+                            'Khi viết bài (Nội dung website → Cẩm nang) chọn **Tác giả hiện trên bài**. Người có tài khoản admin gắn sẵn thì bài họ nhập tự chọn họ.',
+                            'Có ít nhất một bài đã đăng là trang psvtravel.com/tac-gia/… tự có; bài viết có khung "Về tác giả" và link tới trang đó.',
+                        ],
+                        'luu_y' => 'Chỉ ghi thông tin THẬT người đó đồng ý công khai (ảnh, số năm, nơi đã đi). Google và ChatGPT đánh giá cao bài có người viết thật, có kinh nghiệm.',
+                    ],
+                    [
                         'tieu_de' => 'Mã QR cho từng tour',
                         'o_dau' => 'Tour & điều hành → Tour → nút Mã QR',
                         'buoc' => ['Tải PNG / SVG để in tờ rơi, poster. Đổi tên tour thì mã đã in vẫn quét được; xem được số lượt quét.'],

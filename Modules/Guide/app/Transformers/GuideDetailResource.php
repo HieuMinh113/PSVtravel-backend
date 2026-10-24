@@ -2,6 +2,7 @@
 
 namespace Modules\Guide\Transformers;
 
+use App\Http\Resources\TacGiaResource;
 use App\Services\YouTube;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,7 +23,11 @@ class GuideDetailResource extends JsonResource
             'video_id' => YouTube::id($this->video_url),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'category' => $this->category,
-            'author_name' => $this->whenLoaded('author', fn () => $this->author?->name),
+            // Tác giả có trang giới thiệu (thành viên Đội ngũ đang hiển thị) — không
+            // có thì chỉ tên tài khoản đã viết bài như trước
+            'author' => $this->whenLoaded('tacGia', fn () => TacGiaResource::tomTat($this->tacGia)),
+            'author_name' => TacGiaResource::tomTat($this->relationLoaded('tacGia') ? $this->tacGia : null)['name']
+                ?? ($this->relationLoaded('author') ? $this->author?->name : null),
             'view_count' => $this->view_count,
             'published_at' => $this->published_at?->format('Y-m-d'),
             // Ưu tiên "Tiêu đề SEO" nhân viên tự viết; trống thì dùng tiêu đề bài

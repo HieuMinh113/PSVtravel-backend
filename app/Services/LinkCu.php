@@ -477,6 +477,12 @@ class LinkCu
         return array_values(array_filter($noi, fn ($n) => (bool) array_intersect(self::nhom($n), $nhomChinh)));
     }
 
+    /** Chuỗi (tên tour…) có nhắc tên một nơi đã biết không — dùng cho gợi ý SEO */
+    public static function coTenNoi(string $chuoi): bool
+    {
+        return self::noiTrong(Str::slug($chuoi), true) !== [];
+    }
+
     /** Nơi + nước của nó + các vùng chứa nó */
     private static function nhom(string $n): array
     {

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tours\Schemas;
 
 use App\Filament\Resources\AllianceDepartures\Tables\AllianceDeparturesTable;
+use App\Services\KiemTraSeoTour;
 use App\Services\TepTaiLen;
 use App\Services\YouTube;
 use Filament\Forms\Components\FileUpload;
@@ -12,8 +13,10 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -75,6 +78,20 @@ class TourForm
     {
         return $schema
             ->components([
+                // Gợi ý SEO tính trên dữ liệu đã lưu (lưu xong tải lại trang để cập nhật)
+                Section::make('Gợi ý SEO')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->description('Tính theo dữ liệu đã lưu — sửa xong bấm Lưu rồi tải lại trang để xem lại.')
+                    ->collapsible()
+                    ->columnSpanFull()
+                    ->visible(fn (string $operation): bool => $operation === 'edit')
+                    ->schema([
+                        View::make('filament.tour-goi-y-seo')
+                            ->viewData(fn (?Tour $record): array => [
+                                'goiY' => $record ? KiemTraSeoTour::goiY($record) : [],
+                                'tieuDe' => $record ? KiemTraSeoTour::tieuDeGoogle($record) : '',
+                            ]),
+                    ]),
                 TextInput::make('name')
                     ->label('Tên tour')
                     ->required()
@@ -91,7 +108,8 @@ class TourForm
                     }),
                 TextInput::make('slug')
                     ->label('Đường dẫn (slug)')
-                    ->helperText('Tự điền theo tên tour. Chỉ gồm chữ thường không dấu, số và dấu gạch ngang.')
+                    ->helperText(fn (string $operation, ?Tour $record): string => 'Tự điền theo tên tour. Chỉ gồm chữ thường không dấu, số và dấu gạch ngang, mỗi tiếng cách nhau một gạch (cuu-trai-cau, không viết cuutraicau).'
+                        .($operation === 'edit' && $record?->status === 'published' ? ' Tour đang bán: đổi đường dẫn thì link cũ tự chuyển sang link mới (301), không mất khách cũ.' : ''))
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255)

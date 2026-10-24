@@ -4,18 +4,19 @@ use App\Http\Controllers\Api\AboutImageController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DestinationController;
-use App\Http\Controllers\Api\LinkCuController;
-use App\Http\Controllers\Api\SeasonPageController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventReviewController;
 use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\JobApplicationController;
 use App\Http\Controllers\Api\JobPostingController;
+use App\Http\Controllers\Api\LinkCuController;
 use App\Http\Controllers\Api\MyBookingController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PromotionController;
+use App\Http\Controllers\Api\SeasonPageController;
 use App\Http\Controllers\Api\SubscriberController;
+use App\Http\Controllers\Api\TacGiaController;
 use App\Http\Controllers\Api\TeamMemberController;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 Route::post('v1/events/{slug}/reviews', [EventReviewController::class, 'store'])
     ->middleware('throttle:review');
 
+// Tác giả bài cẩm nang (trang /tac-gia/{slug} của website)
+Route::get('v1/authors', [TacGiaController::class, 'index'])->middleware('throttle:api');
+Route::get('v1/authors/{slug}', [TacGiaController::class, 'show'])->middleware('throttle:api');
+
 // Đội ngũ / ban lãnh đạo — công khai để trang Về chúng tôi dựng
 Route::get('v1/team-members', [TeamMemberController::class, 'index'])
     ->middleware('throttle:api');
@@ -74,6 +79,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('destinations-slugs', [DestinationController::class, 'slugs']);
     Route::get('destinations/{slug}', [DestinationController::class, 'show']);
     Route::get('link-cu', LinkCuController::class);
+    Route::get('link-cu/doi-duong-dan', [LinkCuController::class, 'doiDuongDan']);
     Route::get('season-pages', [SeasonPageController::class, 'index']);
     Route::get('season-pages/{slug}', [SeasonPageController::class, 'show']);
     Route::get('faqs', [FaqController::class, 'index']);

@@ -2,17 +2,22 @@
 
 namespace Modules\Tour\Models;
 
+use App\Jobs\PingIndexNow;
+use App\Services\DoiDuongDan;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
-use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Alliance\Models\AllianceTour;
+use Modules\Booking\Models\Booking;
 use Modules\Category\Models\Category;
-use App\Jobs\PingIndexNow;
+use Modules\Review\Models\Review;
 use Modules\Tour\Services\HanNopVisa;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
+
 class Tour extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
@@ -26,6 +31,17 @@ class Tour extends Model
         static::saved(function (self $tour) {
             if ($tour->wasChanged(['country', 'visa_deadline_days', 'visa_kind', 'type'])) {
                 HanNopVisa::tinhLaiTour($tour);
+            }
+        });
+        // Đổi đường dẫn / loại tour đang bán → link cũ tự chuyển sang link mới (301),
+        // giữ thứ hạng Google và link khách đã chia sẻ
+        static::updated(function (self $tour) {
+            if ($tour->wasChanged(['slug', 'type']) && $tour->getOriginal('status') === 'published') {
+                $muc = fn (?string $loai) => $loai === 'abroad' ? 'tour-nuoc-ngoai' : 'tour-trong-nuoc';
+                DoiDuongDan::ghi(
+                    '/'.$muc($tour->getOriginal('type')).'/'.$tour->getOriginal('slug'),
+                    '/'.$muc($tour->type).'/'.$tour->slug,
+                );
             }
         });
         static::saved(function (self $tour) {
@@ -54,19 +70,19 @@ class Tour extends Model
     ];
 
     protected $casts = [
-        'highlights'   => 'array',
-        'included'     => 'array',
-        'excluded'     => 'array',
-        'notes'        => 'array',
-        'adult_price'  => 'integer',
-        'child_price'  => 'integer',
+        'highlights' => 'array',
+        'included' => 'array',
+        'excluded' => 'array',
+        'notes' => 'array',
+        'adult_price' => 'integer',
+        'child_price' => 'integer',
         'infant_price' => 'integer',
-        'old_price'    => 'integer',
-        'rating'       => 'decimal:1',
+        'old_price' => 'integer',
+        'rating' => 'decimal:1',
         'review_count' => 'integer',
         'visa_deadline_days' => 'integer',
-        'is_featured'  => 'boolean',
-        'sort_order'   => 'integer',
+        'is_featured' => 'boolean',
+        'sort_order' => 'integer',
     ];
 
     /**
@@ -96,7 +112,7 @@ class Tour extends Model
     // Đơn đặt của tour — dùng để chặn xoá vĩnh viễn khi tour đã phát sinh giao dịch
     public function bookings(): HasMany
     {
-        return $this->hasMany(\Modules\Booking\Models\Booking::class);
+        return $this->hasMany(Booking::class);
     }
 
     /**
@@ -105,7 +121,7 @@ class Tour extends Model
      */
     public function allianceTour(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Alliance\Models\AllianceTour::class);
+        return $this->belongsTo(AllianceTour::class);
     }
 
     /** Lượt quét mã QR của tour (in trên tờ rơi, poster...) */
@@ -162,6 +178,7 @@ class Tour extends Model
 
         return $sapToi->isNotEmpty() && $sapToi->every(fn ($d) => $d->quaHanVisa($this));
     }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -173,12 +190,14 @@ class Tour extends Model
             ->dontLogEmptyChanges()
             ->useLogName('tour');
     }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'category_tour');
     }
-    public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
+
+    public function reviews(): HasMany
     {
-        return $this->hasMany(\Modules\Review\Models\Review::class);
+        return $this->hasMany(Review::class);
     }
 }

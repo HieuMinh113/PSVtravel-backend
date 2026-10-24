@@ -2,7 +2,9 @@
 
 namespace Modules\Guide\Models;
 
+use App\Models\TeamMember;
 use App\Models\User;
+use App\Services\DoiDuongDan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,7 +19,7 @@ class Guide extends Model
 
     protected $fillable = [
         'title', 'seo_title', 'slug', 'excerpt', 'content', 'cover_image', 'video_url',
-        'author_id', 'category', 'tour_id', 'view_count', 'status', 'published_at', 'sort_order',
+        'author_id', 'team_member_id', 'category', 'tour_id', 'view_count', 'status', 'published_at', 'sort_order',
     ];
 
     protected $casts = [
@@ -34,6 +36,22 @@ class Guide extends Model
     public function tour(): BelongsTo
     {
         return $this->belongsTo(Tour::class);
+    }
+
+    /** Tác giả hiện trên bài (thành viên Đội ngũ, có trang /tac-gia/{slug}) */
+    public function tacGia(): BelongsTo
+    {
+        return $this->belongsTo(TeamMember::class, 'team_member_id');
+    }
+
+    protected static function booted(): void
+    {
+        // Đổi đường dẫn bài đã đăng → link cũ tự chuyển sang link mới (301)
+        static::updated(function (self $g) {
+            if ($g->wasChanged('slug') && $g->getOriginal('status') === 'published') {
+                DoiDuongDan::ghi('/cam-nang/'.$g->getOriginal('slug'), '/cam-nang/'.$g->slug);
+            }
+        });
     }
 
     /** Các điểm trên bản đồ cẩm nang mở ra bài này. */

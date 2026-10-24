@@ -13,7 +13,8 @@ class Redirect extends Model
         404 => 'Chưa khớp — cần xử lý',
     ];
 
-    public const NGUON = ['tu_dong' => 'Tự động', 'tay' => 'Nhân viên'];
+    // doi_slug: tự ghi khi nhân viên đổi đường dẫn tour / bài (App\Services\DoiDuongDan)
+    public const NGUON = ['tu_dong' => 'Tự động', 'tay' => 'Nhân viên', 'doi_slug' => 'Đổi đường dẫn'];
 
     protected $fillable = ['old_path', 'new_path', 'status_code', 'source', 'note'];
 
