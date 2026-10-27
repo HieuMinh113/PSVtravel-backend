@@ -63,18 +63,22 @@ class KiemTraMaldives extends Command
             ->map(fn (Role $r) => $r->name.($r->hasPermissionTo('ViewAny:MaldivesCombo') || $r->hasPermissionTo('ViewAny:MaldivesBooking') ? ' ✓' : ' ✗'));
         $this->line('   Vai trò (✓ = thấy mục Maldives): '.$vaiTro->implode(', '));
 
-        // 4. Menu admin: trang Maldives có trong bảng điều khiển không. Từng chạy "optimize" thì
-        // admin nhớ sẵn danh sách trang cũ (chưa có Maldives) — xoá đi để nạp lại
-        $cuCache = is_dir(app()->bootstrapPath('cache/filament')) || is_file(app()->getCachedConfigPath());
-        Artisan::call('optimize:clear');
-        if ($cuCache) {
-            $this->dat('Đã xoá bộ nhớ đệm menu / cấu hình cũ (có thể đây là lý do không thấy menu).');
+        // 4. Menu admin. Trình duyệt (không phải dòng lệnh) dùng danh sách trang admin lưu tạm
+        // bởi "optimize" / "filament:optimize": lưu từ trước khi có Maldives thì menu không có
+        // Maldives dù mã đã đủ — lệnh chạy ở dòng lệnh không thấy được điều này, nên đọc thẳng file
+        $tepMenu = Filament::getPanel('admin')->getComponentCachePath();
+        $coTep = is_file($tepMenu);
+        $menuCu = $coTep && ! in_array(MaldivesComboResource::class, (array) ((include $tepMenu)['resources'] ?? []), true);
+        Artisan::call('optimize:clear'); // xoá danh sách trang lưu tạm, cấu hình / đường dẫn lưu tạm, bộ nhớ đệm
+        if ($menuCu) {
+            $this->line('<fg=yellow>!</> Admin đang dùng danh sách trang lưu tạm CŨ (chưa có Maldives) — ĐÂY LÀ LÝ DO không thấy menu. Đã xoá.');
+        } elseif ($coTep) {
+            $this->dat('Danh sách trang admin lưu tạm đã có Maldives (đã làm mới).');
         }
-        $coTrang = in_array(MaldivesComboResource::class, Filament::getPanel('admin')->getResources(), true);
-        if (! $coTrang) {
+        if (! in_array(MaldivesComboResource::class, Filament::getPanel('admin')->getResources(), true)) {
             return $this->hong('Admin chưa nhận trang Combo Maldives.', 'Chạy: docker compose restart app rồi chạy lại lệnh này.');
         }
-        $this->dat('Admin đã có các trang Maldives.');
+        $this->dat('Mã admin có đủ các trang Maldives.');
 
         // 5. Tài khoản nhân viên nào thấy menu
         $nv = User::query()->whereHas('roles', fn ($q) => $q->where('name', '!=', 'customer'))->with('roles')->orderBy('id')->limit(50)->get();
@@ -88,7 +92,7 @@ class KiemTraMaldives extends Command
 
         $this->newLine();
         $this->info($thay->isNotEmpty()
-            ? 'Xong. Đăng xuất admin, đăng nhập lại bằng một tài khoản có ✓ ở trên, bấm Ctrl + F5 — mục "Maldives" nằm dưới "Tour & điều hành".'
+            ? 'Xong. Chạy tiếp: docker compose restart app — rồi đăng xuất admin, đăng nhập lại bằng một tài khoản có ✓ ở trên, bấm Ctrl + F5. Mục "Maldives" nằm dưới "Tour & điều hành".'
             : 'Chưa có tài khoản nào có quyền Maldives — gán vai trò admin / super_admin cho tài khoản của bạn.');
 
         return self::SUCCESS;

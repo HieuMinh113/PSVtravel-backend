@@ -136,11 +136,18 @@ class MaldivesTest extends TestCase
         Role::findByName('admin', 'web')->revokePermissionTo('ViewAny:MaldivesCombo');
         $this->assertFalse($admin->fresh()->can('viewAny', MaldivesCombo::class));
 
+        // Danh sách trang admin lưu tạm từ trước khi có Maldives (như sau "php artisan optimize")
+        $tepMenu = Filament::getPanel('admin')->getComponentCachePath();
+        @mkdir(dirname($tepMenu), 0777, true);
+        file_put_contents($tepMenu, '<?php return '.var_export(['resources' => ['App\\Filament\\Resources\\Tours\\TourResource']], true).';');
+
         $this->artisan('psv:kiem-tra-maldives')->assertSuccessful()
-            ->expectsOutputToContain('Admin đã có các trang Maldives')
+            ->expectsOutputToContain('ĐÂY LÀ LÝ DO không thấy menu')
+            ->expectsOutputToContain('Mã admin có đủ các trang Maldives')
             ->expectsOutputToContain('quan-tri@example.com (admin)') // trong dòng "Tài khoản thấy mục Maldives"
             ->expectsOutputToContain('nv-visa@example.com (visa)'); // trong dòng "Tài khoản KHÔNG thấy"
         $this->assertTrue($admin->fresh()->can('viewAny', MaldivesCombo::class));
+        $this->assertFileDoesNotExist($tepMenu);
     }
 
     public function test_hang_phong_chi_nguoi_lon_va_resort_nua_sao(): void
