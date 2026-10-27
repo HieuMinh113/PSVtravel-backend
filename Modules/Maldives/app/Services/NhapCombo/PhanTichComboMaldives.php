@@ -27,6 +27,9 @@ class PhanTichComboMaldives
     /** Gạch đầu dòng ở đầu dòng chữ */
     private const GACH = '/^\s*(?:[•●▪■◆◦‣∙·✓✔➢➤►»\p{So}*]+|[\-–+](?=\s|\p{L}))\s*/u';
 
+    /** Chuyến bay "SQ 191 HANSIN 1235 1705" */
+    private const CHUYEN_BAY = '/\b([A-Z0-9]{2})\s?(\d{2,4})\s+([A-Z]{6})\s+(\d{4})\s+(\d{4})\b/';
+
     private const NGAY = '/^NG[ÀA]Y\s*0?(\d{1,2})\s*[:.\-–]\s*(.*)$/iu';
 
     /** Từ khoá tiêu đề khung tiện ích resort (so chữ không dấu) */
@@ -40,7 +43,7 @@ class PhanTichComboMaldives
     private const TU_VIET = ['bay', 'ra', 'vao', 'xe', 'tham', 'quan', 'tau', 'toi', 'con', 'nha', 'hang', 'an', 'tu', 'do', 'la', 'di', 'sang', 'nghi',
         'tam', 'ban', 'tai', 'sau', 'mua', 'choi', 'cung', 'theo', 'gia', 'phi', 'goi', 'dua', 'don', 'tra', 'phong', 'cao', 'toc', 'thuy', 'co', 'may',
         'hon', 'nam', 'bac', 'tay', 'trong', 'ngoai', 'giua', 'hai', 'ba', 'bon', 'voi', 'cho', 'khi', 'thi', 'nhung', 'cac', 'mot', 'it', 'lon', 'nho',
-        'moi', 'cu', 'bo', 'me', 'em', 'anh', 'chi', 'ong', 'ai', 'hay', 'va', 'dao', 'lan', 'xem', 'ngam', 'hoang', 'tro', 've', 'thu', 'den', 'thao', 'tin', 'gian', 'chung', 'dung', 'trang', 'tang', 'xanh', 'canh', 'quang', 'thanh', 'nhan', 'phan', 'dan', 'lang', 'song', 'ngan', 'resort'];
+        'moi', 'cu', 'bo', 'me', 'em', 'anh', 'chi', 'ong', 'ai', 'hay', 'va', 'dao', 'lan', 'xem', 'ngam', 'hoang', 'tro', 've', 'thu', 'den', 'thao', 'bao', 'tin', 'gian', 'chung', 'dung', 'trang', 'tang', 'xanh', 'canh', 'quang', 'thanh', 'nhan', 'phan', 'dan', 'lang', 'song', 'ngan', 'resort'];
 
     /** @var list<array> */
     private array $ds = [];
@@ -178,7 +181,7 @@ class PhanTichComboMaldives
                 'goi' => $goi,
                 'gioi_thieu' => $gioiThieu,
                 'noi_bat' => array_slice($noiBatResort, 0, 8),
-                'tien_ich' => array_values(array_map(fn ($n) => ['title' => $this->cau($n['title']), 'items' => $n['items']], array_filter($tienIch, fn ($n) => $n['items']))),
+                'tien_ich' => array_values(array_map(fn ($n) => ['title' => rtrim($this->cau($n['title']), ' :'), 'items' => $n['items']], array_filter($tienIch, fn ($n) => $n['items']))),
                 'quy_dinh' => $phan['quy_dinh'],
                 'chi_nguoi_lon' => $chiNguoiLon,
             ],
@@ -193,8 +196,7 @@ class PhanTichComboMaldives
             'noi_khoi_hanh' => $noiDi,
             'ngay' => $cacNgay,
             'tre_em_phan_tram' => $treEm,
-            'tuoi_tre_em' => preg_match('/trẻ em\s*từ\s*0?(\d{1,2})\s*[–\-]\s*0?(\d{1,2})\s*tuổi/iu', $toan, $k)
-                || preg_match('/trẻ em\s*0?(\d{1,2})\s*[–\-]\s*0?(\d{1,2})\s*tuổi/iu', $toan, $k) ? "{$k[1]} – {$k[2]} tuổi" : null,
+            'tuoi_tre_em' => $this->tuoiTreEm($toan),
             'toi_thieu' => preg_match('/không đủ\s+(\d{1,3})\s+khách/iu', $toan, $k) ? (int) $k[1] : null,
             'lich_trinh' => $lichTrinh,
             'bao_gom' => $phan['bao_gom'],
@@ -203,6 +205,19 @@ class PhanTichComboMaldives
             'anh' => $this->locAnh($anh),
             'canh_bao' => array_values(array_unique($this->canhBao)),
         ];
+    }
+
+    /** "trẻ em từ 02 – 12 tuổi", "Trẻ em 2 – 12 tuổi", "Từ 2 – dưới 12 tuổi: 75% giá người lớn" */
+    private function tuoiTreEm(string $toan): ?string
+    {
+        foreach (['/trẻ em\s*từ\s*0?(\d{1,2})\s*[–\-]\s*(dưới\s*)?0?(\d{1,2})\s*tuổi/iu', '/trẻ em\s*0?(\d{1,2})\s*[–\-]\s*(dưới\s*)?0?(\d{1,2})\s*tuổi/iu',
+            '/từ\s*0?(\d{1,2})\s*[–\-]\s*(dưới\s*)?0?(\d{1,2})\s*tuổi\s*:?\s*\d{2,3}\s*%/iu'] as $mau) {
+            if (preg_match($mau, $toan, $k)) {
+                return "{$k[1]} – ".($k[2] !== '' ? 'dưới ' : '')."{$k[3]} tuổi";
+            }
+        }
+
+        return null;
     }
 
     // ===================================================================
@@ -234,26 +249,38 @@ class PhanTichComboMaldives
                 $gach = true;
             }
             // số trang, dòng trang trí "*****"
-            if ($chu === '' || preg_match('/^\d{1,2}$|^[*\s|]+$/u', $chu)) {
+            if ($chu === '' || preg_match('/^\d{1,2}$|^[*\s|]+$|^[\p{P}\s]+$/u', $chu)) {
                 continue;
             }
             $ra[] = ['loai' => 'chu', 'chu' => $chu, 'dam' => (bool) ($m['dam'] ?? false), 'gach' => $gach, 'o' => $o];
         }
 
-        // Bảng Word "TIÊU ĐỀ 1 | TIÊU ĐỀ 2 | …" + hàng nội dung cùng số ô = khung tiện ích nhiều cột
+        // Bảng Word "TIÊU ĐỀ 1 | TIÊU ĐỀ 2 | …" (+ dòng phụ đề "(giá tham khảo)") rồi các hàng nội dung
+        // = khung tiện ích nhiều cột. Hàng nội dung: mỗi cột một ô (nhiều dòng = nhiều mục), hoặc
+        // mỗi cột k ô ("Cho cá mập ăn | $28/ khách | Thuê Jet ski | $122/ 20 phút")
         $gop = [];
         for ($i = 0; $i < count($ra); $i++) {
             $m = $ra[$i];
+            $n = $m['loai'] === 'chu' && $m['o'] ? count($m['o']) : 0;
             $sau = $ra[$i + 1] ?? null;
-            if ($m['loai'] === 'chu' && $m['o'] && count($m['o']) >= 2 && $sau && $sau['loai'] === 'chu' && $sau['o'] && count($sau['o']) === count($m['o'])
-                && ! array_filter($m['o'], fn ($x) => ! self::laTieuDeO($x))) {
-                $nhom = [];
-                foreach ($m['o'] as $c => $tieuDe) {
-                    $muc = array_values(array_filter(array_map(fn ($x) => trim(preg_replace(self::GACH, '', $x)), explode("\n", $sau['o'][$c]))));
-                    $nhom[] = ['title' => $tieuDe, 'items' => $muc];
+            if ($n >= 2 && $sau && $sau['loai'] === 'chu' && $sau['o'] && count($sau['o']) >= $n && count($sau['o']) <= 3 * $n
+                && ! array_filter($m['o'], fn ($x) => ! self::laTieuDeO(explode("\n", $x)[0]))) {
+                $nhom = array_map(fn ($x) => ['title' => trim(preg_replace('/\s*\n\s*/u', ' ', $x)), 'items' => []], $m['o']);
+                $laHangTieuDe = fn (array $o) => ! array_filter($o, fn ($x) => ! self::laTieuDeO(explode("\n", $x)[0]));
+                for ($j = $i + 1; $j < count($ra) && $ra[$j]['loai'] === 'chu' && $ra[$j]['o'] && count($ra[$j]['o']) >= $n && count($ra[$j]['o']) <= 3 * $n
+                    && ! $laHangTieuDe($ra[$j]['o']); $j++) {
+                    $o = $ra[$j]['o'];
+                    $k = (int) ceil(count($o) / $n);
+                    foreach ($nhom as $c => $_) {
+                        $phan = array_slice($o, $c * $k, $k);
+                        $muc = $k === 1
+                            ? array_map(fn ($x) => trim(preg_replace(self::GACH, '', $x)), explode("\n", (string) ($phan[0] ?? '')))
+                            : [trim(preg_replace('/\s+/u', ' ', implode(' ', $phan)))];
+                        array_push($nhom[$c]['items'], ...array_values(array_filter($muc, fn ($x) => $x !== '')));
+                    }
                 }
                 $gop[] = ['loai' => 'nhom_tien_ich', 'nhom' => $nhom];
-                $i++;
+                $i = $j - 1;
 
                 continue;
             }
@@ -441,12 +468,21 @@ class PhanTichComboMaldives
             $daDung = [$i => true];
             for ($j = $i + 1; $j < count($this->ds); $j++) {
                 $h = $this->ds[$j];
-                if ($h['loai'] !== 'chu' || ! preg_match_all('/\b([A-Z0-9]{2})\s?(\d{2,4})\s+([A-Z]{6})\s+(\d{4})\s+(\d{4})\b/', $h['chu'], $cb, PREG_SET_ORDER)) {
+                if ($h['loai'] !== 'chu' || ! preg_match_all(self::CHUYEN_BAY, $h['chu'], $cb, PREG_SET_ORDER)) {
                     break;
                 }
-                foreach ($cb as $c => $x) {
-                    if (isset($noi[$c])) {
-                        $noi[$c]['flights'][] = "{$x[1]} {$x[2]} {$x[3]} {$x[4]} {$x[5]}";
+                $chuyen = fn (array $x) => "{$x[1]} {$x[2]} {$x[3]} {$x[4]} {$x[5]}";
+                if ($h['o'] && count($h['o']) === count($noi)) {
+                    // mỗi ô một nơi đi — ô có thể gồm nhiều chuyến (file Word: cả chặng đi và về trong một ô)
+                    foreach ($h['o'] as $c => $o) {
+                        preg_match_all(self::CHUYEN_BAY, $o, $cbO, PREG_SET_ORDER);
+                        array_push($noi[$c]['flights'], ...array_map($chuyen, $cbO));
+                    }
+                } else {
+                    foreach ($cb as $c => $x) {
+                        if (isset($noi[$c])) {
+                            $noi[$c]['flights'][] = $chuyen($x);
+                        }
                     }
                 }
                 $daDung[$j] = true;
@@ -575,7 +611,7 @@ class PhanTichComboMaldives
             if ($m['loai'] !== 'chu') {
                 continue;
             }
-            $chu = $m['o'] ? implode(' · ', array_filter(array_map(fn ($x) => trim(preg_replace(self::GACH, '', $x)), $m['o']))) : $m['chu'];
+            $chu = $m['o'] ? implode(' · ', array_filter(array_map(fn ($x) => trim(preg_replace(['/\s*\n\s*/u', self::GACH], ['; ', ''], $x)), $m['o']))) : $m['chu'];
             $td = $this->tieuDePhan($m);
             if ($td && $td['loai'] === 'khong_bao_gom') {
                 $trongKbg = true;
@@ -598,17 +634,12 @@ class PhanTichComboMaldives
 
                 continue;
             }
-            // Khung tiện ích một cột kết thúc ở mốc giờ lịch trình ("18h30 – 21h00: …") / "Nghỉ đêm…"
-            if ($nhom !== null && (preg_match('/^\d{1,2}\s*h\s*\d{0,2}\b|^nghỉ\s+(?:đêm|\d+\s*đêm)/iu', $chu))) {
+            // Khung tiện ích một cột kết thúc ở mốc giờ / buổi của lịch trình ("18h30 – 21h00: …", "Tối: …") / "Nghỉ đêm…"
+            if ($nhom !== null && (preg_match('/^\d{1,2}\s*h\s*\d{0,2}\b|^(?:sáng|trưa|chiều|tối)\s*:|nghỉ\s+(?:đêm|\d+\s*đêm)/iu', $chu))) {
                 $nhom = null;
             }
             if ($nhom !== null) {
-                $cuoi = array_key_last($tienIch[$nhom]['items']);
-                if ($cuoi !== null && ! $m['gach'] && preg_match('/^\p{Ll}/u', $chu)) {
-                    $tienIch[$nhom]['items'][$cuoi] .= ' '.$chu;
-                } else {
-                    $tienIch[$nhom]['items'][] = $chu;
-                }
+                $this->themTienIch($tienIch, $nhom, $i, $m);
 
                 continue;
             }
@@ -624,6 +655,67 @@ class PhanTichComboMaldives
         }
 
         return [$dong, $tienIch, $khongBaoGom, $anh];
+    }
+
+    /**
+     * Hàng bảng trong khung tiện ích → một mục: "Nhà hàng chính phục vụ: Bữa sáng
+     * buffet 07:30 – 09:30; Bữa trưa buffet 12:30 – 14:30". Hai ô cùng số dòng
+     * (bữa ăn | giờ) thì ghép từng dòng với nhau.
+     */
+    private static function hangThanhMuc(array $o): string
+    {
+        $o = array_values(array_filter(array_map('trim', $o), fn ($x) => $x !== ''));
+        if (! $o) {
+            return '';
+        }
+        $nhan = trim(preg_replace(['/\s*\n\s*/u', self::GACH], [' ', ''], array_shift($o)));
+        $cot = array_map(fn ($x) => array_values(array_filter(array_map(fn ($d) => trim(preg_replace(self::GACH, '', $d)), explode("\n", $x)), fn ($d) => $d !== '')), $o);
+        if (! $cot) {
+            return $nhan;
+        }
+        if (max(array_map('count', $cot)) === 1) {
+            $phan = implode(' ', array_merge(...$cot)); // các ô một dòng: "Bữa sáng buffet | 07:30 – 09:30"
+        } elseif (count($cot) >= 2 && count(array_unique(array_map('count', $cot))) === 1) {
+            $phan = implode('; ', array_map(fn ($i) => implode(' ', array_column($cot, $i)), array_keys($cot[0])));
+        } else {
+            $phan = implode('; ', array_merge(...$cot));
+        }
+
+        return $nhan.(str_ends_with($nhan, ':') ? ' ' : (str_contains($nhan, ':') ? ' — ' : ': ')).$phan;
+    }
+
+    /**
+     * Thêm một dòng vào khung tiện ích một cột đang đọc ($nhom). Dòng đậm ngắn
+     * nằm trên các dòng thường ("Nhà hàng Sufura Ấn Độ" / "Bữa sáng – 7:30…")
+     * mở một nhóm con; dòng trong ngoặc ngay dưới tiêu đề là phụ đề của tiêu đề.
+     *
+     * @param  list<array{title: string, items: list<string>}>  $tienIch
+     */
+    private function themTienIch(array &$tienIch, int &$nhom, int $i, array $m): void
+    {
+        $chu = $m['o'] ? self::hangThanhMuc($m['o']) : $m['chu'];
+        if ($chu === '') {
+            return;
+        }
+        if (! $tienIch[$nhom]['items'] && preg_match('/^\(.*\)$/u', $chu)) {
+            $tienIch[$nhom]['title'] .= ' '.$chu;
+
+            return;
+        }
+        $sau = $this->ds[$i + 1] ?? null;
+        if ($m['dam'] && ! $m['gach'] && ! $m['o'] && mb_strlen($chu) <= 90 && ! str_ends_with($chu, ':')
+            && $sau && $sau['loai'] === 'chu' && ! $sau['dam'] && ! $this->laTieuDeTienIch($sau)) {
+            $tienIch[] = ['title' => Str::limit(rtrim($chu, ' .'), 250, ''), 'items' => []];
+            $nhom = count($tienIch) - 1;
+
+            return;
+        }
+        $cuoi = array_key_last($tienIch[$nhom]['items']);
+        if ($cuoi !== null && ! $m['gach'] && preg_match('/^\p{Ll}/u', $chu)) {
+            $tienIch[$nhom]['items'][$cuoi] .= ' '.$chu;
+        } else {
+            $tienIch[$nhom]['items'][] = $chu;
+        }
     }
 
     /** Tiêu đề khung tiện ích resort một cột: "THÔNG TIN NHÀ HÀNG", "TOUR/ HOẠT ĐỘNG GIẢI TRÍ (đặt…)" */
@@ -682,9 +774,9 @@ class PhanTichComboMaldives
             (bool) preg_match('/^(DICH VU|CHI PHI|GIA)\b.{0,20}KHONG BAO GOM/', $khoa) => 'khong_bao_gom',
             (bool) preg_match('/^(DICH VU|CHI PHI|GIA)\b.{0,20}BAO GOM/', $khoa) => 'bao_gom',
             (bool) preg_match('/^RESORT\b.*(18 TUOI|NGUOI LON)/', $khoa) => 'nguoi_lon',
-            (bool) preg_match('/^(QUY DINH|THONG TIN VE RESORT|CHINH SACH|DIEU KHOAN)/', $khoa) => 'quy_dinh',
+            (bool) preg_match('/^(QUY DINH|THONG TIN VE RESORT|CHINH SACH(?! TRE EM)|DIEU KHOAN)/', $khoa) => 'quy_dinh',
             (bool) preg_match('/^THONG TIN PHONG/', $khoa) => 'phong',
-            (bool) preg_match('/^(LUU Y DAC BIET|LUU Y CHUNG|LUU Y|GHI CHU|NOTE)$/', $khoa) => 'luu_y',
+            (bool) preg_match('/^(LUU Y DAC BIET|LUU Y CHUNG|LUU Y|GHI CHU|NOTE|CHINH SACH TRE EM)$/', $khoa) => 'luu_y',
             default => null,
         };
         if ($loai === null || mb_strlen($dau) > 100) {
@@ -763,14 +855,22 @@ class PhanTichComboMaldives
             if (preg_match('/DANH CHO NGUOI LON|TU 18 TUOI/', self::khoa($chu)) && self::hoa($chu)) {
                 $ra['chi_nguoi_lon'] = true;
             }
-            if ($this->laTieuDeTienIch($m) && ! in_array($phan, ['bao_gom', 'khong_bao_gom', 'quy_dinh'], true)) {
+            // Tiêu đề viết hoa lạ chen giữa danh sách bao gồm / không bao gồm ("DANH SÁCH GÓI ĐỒ UỐNG…") = hết danh sách
+            $tieuDeLa = in_array($phan, ['bao_gom', 'khong_bao_gom'], true) && ! $m['gach'] && ! $m['o'] && self::hoa($chu) && mb_strlen($chu) <= 100;
+            if ($this->laTieuDeTienIch($m) && (! in_array($phan, ['bao_gom', 'khong_bao_gom', 'quy_dinh'], true) || $tieuDeLa)) {
                 $ra['tien_ich'][] = ['title' => $this->cau($chu), 'items' => []];
                 $nhom = count($ra['tien_ich']) - 1;
+                $phan = null;
+
+                continue;
+            }
+            if ($tieuDeLa) {
+                $phan = null;
 
                 continue;
             }
             if ($nhom !== null) {
-                $ra['tien_ich'][$nhom]['items'][] = $chu;
+                $this->themTienIch($ra['tien_ich'], $nhom, $i, $m);
 
                 continue;
             }
@@ -789,9 +889,11 @@ class PhanTichComboMaldives
                     }
                     break;
                 case $phan === 'quy_dinh':
-                    // "1. Chứng từ…", "5  Ưu đãi Tuần trăng mật…" (không phải "02 ADL + 02 Kids" trong bảng phòng)
-                    if (! $m['gach'] && ! $m['o'] && preg_match('/^(\d{1,2})(?:\s*[.)]\s*|\s+(?=\p{Lu}\p{Ll}))(\p{Lu}.*)$/u', $chu, $k)) {
-                        [$tieuDe, $noiDung] = array_pad(preg_split('/\s*:\s*/u', rtrim($k[2], ' :'), 2), 2, '');
+                    // "1. Chứng từ…", "5  Ưu đãi Tuần trăng mật…" (không phải "02 ADL + 02 Kids" trong bảng phòng);
+                    // dòng đậm đầu tiên của phần = mục 1 (Word tự đánh số nên không có chữ "1.")
+                    $soMuc = ! $m['gach'] && ! $m['o'] && preg_match('/^(\d{1,2})(?:\s*[.)]\s*|\s+(?=\p{Lu}\p{Ll}))(\p{Lu}.*)$/u', $chu, $k);
+                    if ($soMuc || (! $ra['quy_dinh'] && $m['dam'] && ! $m['o'] && mb_strlen($chu) <= 150)) {
+                        [$tieuDe, $noiDung] = array_pad(preg_split('/\s*:\s*/u', rtrim($soMuc ? $k[2] : $chu, ' :'), 2), 2, '');
                         $ra['quy_dinh'][] = ['title' => Str::limit($tieuDe, 250, ''), 'content' => trim($noiDung)];
                         break;
                     }
@@ -816,7 +918,10 @@ class PhanTichComboMaldives
         }
 
         if (! $ra['bang'] && $dongWord) {
-            $ra['bang'] = $this->bangWord($dongWord);
+            [$ra['bang'], $conLai] = $this->bangWord($dongWord);
+            foreach ($this->hangSauBangGia($conLai) as [$ten, $noiDung]) {
+                $luuY[$ten ?? $ghiChuGia][] = $noiDung;
+            }
         }
         foreach ($luuY as $ten => $dong) {
             $ra['luu_y'][] = ['title' => $ten, 'content' => implode("\n", $dong)];
@@ -836,11 +941,12 @@ class PhanTichComboMaldives
      *
      * @param  list<list<string>>  $hang
      */
-    private function bangWord(array $hang): ?array
+    private function bangWord(array $hang): array
     {
         $cot = null;
         $ra = [];
-        foreach ($hang as $o) {
+        $conLai = [];
+        foreach ($hang as $h => $o) {
             $o = array_values($o);
             $gia = [];
             foreach (array_slice($o, 1) as $c => $x) {
@@ -853,7 +959,8 @@ class PhanTichComboMaldives
             }
             if (! $gia) {
                 if ($ra) {
-                    break; // hết bảng
+                    $conLai = array_slice($hang, $h); // hết bảng — các hàng sau (ưu đãi, trẻ em…) đọc riêng
+                    break;
                 }
                 if ($cot === null && preg_grep('/\d{1,2}\s*\/\s*\d{1,2}/u', array_slice($o, 1))) {
                     $cot = array_map(fn ($x) => str_replace("\n", ' ', $x), array_slice($o, 1));
@@ -871,7 +978,47 @@ class PhanTichComboMaldives
             $ra[] = ['dong' => array_values(array_filter(array_map('trim', explode("\n", $o[0])))), 'gia' => array_filter($gia, fn ($c) => $c < count($cot), ARRAY_FILTER_USE_KEY)];
         }
 
-        return $cot && $ra ? ['cot' => $cot, 'hang' => $ra] : null;
+        return [$cot && $ra ? ['cot' => $cot, 'hang' => $ra] : null, $conLai];
+    }
+
+    /**
+     * Các hàng bảng Word ngay sau bảng giá: "Chi phí dành cho trẻ em | 75% giá
+     * người lớn", "Ưu đãi | <nhiều dòng>", cặp hàng "Trăng mật | Kỷ niệm ngày
+     * cưới" + hàng nội dung → [tiêu đề lưu ý (null = ghi chú bảng giá), nội dung].
+     *
+     * @param  list<list<string>>  $hang
+     * @return list<array{0: ?string, 1: string}>
+     */
+    private function hangSauBangGia(array $hang): array
+    {
+        $ra = [];
+        for ($i = 0; $i < count($hang); $i++) {
+            $o = array_values(array_filter(array_map('trim', $hang[$i]), fn ($x) => $x !== ''));
+            $sau = $hang[$i + 1] ?? null;
+            $dai = fn (string $c) => str_contains($c, "\n") || mb_strlen($c) > 40;
+            // cặp hàng tiêu đề + nội dung: mọi ô tiêu đề ngắn, mọi ô nội dung dài / nhiều dòng
+            if (count($o) >= 2 && ! array_filter($o, $dai) && $sau && count($sau) === count($hang[$i])
+                && ! array_filter($sau, fn ($c) => trim($c) !== '' && ! $dai(trim($c)))) {
+                foreach (array_values($hang[$i]) as $c => $ten) {
+                    if (trim($ten) !== '' && trim((string) ($sau[$c] ?? '')) !== '') {
+                        $ra[] = [trim($ten), trim($sau[$c])];
+                    }
+                }
+                $i++;
+
+                continue;
+            }
+            if (count($o) === 2 && mb_strlen($o[0]) <= 40) {
+                $ra[] = str_contains($o[1], "\n") || mb_strlen($o[1]) > 100 ? [$o[0], $o[1]] : [null, rtrim($o[0], ' :').': '.$o[1]];
+
+                continue;
+            }
+            if ($o) {
+                $ra[] = [null, implode(' · ', $o)];
+            }
+        }
+
+        return $ra;
     }
 
     /**

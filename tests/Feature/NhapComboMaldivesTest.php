@@ -79,9 +79,9 @@ class NhapComboMaldivesTest extends TestCase
     }
 
     /** @param  array<int, list<string>>  $themHang  hàng giá thêm vào bảng */
-    private function docx(string $giaWater = '2.631', array $themHang = []): string
+    private function docx(string $giaWater = '2.631', array $themHang = [], ?string $than = null): string
     {
-        $than = implode('', [
+        $than ??= implode('', [
             $this->p('SUN SIYAM WORLD RESORT 5*', dam: true),
             $this->p('Thời gian: 05 ngày – 04 đêm', dam: true),
             $this->p('Hàng không: Singapore Airlines – sử dụng Thủy Phi Cơ', dam: true),
@@ -193,6 +193,85 @@ class NhapComboMaldivesTest extends TestCase
 
         $this->assertContains('Phụ thu khởi hành từ TP.HCM trong file là $100 – $120/khách: đã lấy mức thấp nhất $100 — sửa lại nếu cần.', $kq['canh_bao']);
         $this->assertContains('Bỏ qua 1 ngày khởi hành đã qua: 10/10/2026.', $kq['canh_bao']);
+    }
+
+    /**
+     * Kiểu bảng trong file Word thật (Rannalhi, Prestige, Hudhuranfushi): lịch bay cả
+     * chặng trong một ô, khung tour / water sport có dòng phụ đề và mỗi cột hai ô (tên |
+     * giá), bảng nhà hàng nhiều dòng trong ô, hàng ưu đãi ngay dưới bảng giá, mục quy định
+     * số 1 do Word tự đánh số, "CHÍNH SÁCH TRẺ EM", tiêu đề lạ giữa danh sách không bao gồm.
+     */
+    public function test_doc_cac_kieu_bang_trong_file_word_that(): void
+    {
+        $kq = app(NhapComboTuFile::class)->doc($this->docx(than: implode('', [
+            $this->p('ADAARAN CLUB RANNALHI 4*', dam: true),
+            $this->p('Hàng không: Singapore Airlines 5*', dam: true),
+            $this->p('Thời gian: 05 ngày – 04 đêm (Cả thời gian bay)', dam: true),
+            $this->bang([
+                ['Lịch bay từ Hà Nội', 'Lịch bay từ TP HCM'],
+                ["SQ 191 HANSIN 1235 1705\nSQ 438 SINMLE 2045 2210", "SQ 183 SGNSIN 1555 1855\nSQ 438 SINMLE 2045 2210"],
+            ]),
+            $this->p('LỊCH TRÌNH', dam: true),
+            $this->p('NGÀY 01: KHỞI HÀNH (Ăn 02 bữa trên máy bay)', dam: true),
+            $this->p('10h00: Quý khách có mặt tại sân bay.'),
+            $this->p('NGÀY 02: ADAARAN CLUB RANNALHI (Bữa sáng, bữa trưa, bữa tối, đồ uống)', dam: true),
+            $this->p('THÔNG TIN NHÀ HÀNG THEO GÓI “ALL INCLUSIVE” TẠI RESORT BAO GỒM:', dam: true),
+            $this->bang([['Nhà hàng chính phục vụ:', "+ Bữa sáng buffet\n+ Bữa tối buffet", "07:30 – 09:30\n19:30 – 21:30"]]),
+            $this->p('HOAT ĐỘNG MIỄN PHÍ TẠI RESORT', dam: true),
+            $this->p('+ Miễn phí mượn dụng cụ snorkeling.'),
+            $this->p('Tối: Quý khách ăn tối tại nhà hàng trong Resort.'),
+            $this->bang([
+                ["CÁC TOUR CÓ TÍNH PHÍ TẠI RESORT\n(giá tham khảo)", "WATER SPORT\n(giá tham khảo)"],
+                ['06:30-07:30 Cho cá mập ăn', '$ 28/ khách', 'Thuê Jet ski', '$122/ 20 phút'],
+                ['09:30-12:00 Du thuyền cá heo', '$ 77/ khách', ''],
+            ]),
+            $this->p('NGÀY 03: MALDIVES – VIỆT NAM (Bữa sáng)', dam: true),
+            $this->p('Trả phòng, bay về Việt Nam.'),
+            $this->p('GIÁ COMBO TÍNH BẰNG USD/ 01 KHÁCH', dam: true),
+            $this->bang([
+                ['LOẠI PHÒNG', '04/11/2026', '24/ 03/ 2027'],
+                ['Water Villa', '2.171', '2.390'],
+                ['Ưu đãi', "Spa miễn phí 30 phút cho cặp đôi.\nGiảm 10% hóa đơn tham quan."],
+                ['Trăng mật', 'Sinh Nhật'],
+                ["1 lần trang trí giường ngủ lãng mạn.\n1 bánh cưới cho tuần trăng mật.", "Bánh sinh nhật.\nGiỏ trái cây khi đến."],
+            ]),
+            $this->p('CHÍNH SÁCH TRẺ EM:', dam: true),
+            $this->p('Từ 2 – dưới 12 tuổi: 75% giá người lớn (chung phòng bố mẹ)', dam: true, gach: true),
+            $this->p('DỊCH VỤ KHÔNG BAO GỒM:', dam: true),
+            $this->p('Chi phí cá nhân.', gach: true),
+            $this->p('DANH SÁCH GÓI ĐỒ UỐNG TRONG GÓI TẠI RESORT', dam: true),
+            $this->p('QUY ĐỊNH RESORT ADAARAN CLUB RANNALHI', dam: true),
+            $this->p('Chứng từ cần có để nhập cảnh (không cần xin visa)', dam: true, gach: true),
+            $this->p('Passport còn hiệu lực tối thiểu 6 tháng.', gach: true),
+            $this->p('2. Thời gian nhận phòng – trả phòng:', dam: true),
+            $this->p('Nhận phòng 14:00.', gach: true),
+        ])), 'RANNALHI_4__-_Bay_SQ.docx');
+
+        $this->assertSame('Adaaran Club Rannalhi 4* – bay Singapore Airlines', $kq['ten']);
+        $this->assertSame([
+            ['city' => 'Hà Nội', 'surcharge_usd' => 0, 'flights' => "SQ 191 HANSIN 1235 1705\nSQ 438 SINMLE 2045 2210"],
+            ['city' => 'TP.HCM', 'surcharge_usd' => null, 'flights' => "SQ 183 SGNSIN 1555 1855\nSQ 438 SINMLE 2045 2210"],
+        ], $kq['noi_khoi_hanh']);
+        $this->assertSame([
+            ['title' => 'Thông tin nhà hàng theo gói “All Inclusive” tại resort bao gồm', 'items' => ['Nhà hàng chính phục vụ: Bữa sáng buffet 07:30 – 09:30; Bữa tối buffet 19:30 – 21:30']],
+            ['title' => 'Hoat động miễn phí tại resort', 'items' => ['Miễn phí mượn dụng cụ snorkeling.']],
+            ['title' => 'Các Tour có tính phí tại resort (giá tham khảo)', 'items' => ['06:30-07:30 Cho cá mập ăn $ 28/ khách', '09:30-12:00 Du thuyền cá heo $ 77/ khách']],
+            ['title' => 'Water Sport (giá tham khảo)', 'items' => ['Thuê Jet ski $122/ 20 phút']],
+        ], $kq['resort']['tien_ich']);
+        $this->assertStringContainsString('Tối: Quý khách ăn tối', $kq['lich_trinh'][1]['noi_dung']); // không bị khung tiện ích nuốt
+        $this->assertSame([['ngay' => '2026-11-04', 'nhan' => null, 'gia' => [2171]], ['ngay' => '2027-03-24', 'nhan' => null, 'gia' => [2390]]], $kq['ngay']);
+        $this->assertSame([75, '2 – dưới 12 tuổi'], [$kq['tre_em_phan_tram'], $kq['tuoi_tre_em']]);
+        $this->assertSame(['Chi phí cá nhân.'], $kq['khong_bao_gom']);
+        $this->assertSame([
+            'Chính sách trẻ em' => 'Từ 2 – dưới 12 tuổi: 75% giá người lớn (chung phòng bố mẹ)',
+            'Ưu đãi' => "Spa miễn phí 30 phút cho cặp đôi.\nGiảm 10% hóa đơn tham quan.",
+            'Trăng mật' => "1 lần trang trí giường ngủ lãng mạn.\n1 bánh cưới cho tuần trăng mật.",
+            'Sinh Nhật' => "Bánh sinh nhật.\nGiỏ trái cây khi đến.",
+        ], array_column($kq['luu_y'], 'content', 'title'));
+        $this->assertSame([
+            ['title' => 'Chứng từ cần có để nhập cảnh (không cần xin visa)', 'content' => '• Passport còn hiệu lực tối thiểu 6 tháng.'],
+            ['title' => 'Thời gian nhận phòng – trả phòng', 'content' => '• Nhận phòng 14:00.'],
+        ], $kq['resort']['quy_dinh']);
     }
 
     public function test_tao_combo_nhap_roi_nhap_lai_chi_cap_nhat_bang_gia(): void
