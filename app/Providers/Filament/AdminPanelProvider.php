@@ -92,6 +92,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Bán hàng'),
                 NavigationGroup::make('Tour & điều hành'),
+                NavigationGroup::make('Maldives'),
                 NavigationGroup::make('Visa'),
                 NavigationGroup::make('Marketing'),
                 NavigationGroup::make('Nội dung website')->collapsed(),

@@ -1,0 +1,11 @@
+{
+    "name": "Maldives",
+    "alias": "maldives",
+    "description": "Combo nghỉ dưỡng Maldives: resort, hạng phòng, combo, đơn đặt",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Maldives\\Providers\\MaldivesServiceProvider"
+    ],
+    "files": []
+}

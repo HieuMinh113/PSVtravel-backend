@@ -23,11 +23,20 @@ class FlightDealResource extends Resource
     protected static ?string $model = FlightDeal::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
+
     protected static ?string $recordTitleAttribute = 'to_city';
+
     protected static ?string $modelLabel = 'chặng bay';
+
     protected static ?string $pluralModelLabel = 'Chặng bay ưu đãi';
+
     protected static string|\UnitEnum|null $navigationGroup = 'Nội dung website';
-    protected static ?int $navigationSort = 90; 
+
+    // Trang Vé máy bay trên website đã thay bằng Maldives (10/2026): ẩn khỏi menu,
+    // giữ dữ liệu cũ (mở thẳng đường dẫn vẫn xem được)
+    protected static bool $shouldRegisterNavigation = false;
+
+    protected static ?int $navigationSort = 90;
 
     public static function form(Schema $schema): Schema
     {

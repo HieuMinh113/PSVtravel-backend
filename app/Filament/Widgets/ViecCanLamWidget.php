@@ -8,6 +8,7 @@ use App\Filament\Resources\Bookings\BookingResource;
 use App\Filament\Resources\ContactMessages\ContactMessageResource;
 use App\Filament\Resources\EventReviews\EventReviewResource;
 use App\Filament\Resources\JobApplications\JobApplicationResource;
+use App\Filament\Resources\MaldivesBookings\MaldivesBookingResource;
 use App\Filament\Resources\Payments\PaymentResource;
 use App\Filament\Resources\Redirects\RedirectResource;
 use App\Filament\Resources\Reviews\ReviewResource;
@@ -34,6 +35,7 @@ class ViecCanLamWidget extends Widget
     public const NGUON = [
         BookingResource::class,
         ContactMessageResource::class,
+        MaldivesBookingResource::class,
         VisaCaseResource::class,
         PaymentResource::class,
         ReviewResource::class,
@@ -51,6 +53,7 @@ class ViecCanLamWidget extends Widget
     private const MO_TA = [
         BookingResource::class => 'Tới hạn nhắn khách đóng tiền',
         ContactMessageResource::class => 'Chưa ai xử lý',
+        MaldivesBookingResource::class => 'Đơn mới chưa ai nhận',
         PaymentResource::class => 'Chờ kế toán duyệt',
         ReviewResource::class => 'Chờ duyệt trước khi hiện',
         EventReviewResource::class => 'Chờ duyệt trước khi hiện',

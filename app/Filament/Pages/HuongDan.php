@@ -171,6 +171,17 @@ class HuongDan extends Page
                         ],
                     ],
                     [
+                        'tieu_de' => 'Đơn combo Maldives',
+                        'o_dau' => 'Maldives → Đơn Maldives',
+                        'buoc' => [
+                            'Khách đặt combo trên trang psvtravel.com/maldives: số đỏ cạnh mục = đơn mới chưa ai nhận, chuông cũng báo.',
+                            'Mở đơn → **Nhận đơn** (bạn thành người phụ trách) → **Gọi khách** xác nhận ngày, hạng phòng, số khách.',
+                            'Giá trên đơn là **tạm tính** (USD × tỷ giá lúc khách đặt). Hỏi đối tác còn phòng rồi **Sửa**: ghi Tổng VNĐ chốt, Đã thu, đổi trạng thái (Đã xác nhận → Đã đặt cọc → Hoàn tất).',
+                            'Khách gọi điện đặt: **Tạo đơn cho khách gọi điện** — để trống ô Tạm tính thì hệ thống tự tính theo bảng giá.',
+                        ],
+                        'luu_y' => 'Đơn Maldives tách riêng hoàn toàn với Đơn đặt tour: không trừ chỗ, không có tab khoản thu — tiền đã thu ghi ở ô "Đã thu".',
+                    ],
+                    [
                         'tieu_de' => 'Gửi danh sách giấy tờ visa cho khách',
                         'o_dau' => 'Visa → Mẫu checklist',
                         'buoc' => ['Chọn nước và loại visa → **Xuất file** → gửi khách.'],
@@ -246,6 +257,18 @@ class HuongDan extends Page
                             'Có ít nhất một bài đã đăng là trang psvtravel.com/tac-gia/… tự có; bài viết có khung "Về tác giả" và link tới trang đó.',
                         ],
                         'luu_y' => 'Chỉ ghi thông tin THẬT người đó đồng ý công khai (ảnh, số năm, nơi đã đi). Google và ChatGPT đánh giá cao bài có người viết thật, có kinh nghiệm.',
+                    ],
+                    [
+                        'tieu_de' => 'Nhập combo Maldives',
+                        'o_dau' => 'Maldives → Resort Maldives / Combo Maldives',
+                        'buoc' => [
+                            '**Resort Maldives** (nhập một lần): giới thiệu, ảnh, các **hạng phòng** kèm sức chứa, tiện ích, quy định của resort.',
+                            '**Combo Maldives** → Tạo: chọn resort, tên combo, số ngày, hãng bay, nơi khởi hành (phụ thu USD / khách, lịch bay).',
+                            '**Ngày khởi hành & bảng giá**: mỗi ngày một dòng, chép giá USD / người lớn cho từng hạng phòng đúng bảng giá đối tác. Nút nhân bản để chép nhanh ngày tiếp theo.',
+                            'Thêm lịch trình từng ngày, giá bao gồm / không bao gồm, lưu ý → Trạng thái **Đang bán** → Lưu → **Xem trên web**.',
+                            'Tỷ giá để web hiện "≈ … triệu đồng": Hệ thống → Cấu hình chung → "Maldives: tỷ giá USD tạm tính".',
+                        ],
+                        'luu_y' => 'Ảnh lấy từ file đối tác có thể vướng bản quyền — dùng ảnh resort cấp chính thức (media kit) hoặc ảnh công ty tự chụp.',
                     ],
                     [
                         'tieu_de' => 'Gợi ý SEO khi viết bài cẩm nang',

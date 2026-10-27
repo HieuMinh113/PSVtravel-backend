@@ -1,0 +1,17 @@
+{
+    "name": "psvtravel/maldives",
+    "description": "Combo nghỉ dưỡng Maldives",
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Maldives\\": "app/",
+            "Modules\\Maldives\\Database\\Factories\\": "database/factories/",
+            "Modules\\Maldives\\Database\\Seeders\\": "database/seeders/"
+        }
+    }
+}

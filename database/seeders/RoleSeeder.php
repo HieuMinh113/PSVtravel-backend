@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Modules\Alliance\Database\Seeders\QuyenLienMinhSeeder;
 use Modules\Booking\Database\Seeders\QuyenDonTourSeeder;
+use Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder;
+use Modules\Maldives\Database\Seeders\QuyenMaldivesSeeder;
 use Modules\Visa\Database\Seeders\QuyenVisaSeeder;
 use Spatie\Permission\Models\Role;
 
@@ -62,9 +64,11 @@ class RoleSeeder extends Seeder
         // Vai trò theo bộ phận: sale, kế toán, marketing, điều hành, visa
         $this->call(VaiTroNhanVienSeeder::class);
         // Bản đồ cẩm nang: admin + ai sửa được Cẩm nang
-        $this->call(\Modules\Guide\Database\Seeders\QuyenBanDoCamNangSeeder::class);
+        $this->call(QuyenBanDoCamNangSeeder::class);
         // Hồ sơ ứng tuyển (CV): chỉ super_admin + admin
         $this->call(QuyenHoSoUngTuyenSeeder::class);
+        // Combo Maldives: admin + sale, marketing, điều hành, kế toán (sau khi đã có các vai trò)
+        $this->call(QuyenMaldivesSeeder::class);
 
         // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
         // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này
