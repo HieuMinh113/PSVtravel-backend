@@ -17,6 +17,7 @@ use Modules\Maldives\Models\MaldivesBooking;
 use Modules\Maldives\Models\MaldivesCombo;
 use Modules\Maldives\Models\MaldivesResort;
 use Modules\Page\Models\Setting;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -124,6 +125,22 @@ class MaldivesTest extends TestCase
         $gui(['combo_date_id' => $ngay->id, 'departure_city' => 'Cần Thơ'])->assertStatus(422);
         // Chưa chọn ngày / phòng vẫn gửi được — nhân viên tư vấn sau
         $this->assertNull($gui([])->assertCreated()->json('data.total_usd'));
+    }
+
+    public function test_lenh_kiem_tra_vi_sao_khong_thay_muc_maldives(): void
+    {
+        $this->seed(RoleSeeder::class);
+        $admin = User::factory()->create(['email' => 'quan-tri@example.com'])->assignRole('admin');
+        User::factory()->create(['email' => 'nv-visa@example.com'])->assignRole('visa');
+        // Quyền Maldives bị mất khỏi vai trò admin → lệnh tự thêm lại
+        Role::findByName('admin', 'web')->revokePermissionTo('ViewAny:MaldivesCombo');
+        $this->assertFalse($admin->fresh()->can('viewAny', MaldivesCombo::class));
+
+        $this->artisan('psv:kiem-tra-maldives')->assertSuccessful()
+            ->expectsOutputToContain('Admin đã có các trang Maldives')
+            ->expectsOutputToContain('quan-tri@example.com (admin)') // trong dòng "Tài khoản thấy mục Maldives"
+            ->expectsOutputToContain('nv-visa@example.com (visa)'); // trong dòng "Tài khoản KHÔNG thấy"
+        $this->assertTrue($admin->fresh()->can('viewAny', MaldivesCombo::class));
     }
 
     public function test_hang_phong_chi_nguoi_lon_va_resort_nua_sao(): void
