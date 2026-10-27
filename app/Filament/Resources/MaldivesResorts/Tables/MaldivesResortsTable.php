@@ -20,7 +20,7 @@ class MaldivesResortsTable
             ->modifyQueryUsing(fn (Builder $query) => $query->withCount(['roomTypes', 'combos']))
             ->columns([
                 ImageColumn::make('cover_image')->label('Ảnh')->disk('public'),
-                TextColumn::make('name')->label('Resort')->searchable()->description(fn ($record) => collect([$record->stars ? $record->stars.' sao' : null, $record->atoll])->filter()->implode(' · ')),
+                TextColumn::make('name')->label('Resort')->searchable()->description(fn ($record) => collect([$record->saoChu(), $record->atoll])->filter()->implode(' · ')),
                 TextColumn::make('room_types_count')->label('Hạng phòng')->badge()->color(fn (int $state) => $state ? 'info' : 'danger'),
                 TextColumn::make('combos_count')->label('Combo')->badge()->color('gray'),
                 TextColumn::make('status')->label('Trạng thái')->badge()

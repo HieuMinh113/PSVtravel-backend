@@ -126,6 +126,30 @@ class MaldivesTest extends TestCase
         $this->assertNull($gui([])->assertCreated()->json('data.total_usd'));
     }
 
+    public function test_hang_phong_chi_nguoi_lon_va_resort_nua_sao(): void
+    {
+        $this->withoutMiddleware(ThrottleRequests::class);
+        $this->combo->resort->update(['stars' => 4.5]);
+        $o = $this->phong['Ocean Villa with Pool & Slide'];
+        $this->combo->resort->roomTypes()->whereKey($o)->update(['adults_only' => true]);
+
+        $ct = $this->getJson('/api/v1/maldives/'.$this->combo->slug)->assertOk()->json('data');
+        $this->assertSame(4.5, $ct['resort']['stars']);
+        $this->assertSame([false, true], array_column($ct['room_types'], 'adults_only'));
+        $this->assertSame(4.5, $this->getJson('/api/v1/maldives')->json('data.0.resort.stars'));
+        $this->assertSame('4,5 sao', $this->combo->resort->fresh()->saoChu());
+
+        // Hạng phòng chỉ người lớn: không nhận đơn có trẻ em / em bé
+        $ngay = $this->combo->dates()->where('start_date', '>=', today())->orderBy('start_date')->first();
+        $gui = fn (array $them) => $this->postJson('/api/v1/maldives/bookings', [
+            'combo_id' => $this->combo->id, 'combo_date_id' => $ngay->id, 'room_type_id' => $o,
+            'customer_name' => 'Nguyễn Văn A', 'customer_phone' => '0901234567', 'adults' => 2, ...$them,
+        ]);
+        $gui(['children' => 1])->assertStatus(422)->assertJsonPath('message', 'Hạng phòng Ocean Villa with Pool & Slide chỉ nhận khách từ 18 tuổi — vui lòng chọn hạng phòng khác nếu đi cùng trẻ em.');
+        $gui(['infants' => 1])->assertStatus(422);
+        $gui([])->assertCreated();
+    }
+
     public function test_quan_tri_nhap_combo_va_tao_don(): void
     {
         $this->seed(RoleSeeder::class);

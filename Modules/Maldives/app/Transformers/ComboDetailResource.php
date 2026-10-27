@@ -41,7 +41,7 @@ class ComboDetailResource extends JsonResource
                     'prices' => (object) collect($d->prices ?? [])->filter(fn ($g) => is_numeric($g) && (int) $g > 0)->map(fn ($g) => (int) $g)->all(),
                 ])->all(),
             'room_types' => $r?->roomTypes->map(fn ($p) => [
-                'id' => $p->id, 'name' => $p->name, 'capacity' => $p->capacity,
+                'id' => $p->id, 'name' => $p->name, 'capacity' => $p->capacity, 'adults_only' => (bool) $p->adults_only,
                 'description' => $p->description, 'image' => AnhMaldives::url($p->image),
             ])->all() ?? [],
             'days' => $this->days->map(fn ($d) => [
@@ -51,7 +51,7 @@ class ComboDetailResource extends JsonResource
             'resort' => $r ? [
                 'slug' => $r->slug,
                 'name' => $r->name,
-                'stars' => $r->stars,
+                'stars' => $r->sao(),
                 'atoll' => $r->atoll,
                 'package_name' => $r->package_name,
                 'intro' => $r->intro,

@@ -10,6 +10,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -38,7 +39,8 @@ class MaldivesResortForm
                     ->maxLength(150)->unique(ignoreRecord: true)
                     ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Str::slug($state) : null)
                     ->rule('nullable')->rule('regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'),
-                Select::make('stars')->label('Hạng sao')->options([3 => '3 sao', 4 => '4 sao', 5 => '5 sao'])->default(5),
+                Select::make('stars')->label('Hạng sao')->options(['3' => '3 sao', '4' => '4 sao', '4.5' => '4,5 sao', '5' => '5 sao'])->default('5')
+                    ->formatStateUsing(fn ($state) => $state === null ? null : (string) (fmod((float) $state, 1.0) ? (float) $state : (int) $state)),
                 TextInput::make('atoll')->label('Vị trí (đảo san hô)')->placeholder('Noonu Atoll')->maxLength(255),
                 TextInput::make('package_name')->label('Gói dịch vụ tại resort')->placeholder('WOW Premium All-Inclusive')->maxLength(255),
                 Select::make('status')->label('Trạng thái')->options(['published' => 'Đang hiện', 'hidden' => 'Tạm ẩn'])->default('published')->required()
@@ -67,6 +69,8 @@ class MaldivesResortForm
                     ->schema([
                         TextInput::make('name')->label('Tên hạng phòng')->required()->maxLength(255)->placeholder('Water Villa with Pool & Slide'),
                         TextInput::make('capacity')->label('Sức chứa')->maxLength(255)->placeholder('3 người lớn hoặc 2 người lớn + 1 trẻ em'),
+                        Toggle::make('adults_only')->label('Chỉ nhận người lớn (từ 18 tuổi)')
+                            ->helperText('Website ẩn ô trẻ em / em bé khi khách chọn hạng phòng này.')->columnSpanFull(),
                         Textarea::make('description')->label('Mô tả ngắn')->rows(2),
                         FileUpload::make('image')->label('Ảnh phòng')->image()->acceptedFileTypes(TepTaiLen::ANH)
                             ->directory('maldives')->disk('public')->maxSize(15360),

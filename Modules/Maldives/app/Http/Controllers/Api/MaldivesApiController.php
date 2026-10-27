@@ -63,6 +63,9 @@ class MaldivesApiController extends Controller
             if (! $phong || ($ngay && $ngay->gia($phong->id) === null)) {
                 return response()->json(['message' => 'Hạng phòng này không có ở ngày đã chọn.'], 422);
             }
+            if ($phong->adults_only && ((int) ($d['children'] ?? 0) > 0 || (int) ($d['infants'] ?? 0) > 0)) {
+                return response()->json(['message' => 'Hạng phòng '.$phong->name.' chỉ nhận khách từ 18 tuổi — vui lòng chọn hạng phòng khác nếu đi cùng trẻ em.'], 422);
+            }
         }
         $noiDi = filled($d['departure_city'] ?? null) ? $combo->noiKhoiHanh($d['departure_city']) : null;
         if (filled($d['departure_city'] ?? null) && ! $noiDi) {

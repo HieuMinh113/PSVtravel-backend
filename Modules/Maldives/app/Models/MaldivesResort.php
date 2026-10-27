@@ -23,7 +23,7 @@ class MaldivesResort extends Model
     ];
 
     protected $casts = [
-        'stars' => 'integer',
+        'stars' => 'float', // 4.5 = 4,5 sao
         'highlights' => 'array',
         'gallery' => 'array',
         'amenities' => 'array',
@@ -43,6 +43,18 @@ class MaldivesResort extends Model
                 $r->slug = $slug;
             }
         });
+    }
+
+    /** Hạng sao để hiện / trả API: 5 (số nguyên) hoặc 4.5 */
+    public function sao(): int|float|null
+    {
+        return $this->stars === null ? null : (fmod((float) $this->stars, 1.0) ? (float) $this->stars : (int) $this->stars);
+    }
+
+    /** "4,5 sao", "5 sao" */
+    public function saoChu(): ?string
+    {
+        return $this->stars === null ? null : str_replace('.', ',', (string) $this->sao()).' sao';
     }
 
     public function roomTypes(): HasMany

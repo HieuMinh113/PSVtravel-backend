@@ -20,6 +20,9 @@ use RuntimeException;
  */
 class DocPdf
 {
+    /** @var list<array> mẩu chữ có toạ độ của file vừa đọc */
+    private array $manhChu = [];
+
     /** @return list<array> */
     public function doc(string $duong): array
     {
@@ -105,7 +108,9 @@ class DocPdf
 
         // Thứ tự đọc: trang → từ trên xuống → trái sang phải
         usort($phanTu, fn ($a, $b) => [$a['trang'], $a['top'], $a['left']] <=> [$b['trang'], $b['top'], $b['left']]);
-        $phanTu = $this->bangGia($this->ghepChuBiCat($phanTu));
+        $phanTu = $this->ghepChuBiCat($phanTu);
+        $this->manhChu = array_values(array_filter($phanTu, fn ($p) => $p['loai'] === 'chu'));
+        $phanTu = $this->bangGia($phanTu);
 
         // Gom các mẩu chữ cùng một hàng (lệch nhau vài điểm) thành một dòng
         $dong = [];
@@ -137,12 +142,13 @@ class DocPdf
         foreach ($dong as $d) {
             if ($d['loai'] === 'hang') {
                 $muc[] = ['loai' => 'chu', 'chu' => implode(' | ', $d['o']), 'dam' => false, 'gach' => false, 'o' => $d['o'],
-                    'trang' => $d['trang'], 'top' => $d['top'], 'cao' => $d['cao'], 'left' => $d['left']];
+                    'trang' => $d['trang'], 'top' => $d['top'], 'cao' => $d['cao'], 'left' => $d['left'], 'tren' => $d['top']];
 
                 continue;
             }
             if ($d['loai'] === 'anh') {
-                $muc[] = ['loai' => 'anh', 'du_lieu' => $d['du_lieu'], 'ten' => $d['ten'], 'trang' => $d['trang']];
+                $muc[] = ['loai' => 'anh', 'du_lieu' => $d['du_lieu'], 'ten' => $d['ten'], 'trang' => $d['trang'],
+                    'tren' => $d['top'], 'duoi' => $d['top'] + $d['cao']];
 
                 continue;
             }
@@ -177,7 +183,7 @@ class DocPdf
                 'loai' => 'chu', 'chu' => implode(' | ', $o), 'dam' => $dam, 'gach' => $gach,
                 'o' => count($o) > 1 ? $o : null,
                 // để nối các dòng bị ngắt trong cùng một đoạn
-                'trang' => $d['trang'], 'top' => $d['top'], 'cao' => $d['cao'], 'left' => $d['manh'][0]['left'],
+                'trang' => $d['trang'], 'top' => $d['top'], 'cao' => $d['cao'], 'left' => $d['manh'][0]['left'], 'tren' => $d['top'],
                 'phai' => max(array_map(fn ($m) => $m['left'] + $m['rong'], $d['manh'])),
             ];
         }
@@ -223,7 +229,9 @@ class DocPdf
             $ra[] = $m;
         }
 
-        return array_map(fn ($m) => array_diff_key($m, array_flip(['top', 'cao', 'left', 'phai'])), $ra);
+        // tren / duoi: mép trên dòng đầu, mép dưới dòng cuối của mục — để bộ đọc khác biết mục nằm ở đâu trên trang
+        return array_map(fn ($m) => array_diff_key($m + (isset($m['top'], $m['cao']) ? ['duoi' => $m['top'] + $m['cao']] : []),
+            array_flip(['top', 'cao', 'left', 'phai'])), $ra);
     }
 
     /**
@@ -281,6 +289,18 @@ class DocPdf
         }
 
         return $ra;
+    }
+
+    /**
+     * Mẩu chữ có toạ độ (trang, top, left, rong, cao, chu, dam…) của file vừa
+     * doc(), đã ghép chữ bị cắt — cho bộ đọc cần vị trí trên trang, như bảng giá
+     * USD theo hạng phòng của combo Maldives.
+     *
+     * @return list<array>
+     */
+    public function manhChu(): array
+    {
+        return $this->manhChu;
     }
 
     /** Mẩu chữ là ô ngày khởi hành: "03/06", "05, 19/08", "Tháng 10: 17, 21" */

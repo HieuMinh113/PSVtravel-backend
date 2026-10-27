@@ -30,7 +30,7 @@ class ComboListResource extends JsonResource
             'noi_khoi_hanh' => array_values(array_filter(array_map(fn ($n) => $n['city'] ?? null, $this->departure_cities ?? []))),
             'is_featured' => $this->is_featured,
             'updated_at' => $this->updated_at?->toIso8601String(),
-            'resort' => $resort ? ['slug' => $resort->slug, 'name' => $resort->name, 'stars' => $resort->stars, 'atoll' => $resort->atoll] : null,
+            'resort' => $resort ? ['slug' => $resort->slug, 'name' => $resort->name, 'stars' => $resort->sao(), 'atoll' => $resort->atoll] : null,
         ];
     }
 }
