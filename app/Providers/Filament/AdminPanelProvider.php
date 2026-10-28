@@ -39,6 +39,36 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public function register(): void
+    {
+        $this->boLuuTamCuTrenMayDev();
+        parent::register();
+    }
+
+    /**
+     * Máy lập trình (APP_ENV=local): bỏ danh sách trang admin và danh sách đường
+     * dẫn lưu tạm. Hai file này chỉ sinh ra khi chạy "php artisan optimize" /
+     * "filament:optimize" — dành cho máy chủ thật (trien-khai.sh tạo lại sau mỗi
+     * lần cập nhật). Trên máy dev, kéo mã mới về mà còn file cũ thì menu admin
+     * thiếu mục mới (đã gặp với Maldives, Voucher). Chạy trước khi Filament đọc
+     * danh sách trang và Laravel nạp đường dẫn, nên chính lượt mở trang này đã đủ mục.
+     */
+    private function boLuuTamCuTrenMayDev(): void
+    {
+        if (! $this->app->isLocal() || $this->app->runningInConsole()) {
+            return;
+        }
+        $tep = [
+            (config('filament.cache_path') ?? base_path('bootstrap/cache/filament')).'/panels/admin.php',
+            $this->app->getCachedRoutesPath(),
+        ];
+        foreach ($tep as $t) {
+            if (is_file($t)) {
+                @unlink($t);
+            }
+        }
+    }
+
     public function panel(Panel $panel): Panel
     {
         // Tên mục viết hoa chữ đầu như câu thường ("Khoảnh khắc du khách"), không

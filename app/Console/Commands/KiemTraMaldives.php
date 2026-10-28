@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\KiemTraMenuAdmin;
 use App\Filament\Resources\MaldivesCombos\MaldivesComboResource;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Maldives\Database\Seeders\QuyenMaldivesSeeder;
@@ -27,6 +27,8 @@ use Throwable;
  */
 class KiemTraMaldives extends Command
 {
+    use KiemTraMenuAdmin;
+
     protected $signature = 'psv:kiem-tra-maldives';
 
     protected $description = 'Kiểm tra (và sửa phần an toàn) vì sao không thấy mục Maldives trong admin';
@@ -63,16 +65,11 @@ class KiemTraMaldives extends Command
             ->map(fn (Role $r) => $r->name.($r->hasPermissionTo('ViewAny:MaldivesCombo') || $r->hasPermissionTo('ViewAny:MaldivesBooking') ? ' ✓' : ' ✗'));
         $this->line('   Vai trò (✓ = thấy mục Maldives): '.$vaiTro->implode(', '));
 
-        // 4. Menu admin. Trình duyệt (không phải dòng lệnh) dùng danh sách trang admin lưu tạm
-        // bởi "optimize" / "filament:optimize": lưu từ trước khi có Maldives thì menu không có
-        // Maldives dù mã đã đủ — lệnh chạy ở dòng lệnh không thấy được điều này, nên đọc thẳng file
-        $tepMenu = Filament::getPanel('admin')->getComponentCachePath();
-        $coTep = is_file($tepMenu);
-        $menuCu = $coTep && ! in_array(MaldivesComboResource::class, (array) ((include $tepMenu)['resources'] ?? []), true);
-        Artisan::call('optimize:clear'); // xoá danh sách trang lưu tạm, cấu hình / đường dẫn lưu tạm, bộ nhớ đệm
+        // 4. Menu admin: danh sách trang lưu tạm cũ (xem KiemTraMenuAdmin)
+        $menuCu = $this->lamMoiMenuLuuTam(MaldivesComboResource::class);
         if ($menuCu) {
             $this->line('<fg=yellow>!</> Admin đang dùng danh sách trang lưu tạm CŨ (chưa có Maldives) — ĐÂY LÀ LÝ DO không thấy menu. Đã xoá.');
-        } elseif ($coTep) {
+        } elseif ($menuCu === false) {
             $this->dat('Danh sách trang admin lưu tạm đã có Maldives (đã làm mới).');
         }
         if (! in_array(MaldivesComboResource::class, Filament::getPanel('admin')->getResources(), true)) {
@@ -105,18 +102,5 @@ class KiemTraMaldives extends Command
         } catch (Throwable) {
             return false;
         }
-    }
-
-    private function dat(string $s): void
-    {
-        $this->line("<fg=green>✓</> {$s}");
-    }
-
-    private function hong(string $loi, string $cach): int
-    {
-        $this->line("<fg=red>✗</> {$loi}");
-        $this->line("   → {$cach}");
-
-        return self::FAILURE;
     }
 }

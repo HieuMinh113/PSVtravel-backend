@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -247,5 +248,28 @@ class VoucherTest extends TestCase
         // dọn file quá 1 ngày
         $this->travel(2)->days();
         $this->assertSame(1, XuatVoucher::donDep());
+    }
+
+    public function test_lenh_kiem_tra_vi_sao_khong_thay_muc_voucher(): void
+    {
+        $admin = User::factory()->create(['email' => 'quan-tri@example.com'])->assignRole('admin');
+        User::factory()->create(['email' => 'nv-visa@example.com'])->assignRole('visa');
+        // Quyền voucher bị mất khỏi vai trò admin → lệnh tự thêm lại
+        Role::findByName('admin', 'web')->revokePermissionTo(['ViewAny:VoucherBatch', 'Scan:Voucher']);
+        $this->assertFalse($admin->fresh()->can('viewAny', VoucherBatch::class));
+
+        // Danh sách trang admin lưu tạm từ trước khi có Voucher (như sau "php artisan optimize")
+        $tepMenu = Filament::getPanel('admin')->getComponentCachePath();
+        @mkdir(dirname($tepMenu), 0777, true);
+        file_put_contents($tepMenu, '<?php return '.var_export(['resources' => ['App\\Filament\\Resources\\Tours\\TourResource']], true).';');
+
+        $this->artisan('psv:kiem-tra-voucher')->assertSuccessful()
+            ->expectsOutputToContain('ĐÂY LÀ LÝ DO không thấy menu')
+            ->expectsOutputToContain('Mã admin có đủ các trang Voucher')
+            ->expectsOutputToContain('quan-tri@example.com (admin)') // trong dòng "Tài khoản thấy mục Voucher"
+            ->expectsOutputToContain('nv-visa@example.com (visa)'); // trong dòng "Tài khoản KHÔNG thấy"
+        $this->assertTrue($admin->fresh()->can('viewAny', VoucherBatch::class));
+        $this->assertTrue($admin->fresh()->can('Scan:Voucher'));
+        $this->assertFileDoesNotExist($tepMenu);
     }
 }
