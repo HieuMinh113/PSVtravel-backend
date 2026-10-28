@@ -70,7 +70,8 @@ class GiaoDienQuanTriTest extends TestCase
         $this->assertSame('Hệ thống', $menu['Người dùng']);
         $this->assertSame('Maldives', $menu['Đơn Maldives']);
         $this->assertSame('Maldives', $menu['Combo Maldives']);
-        $this->assertArrayNotHasKey('Hãng bay', $menu); // thay bằng Maldives, chỉ ẩn khỏi menu
+        $this->assertSame('Nội dung website', $menu['Hãng bay']); // trang Vé máy bay nằm trong menu "Khám phá" của website
+        $this->assertSame('Nội dung website', $menu['Chặng bay ưu đãi']);
         $this->assertArrayNotHasKey('Hướng dẫn sử dụng', $menu); // mở bằng nút trên thanh trên cùng
     }
 
