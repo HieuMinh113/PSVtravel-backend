@@ -84,6 +84,7 @@ class ChamCong extends Page implements HasTable
             'js' => asset('js/psv/cham-cong.js').'?v='.@filemtime(public_path('js/psv/cham-cong.js')),
             'thuVien' => asset('vendor/face-api/face-api.js'),
             'moHinh' => asset('vendor/face-api/model'),
+            'wasm' => asset('vendor/face-api/wasm').'/',
         ];
     }
 
@@ -103,8 +104,33 @@ class ChamCong extends Page implements HasTable
     }
 
     /**
+     * Gọi từ trình duyệt (Alpine) trong lúc quét: chỉ so khuôn mặt (128 số, không
+     * kèm ảnh — mạng yếu vẫn nhanh), không lưu, không vẽ lại trang. Khớp rồi
+     * trình duyệt mới gọi chamCong() kèm ảnh + vị trí.
+     *
+     * @return array{khop: bool, qua_nhieu?: bool, loi?: string}
+     */
+    public function soKhuonMat($descriptor): array
+    {
+        $this->skipRender();
+        $khoa = 'cham-cong-quet:'.auth()->id();
+        if (RateLimiter::tooManyAttempts($khoa, self::SO_LAN_KHONG_KHOP)) {
+            return ['khop' => false] + $this->quaNhieuLan($khoa);
+        }
+        $khop = app(DichVuChamCong::class)->khopKhuonMat(auth()->user(), $descriptor);
+        if ($khop === null) {
+            return ['khop' => false, 'loi' => 'Bạn chưa đăng ký khuôn mặt — tải lại trang để đăng ký.'];
+        }
+        if (! $khop) {
+            RateLimiter::hit($khoa, 600);
+        }
+
+        return ['khop' => $khop];
+    }
+
+    /**
      * Gọi từ trình duyệt (Alpine): chấm vào / ra. Lúc quét, trình duyệt gọi
-     * liên tục với chi_khi_khop — chưa khớp thì không vẽ lại trang (đỡ nặng).
+     * với chi_khi_khop — chưa khớp thì không vẽ lại trang (đỡ nặng).
      */
     public function chamCong($loai, $duLieu): array
     {
@@ -116,8 +142,7 @@ class ChamCong extends Page implements HasTable
         if ($quet && RateLimiter::tooManyAttempts($khoa, self::SO_LAN_KHONG_KHOP)) {
             $this->skipRender();
 
-            return ['ok' => false, 'qua_nhieu' => true, 'loi' => 'Khuôn mặt không khớp quá nhiều lần. Đợi '.max(1, (int) ceil(RateLimiter::availableIn($khoa) / 60))
-                .' phút rồi quét lại, hoặc bấm "Gửi ảnh cho quản lý duyệt".'];
+            return ['ok' => false] + $this->quaNhieuLan($khoa);
         }
 
         $kq = app(DichVuChamCong::class)->cham(auth()->user(), $loai, $duLieu);
@@ -127,6 +152,13 @@ class ChamCong extends Page implements HasTable
         }
 
         return $kq;
+    }
+
+    /** @return array{qua_nhieu: true, loi: string} */
+    private function quaNhieuLan(string $khoa): array
+    {
+        return ['qua_nhieu' => true, 'loi' => 'Khuôn mặt không khớp quá nhiều lần. Đợi '.max(1, (int) ceil(RateLimiter::availableIn($khoa) / 60))
+            .' phút rồi quét lại, hoặc bấm "Gửi ảnh cho quản lý duyệt".'];
     }
 
     protected function getHeaderActions(): array

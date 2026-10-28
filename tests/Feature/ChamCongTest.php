@@ -280,6 +280,39 @@ class ChamCongTest extends TestCase
         $this->assertTrue(Attendance::sole()->nghiVan());
     }
 
+    public function test_luc_quet_chi_so_khuon_mat_khong_luu_khong_gui_anh(): void
+    {
+        $u = $this->nhanVien();
+        $this->actingAs($u);
+        $trang = Livewire::test(ChamCong::class)->instance();
+        $this->assertSame(['khop' => false, 'loi' => 'Bạn chưa đăng ký khuôn mặt — tải lại trang để đăng ký.'], $trang->soKhuonMat($this->mat));
+
+        $this->dangKy($u);
+        $this->assertSame(['khop' => false], $trang->soKhuonMat($this->matKhac()));
+        $this->assertSame(['khop' => false], $trang->soKhuonMat(['rác']));
+        $this->assertSame(['khop' => true], $trang->soKhuonMat($this->mat));
+        $this->assertSame(0, Attendance::count()); // chỉ so, không chấm
+
+        // Lần so sai tính chung giới hạn với lần chấm: quá số lần thì tạm khoá cả hai
+        for ($i = 2; $i < ChamCong::SO_LAN_KHONG_KHOP; $i++) {
+            $trang->soKhuonMat($this->matKhac());
+        }
+        $kq = $trang->soKhuonMat($this->mat);
+        $this->assertFalse($kq['khop']);
+        $this->assertTrue($kq['qua_nhieu']);
+        $this->assertTrue($trang->chamCong('vao', ['lat' => self::LAT, 'lng' => self::LNG, 'anh' => $this->anh(), 'descriptor' => $this->mat, 'chi_khi_khop' => true])['qua_nhieu']);
+    }
+
+    public function test_trang_cham_cong_nap_bo_nhan_dien_va_wasm(): void
+    {
+        $this->actingAs($this->nhanVien());
+        $d = Livewire::test(ChamCong::class)->assertOk()->instance()->duLieuTrang();
+        $this->assertStringEndsWith('/vendor/face-api/face-api.js', $d['thuVien']);
+        $this->assertStringEndsWith('/vendor/face-api/wasm/', $d['wasm']); // máy không có card đồ hoạ chạy WebAssembly
+        $this->assertFileExists(public_path('vendor/face-api/wasm/tfjs-backend-wasm.wasm'));
+        $this->assertFileExists(public_path('vendor/face-api/wasm/tfjs-backend-wasm-simd.wasm'));
+    }
+
     public function test_thu_7_nua_ngay_chu_nhat_khong_tinh_tre(): void
     {
         $u = $this->nhanVien();

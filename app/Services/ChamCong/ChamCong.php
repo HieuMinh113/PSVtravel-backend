@@ -24,6 +24,24 @@ use InvalidArgumentException;
 class ChamCong
 {
     /**
+     * Chỉ so khuôn mặt, không lưu gì — trang chấm công gọi trong lúc quét (gửi
+     * 128 số, không kèm ảnh nên mạng yếu vẫn nhanh). Khớp rồi trình duyệt mới
+     * gửi ảnh + vị trí để chấm; lúc đó cham() so lại lần nữa.
+     *
+     * @return bool|null null = chưa đăng ký khuôn mặt
+     */
+    public function khopKhuonMat(User $u, $descriptor): ?bool
+    {
+        $khuonMat = AttendanceFace::where('user_id', $u->id)->first();
+        if (! $khuonMat) {
+            return null;
+        }
+        $moTa = self::docDacTrung($descriptor);
+
+        return $moTa !== null && self::soKhuonMat($moTa, $khuonMat->descriptor) < Attendance::NGUONG_KHUON_MAT;
+    }
+
+    /**
      * @param  array{lat?: ?float, lng?: ?float, accuracy?: ?float, anh?: ?string, descriptor?: ?array, ly_do?: ?string, chi_khi_khop?: bool}  $d
      * @return array{ok: bool, khong_khop?: bool, can_ly_do?: bool, vi_sao?: list<string>, loi?: string, thong_bao?: string, canh_bao?: list<string>}
      */

@@ -7,7 +7,7 @@
 <div
     x-load
     x-load-src="{{ $js }}"
-    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh) })"
+    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh), wasm: @js($wasm) })"
     wire:ignore.self
     style="display:grid;gap:16px"
 >
@@ -95,7 +95,7 @@
         {{-- Quét khuôn mặt --}}
         <div x-show="buoc === 'quet'" x-cloak style="display:grid;gap:12px;max-width:420px">
             <div class="psv-quet" :class="'psv-quet--' + pha">
-                <video x-ref="video" playsinline muted></video>
+                <video x-ref="video" playsinline muted autoplay disablepictureinpicture></video>
                 <div class="psv-quet__nhan" x-text="nhanLoai"></div>
                 <div class="psv-quet__khung">
                     <div class="psv-quet__tia"></div>
@@ -112,7 +112,8 @@
         {{-- Quét hết giờ mà chưa khớp / không tải được bộ nhận diện --}}
         <div x-show="buoc === 'khong_nhan'" x-cloak style="display:grid;gap:10px;max-width:560px">
             <div style="font-weight:600;color:#b45309" x-text="tieuDeKhongNhan"></div>
-            <div style="font-size:.9rem;opacity:.85">
+            <div style="font-size:.9rem;opacity:.85" x-show="moTaKhongNhan" x-text="moTaKhongNhan"></div>
+            <div style="font-size:.9rem;opacity:.85" x-show="! moTaKhongNhan">
                 Thử lại ở chỗ đủ sáng, bỏ khẩu trang / kính râm, nhìn thẳng camera.
                 <span x-show="loai !== 'dang_ky'">Vẫn không được (ví dụ ảnh đăng ký đã cũ) thì gửi ảnh để quản lý duyệt, và nhờ quản lý mở đăng ký lại khuôn mặt.</span>
             </div>
@@ -150,7 +151,9 @@
         <div x-show="loi" x-cloak style="color:#dc2626;font-size:.9rem;margin-top:8px" x-text="loi"></div>
     </x-filament::section>
     <style>
-        .psv-quet { position: relative; border-radius: 20px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; }
+        /* Khung quét luôn nằm trọn trong màn hình điện thoại, kể cả khi xoay ngang */
+        .psv-quet { position: relative; border-radius: 20px; overflow: hidden; background: #000; aspect-ratio: 3 / 4;
+            width: min(100%, calc(68vh * .75)); width: min(100%, calc(68svh * .75)); margin-inline: auto; touch-action: manipulation; }
         .psv-quet video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
         .psv-quet__nhan { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px;
             background: rgba(0,0,0,.55); color: #fff; font-size: .8rem; font-weight: 600; white-space: nowrap; }
@@ -158,7 +161,8 @@
         .psv-quet__khung { position: absolute; inset: 13% 16% 15%; border-radius: 50%; overflow: hidden;
             border: 3px solid rgba(255,255,255,.75); box-shadow: 0 0 0 100vmax rgba(0,0,0,.5);
             transition: border-color .2s, border-width .2s, background-color .3s; }
-        .psv-quet__tia { position: absolute; left: 0; right: 0; height: 22%; top: -22%;
+        /* Tia quét chạy bằng transform (luồng vẽ riêng của trình duyệt) — máy đang bận dò mặt vẫn chạy mượt */
+        .psv-quet__tia { position: absolute; left: 0; right: 0; height: 22%; top: 0; will-change: transform;
             background: linear-gradient(to bottom, transparent, rgba(255,255,255,.35) 85%, rgba(255,255,255,.9));
             animation: psv-quet-tia 2.2s ease-in-out infinite; }
         .psv-quet__tich { position: absolute; left: 50%; top: 46%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
@@ -183,7 +187,7 @@
         .psv-quet--khop .psv-quet__tia { animation: none; opacity: 0; }
         .psv-quet--khop .psv-quet__tich { transform: scale(1); opacity: 1; }
 
-        @keyframes psv-quet-tia { 0% { top: -22%; } 100% { top: 100%; } }
+        @keyframes psv-quet-tia { 0% { transform: translateY(-100%); } 100% { transform: translateY(455%); } }
         @keyframes psv-quet-lac { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
         @media (prefers-reduced-motion: reduce) { .psv-quet__tia { animation: none; opacity: 0; } }
     </style>
