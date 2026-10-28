@@ -182,6 +182,17 @@ class HuongDan extends Page
                         'luu_y' => 'Đơn Maldives tách riêng hoàn toàn với Đơn đặt tour: không trừ chỗ, không có tab khoản thu — tiền đã thu ghi ở ô "Đã thu".',
                     ],
                     [
+                        'tieu_de' => 'Khách đưa voucher',
+                        'o_dau' => 'Voucher → Quét voucher',
+                        'buoc' => [
+                            'Máy quét cầm tay: bấm vào ô mã rồi quét. Điện thoại / laptop: **Quét bằng camera** → đưa mã QR vào khung. Hoặc gõ mã in dưới QR.',
+                            'Hiện **CÒN DÙNG ĐƯỢC** (xanh): ghi chú mã đơn / tên khách nếu cần → **Xác nhận đã dùng**. Trừ mệnh giá vào hoá đơn / đơn tour như bình thường — hệ thống không tự trừ tiền.',
+                            '**ĐÃ DÙNG** / **HẾT HẠN** / **ĐÃ HUỶ** (đỏ, cam): không nhận. Màn hình ghi rõ dùng lúc nào, ai xác nhận.',
+                            'Quét nhầm: bấm **Hoàn tác** trong 30 phút.',
+                        ],
+                        'luu_y' => 'Mỗi mã chỉ dùng một lần — hai người quét cùng lúc thì chỉ một người xác nhận được. Khách tự kiểm tra mã ở psvtravel.com/khuyen-mai.',
+                    ],
+                    [
                         'tieu_de' => 'Gửi danh sách giấy tờ visa cho khách',
                         'o_dau' => 'Visa → Mẫu checklist',
                         'buoc' => ['Chọn nước và loại visa → **Xuất file** → gửi khách.'],
@@ -270,6 +281,19 @@ class HuongDan extends Page
                             'Tỷ giá để web hiện "≈ … triệu đồng": Hệ thống → Cấu hình chung → "Maldives: tỷ giá USD tạm tính".',
                         ],
                         'luu_y' => 'Nhập từ file: phụ thu ghi khoảng ("$100 – $120") thì máy lấy mức thấp nhất; ngày đã qua tự bỏ — đọc mục "Cần xem lại" trước khi đăng bán. Ảnh lấy từ file đối tác có thể vướng bản quyền nên mặc định không lấy — dùng ảnh resort cấp chính thức (media kit) hoặc ảnh công ty tự chụp.',
+                    ],
+                    [
+                        'tieu_de' => 'Tạo và in voucher',
+                        'o_dau' => 'Voucher → Đợt voucher',
+                        'buoc' => [
+                            '**Tạo đợt voucher**: tên đợt, mệnh giá, hạn dùng, áp dụng cho, điều kiện (khách thấy khi kiểm tra mã).',
+                            '**Mẫu in**: tải ảnh mặt trước / mặt sau do thiết kế làm (khổ 155×100 mm, hoặc có tràn lề 161×106 mm). Chọn mặt, góc, bề rộng ô mã, khoảng cách mép → Lưu → khung **Xem thử** hiện đúng như bản in.',
+                            '**Tạo mã**: 1 – 1000 mã mỗi lần, mỗi mã dùng một lần. Ghi "Phát cho" để biết lô mã phát ở đâu (voucher không ghi tên khách).',
+                            '**Tải file in**: nhà in → bản tràn lề (mỗi voucher 2 trang: trước, sau). In ở văn phòng → A4, 2 voucher / tờ, in 2 mặt lật cạnh dài, tỉ lệ 100%, cắt theo vạch. Gửi khách qua Zalo → ảnh JPG (ZIP).',
+                            'Trên 300 mã: file tạo trong nền khoảng 1 phút, xong báo ở chuông 🔔 kèm nút tải.',
+                            'Voucher mất / in hỏng: **Mã voucher** → tìm mã → **Huỷ mã**.',
+                        ],
+                        'luu_y' => 'File in chứa mã dùng được như tiền: link tải chỉ người bấm xuất mở được, tải xong tự xoá. Không gửi file in cho người ngoài ngoài nhà in.',
                     ],
                     [
                         'tieu_de' => 'Gợi ý SEO khi viết bài cẩm nang',

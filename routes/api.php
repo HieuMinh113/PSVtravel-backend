@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\SeasonPageController;
 use App\Http\Controllers\Api\SubscriberController;
 use App\Http\Controllers\Api\TacGiaController;
 use App\Http\Controllers\Api\TeamMemberController;
+use App\Http\Controllers\Api\VoucherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->group(function () {
@@ -88,6 +89,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('jobs/{slug}', [JobPostingController::class, 'show']);
     Route::get('partners', [PartnerController::class, 'index']);
 });
+
+// Khách kiểm tra voucher (gõ mã / quét QR trên voucher) — giới hạn lượt để không dò được mã
+Route::get('v1/vouchers/{ma}', [VoucherController::class, 'show'])
+    ->where('ma', '[A-Za-z0-9\-\s%]{4,40}')
+    ->middleware('throttle:voucher');
 
 // Ứng viên gửi hồ sơ (CV + portfolio PDF) từ trang chi tiết tin tuyển dụng
 Route::post('v1/jobs/{slug}/apply', [JobApplicationController::class, 'store'])

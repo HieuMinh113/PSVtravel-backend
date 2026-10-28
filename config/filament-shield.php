@@ -259,6 +259,7 @@ return [
         'ViewAll:Booking' => 'Xem mọi đơn, đổi người phụ trách',
         'ViewAll:Attendance' => 'Quản lý chấm công mọi người',
         'ViewAll:VisaCase' => 'Xem mọi hồ sơ visa, giao hồ sơ',
+        'Scan:Voucher' => 'Quét voucher, đánh dấu đã dùng',
     ],
 
     /*

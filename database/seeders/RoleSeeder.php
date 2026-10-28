@@ -69,6 +69,7 @@ class RoleSeeder extends Seeder
         $this->call(QuyenHoSoUngTuyenSeeder::class);
         // Combo Maldives: admin + sale, marketing, điều hành, kế toán (sau khi đã có các vai trò)
         $this->call(QuyenMaldivesSeeder::class);
+        $this->call(QuyenVoucherSeeder::class);
 
         // Tạo đủ quyền cho mọi mục quản trị (Tour, Đơn đặt tour, Vé máy bay,
         // Người dùng, Cấu hình...) và cấp hết cho super_admin. Thiếu bước này

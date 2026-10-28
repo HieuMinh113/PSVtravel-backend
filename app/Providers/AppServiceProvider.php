@@ -48,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\JobApplication::class, \App\Policies\JobApplicationPolicy::class);
         Gate::policy(\Modules\Alliance\Models\AllianceSource::class, \Modules\Alliance\Policies\AllianceSourcePolicy::class);
         Gate::policy(\Modules\Alliance\Models\AllianceDeparture::class, \Modules\Alliance\Policies\AllianceDeparturePolicy::class);
+        Gate::policy(\App\Models\VoucherBatch::class, \App\Policies\VoucherBatchPolicy::class);
+        Gate::policy(\App\Models\Voucher::class, \App\Policies\VoucherPolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
             // API đọc (GET) đã cache: 600 lần/phút/IP đủ chặn lạm dụng mà không cản
             // lúc build (Next.js dựng ~80 trang bắn nhiều request). Nhờ TrustProxies,
@@ -81,6 +83,11 @@ class AppServiceProvider extends ServiceProvider
         // Chống dò mã đơn: 10 lần tra cứu/phút/IP
         \Illuminate\Support\Facades\RateLimiter::for('lookup', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(10)->by($request->ip());
+        });
+
+        // Kiểm tra voucher: 20 lần/phút/IP — đủ cho khách quét vài voucher, không đủ để dò mã
+        \Illuminate\Support\Facades\RateLimiter::for('voucher', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(20)->by($request->ip());
         });
 
         // Chống spam form liên hệ: 3 tin/giờ/IP

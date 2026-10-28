@@ -21,7 +21,7 @@ class GiaoDienQuanTriTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const NHOM = ['Bán hàng', 'Tour & điều hành', 'Maldives', 'Visa', 'Marketing', 'Nội dung website', 'Giới thiệu công ty', 'Nhân sự', 'Hệ thống'];
+    private const NHOM = ['Bán hàng', 'Tour & điều hành', 'Maldives', 'Voucher', 'Visa', 'Marketing', 'Nội dung website', 'Giới thiệu công ty', 'Nhân sự', 'Hệ thống'];
 
     protected function setUp(): void
     {
@@ -70,6 +70,9 @@ class GiaoDienQuanTriTest extends TestCase
         $this->assertSame('Hệ thống', $menu['Người dùng']);
         $this->assertSame('Maldives', $menu['Đơn Maldives']);
         $this->assertSame('Maldives', $menu['Combo Maldives']);
+        $this->assertSame('Voucher', $menu['Quét voucher']);
+        $this->assertSame('Voucher', $menu['Đợt voucher']);
+        $this->assertSame('Voucher', $menu['Mã voucher']);
         $this->assertSame('Nội dung website', $menu['Hãng bay']); // trang Vé máy bay nằm trong menu "Khám phá" của website
         $this->assertSame('Nội dung website', $menu['Chặng bay ưu đãi']);
         $this->assertArrayNotHasKey('Hướng dẫn sử dụng', $menu); // mở bằng nút trên thanh trên cùng
