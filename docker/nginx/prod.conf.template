@@ -76,8 +76,10 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    # Chặn sẵn các API trình duyệt web không dùng (vị trí, mic, camera, thanh toán)
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()" always;
+    # Chặn sẵn các API trình duyệt web không dùng (vị trí, mic, thanh toán).
+    # Camera chỉ cho chính website: nút "Quét mã" ở trang Voucher & ưu đãi
+    # (/khuyen-mai) đọc QR trên voucher — camera=() thì nút này báo lỗi.
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(), usb=()" always;
 
     client_max_body_size 20M;
     gzip on;
