@@ -73,6 +73,16 @@ if [ "${PSV_DA_LAY_MA:-0}" != "1" ]; then
     exec "$0" "$@"
 fi
 
+# Khoá nội bộ để máy chủ Next.js gọi API dựng trang mà không bị tính vào giới
+# hạn tần suất theo IP (docker/nginx/prod.conf.template). docker-compose.prod.yml
+# BẮT BUỘC có khoá này — chưa có thì sinh ngay, trước mọi lệnh docker compose.
+# Chỉ nằm trong .env (ngoài git), không cần ghi lại hay chia sẻ cho ai.
+if ! grep -qE '^PSV_NOI_BO=[0-9a-f]{32,}$' .env; then
+    sed -i '/^PSV_NOI_BO=/d' .env
+    printf '\n# Khoá nội bộ Next.js -> API (tự sinh bởi scripts/trien-khai.sh, không chia sẻ)\nPSV_NOI_BO=%s\n' "$(openssl rand -hex 24)" >> .env
+    echo "==> Đã tạo khoá nội bộ PSV_NOI_BO trong .env"
+fi
+
 # Mã nguồn được gắn thẳng vào container (./:/var/www), nên từ lúc reset ở
 # bước 1 website ĐANG CHẠY mã mới với thư viện / bảng nạp lớp (autoload) cũ.
 # Bản có thêm module mới thì mọi yêu cầu đều chết "Class ... ServiceProvider

@@ -283,7 +283,12 @@ Sinh ba chuỗi bí mật:
 echo "base64:$(openssl rand -base64 32)"   # dùng cho APP_KEY
 openssl rand -base64 32                    # dùng cho DB_PASSWORD
 openssl rand -base64 32                    # dùng cho REDIS_PASSWORD
+openssl rand -hex 24                       # dùng cho PSV_NOI_BO
 ```
+
+> PSV_NOI_BO là khoá nội bộ để máy chủ Next.js gọi API dựng trang mà không bị
+> tính vào giới hạn tần suất theo IP. Để trống cũng được: `scripts/trien-khai.sh`
+> tự sinh. Nhưng `docker compose` sẽ báo "Thiếu PSV_NOI_BO" cho tới khi có khoá.
 
 > APP_KEY phải giữ nguyên cả chữ `base64:` ở đầu.
 >

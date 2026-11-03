@@ -115,6 +115,19 @@ services:
         NEXT_PUBLIC_SITE_URL: https://${PSV_DOMAIN}
     container_name: psv_frontend
     restart: unless-stopped
+    environment:
+      # Khoá nội bộ: máy chủ Next gửi kèm khi gọi API dựng trang để nginx và
+      # Laravel không tính vào giới hạn tần suất theo IP (xem đầu
+      # docker/nginx/prod.conf.template). Chỉ ở máy chủ — KHÔNG có tiền tố
+      # NEXT_PUBLIC_ nên không bao giờ xuống trình duyệt. Truyền lúc CHẠY, không
+      # truyền lúc build (biến build còn lại trong lịch sử ảnh Docker).
+      # Thiếu khoá thì dừng hẳn: scripts/trien-khai.sh tự sinh vào .env.
+      PSV_NOI_BO: ${PSV_NOI_BO:?Thiếu PSV_NOI_BO trong .env — chạy ./scripts/trien-khai.sh để tự tạo}
+    volumes:
+      # Ảnh đã nén (/_next/image) giữ qua các lần triển khai. Trước đây tạo lại
+      # container là mất sạch, vài phút đầu sau mỗi lần cập nhật trang nào cũng
+      # phải nén lại ảnh. Next tự xoá ảnh ít dùng khi quá 500 MB (next.config).
+      - psv_next_anh:/app/.next/cache/images
     networks: [psv]
 
   nginx:
@@ -127,6 +140,8 @@ services:
     environment:
       PSV_DOMAIN: ${PSV_DOMAIN}
       PSV_API_DOMAIN: ${PSV_API_DOMAIN}
+      # Khoá nội bộ của máy chủ Next (xem dịch vụ frontend ở trên)
+      PSV_NOI_BO: ${PSV_NOI_BO:?Thiếu PSV_NOI_BO trong .env — chạy ./scripts/trien-khai.sh để tự tạo}
       # Chỉ thay các biến bắt đầu bằng PSV_ — không đụng vào $host, $uri...
       # của chính nginx trong file cấu hình.
       NGINX_ENVSUBST_FILTER: "PSV_"
@@ -179,3 +194,4 @@ volumes:
   psv_redisdata:
   psv_certs:
   psv_acme:
+  psv_next_anh:

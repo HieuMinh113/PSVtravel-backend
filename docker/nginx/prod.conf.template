@@ -6,15 +6,39 @@
 # giá trị trong .env lúc container khởi động.
 
 # ---- Giới hạn tần suất, chặn dò mật khẩu và spam form ----
-limit_req_zone $binary_remote_addr zone=psv_chung:10m rate=30r/s;
+# Tính theo IP. Cả văn phòng dùng chung MỘT IP (wifi công ty), khách 4G cũng hay
+# chung IP của nhà mạng. Trước đây mọi lượt — kể cả ảnh, JS, CSS, font — đều
+# tính vào 30 lượt/giây, dồn 60 rồi chặn ngay: mở một trang admin đã tốn 31
+# lượt, nên 3 người mở cùng lúc bị chặn 1/3 (trang thiếu chữ, đứng hình — "sáng
+# web hơi lag" lúc cả công ty vào chấm công). Giờ:
+#  - tệp tĩnh (ảnh, JS, CSS, font, bộ nhận diện khuôn mặt) KHÔNG tính
+#  - trang + PHP: 30 lượt/giây, dồn được 150 — 60 lượt đầu đi ngay, phần sau
+#    xếp hàng chờ (chậm một chút, không lỗi); quá 150 mới chặn (503)
+#  - máy chủ Next.js gọi API lúc dựng trang KHÔNG tính: mọi lời gọi đó đi ra từ
+#    một IP, bot quét 56 trang đã làm 36% bị chặn → trang tour không cập nhật.
+#    Next gửi kèm header X-Psv-Noi-Bo = khoá PSV_NOI_BO trong .env (scripts/
+#    trien-khai.sh tự sinh). Khoá sai / không có header → tính như mọi người.
+#    Ba map dưới: kể cả khi khoá rỗng, lượt KHÔNG có header vẫn bị tính.
+# Khoá 48 ký tự dài hơn ô băm mặc định (64 byte) của map → nginx không khởi động
+map_hash_bucket_size 128;
+map $http_x_psv_noi_bo $psv_noi_bo_dung { default 0; "${PSV_NOI_BO}" 1; }
+map $http_x_psv_noi_bo $psv_co_noi_bo { default 1; "" 0; }
+map "$psv_co_noi_bo$psv_noi_bo_dung" $psv_khoa_gioi_han { default $binary_remote_addr; "11" ""; }
+
+limit_req_zone $psv_khoa_gioi_han zone=psv_chung:10m rate=30r/s;
+# Ảnh Next tự nén (/_next/image): trang chủ ~20 ảnh/lượt, nén lần đầu tốn CPU
+limit_req_zone $binary_remote_addr zone=psv_anh:10m rate=50r/s;
 limit_req_zone $binary_remote_addr zone=psv_dangnhap:10m rate=1r/s;
 
 # ---- Nhật ký: y như dạng "main" mặc định của nginx + tên miền ở cuối dòng ----
 # Để tách lượt vào website và lượt vào API (scripts/dem-bot-ai.sh) — trước đây
 # không phân biệt được api.psvtravel.com/sitemap.xml (404) với sitemap thật.
+# rt = tổng thời gian nginx phục vụ, urt = thời gian Next / PHP xử lý (giây) —
+# scripts/kiem-tra-tai.sh đọc để biết giờ nào, trang nào chậm.
 log_format psv_co_ten_mien '$remote_addr - $remote_user [$time_local] "$request" '
                            '$status $body_bytes_sent "$http_referer" '
-                           '"$http_user_agent" "$http_x_forwarded_for" "$host"';
+                           '"$http_user_agent" "$http_x_forwarded_for" "$host" '
+                           'rt=$request_time urt=$upstream_response_time';
 
 # ---- Chuyển hết HTTP sang HTTPS, trừ đường xác thực chứng chỉ ----
 server {
@@ -86,10 +110,9 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
     gzip_min_length 1024;
 
-    limit_req zone=psv_chung burst=60 nodelay;
-
-    # Tệp tĩnh Next sinh ra có mã băm trong tên nên giữ vĩnh viễn được
-    location /_next/static/ {
+    # Tệp tĩnh Next sinh ra có mã băm trong tên nên giữ vĩnh viễn được.
+    # Không giới hạn tần suất (xem đầu file).
+    location ^~ /_next/static/ {
         proxy_pass http://frontend:3000;
         add_header Cache-Control "public, max-age=31536000, immutable";
         # LƯU Ý nginx: khối nào tự khai add_header thì KHÔNG kế thừa add_header
@@ -99,7 +122,21 @@ server {
         access_log off;
     }
 
+    # Ảnh Next tự nén: vùng giới hạn riêng, rộng hơn trang (một trang ~20 ảnh)
+    location ^~ /_next/image {
+        limit_req zone=psv_anh burst=300 delay=100;
+        proxy_pass http://frontend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        access_log off;
+    }
+
     location / {
+        limit_req zone=psv_chung burst=150 delay=60;
         proxy_pass http://frontend:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -139,10 +176,9 @@ server {
     client_max_body_size 20M;
 
     gzip on;
-    gzip_types application/json application/javascript text/css;
+    # application/wasm: bộ nhận diện khuôn mặt (trang Chấm công) nén còn ~1/2
+    gzip_types application/json application/javascript text/css application/wasm;
     gzip_min_length 1024;
-
-    limit_req zone=psv_chung burst=60 nodelay;
 
     # Ảnh admin tải lên. Trỏ thẳng thư mục thật thay vì qua liên kết tượng
     # trưng public/storage — không phụ thuộc `artisan storage:link`.
@@ -172,17 +208,45 @@ server {
         try_files $uri =404;
     }
 
+    # Tệp tĩnh của trang quản trị: giao diện Filament, phông chữ, bộ nhận diện
+    # khuôn mặt (~9 MB), bộ đọc QR. Không giới hạn tần suất, trình duyệt giữ 7
+    # ngày — trước đây không có hạn giữ nên mỗi lần mở trang lại hỏi máy chủ.
+    # JS / CSS của Filament và js/psv có ?v=… đổi theo phiên bản nên sửa xong
+    # khách nhận ngay; logo (images/) giữ 1 ngày cho dễ thay.
+    # "expires" không phải add_header nên header bảo mật của server vẫn kế thừa.
+    location ~ ^/(?:js|css|fonts|vendor)/ {
+        expires 7d;
+        access_log off;
+        # Khối này đứng trước khối chặn tệp ẩn / .php cuối file nên tự chặn lại
+        location ~ (?:\.(?:php|phtml|phar)$|/\.) {
+            deny all;
+        }
+        try_files $uri =404;
+    }
+    location ^~ /images/ {
+        expires 1d;
+        access_log off;
+        location ~ (?:\.(?:php|phtml|phar)$|/\.) {
+            deny all;
+        }
+        try_files $uri =404;
+    }
+
     # Trang đăng nhập quản trị — siết chặt để chặn dò mật khẩu tự động
     location = /admin/login {
         limit_req zone=psv_dangnhap burst=5 nodelay;
         try_files $uri /index.php?$query_string;
     }
 
+    # Trang quản trị + API (xem giới hạn ở đầu file). Một lượt chỉ tính một lần
+    # dù đi tiếp sang khối .php bên dưới.
     location / {
+        limit_req zone=psv_chung burst=150 delay=60;
         try_files $uri $uri/ /index.php?$query_string;
     }
 
     location ~ \.php$ {
+        limit_req zone=psv_chung burst=150 delay=60;
         try_files $uri =404;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
         fastcgi_pass app:9000;

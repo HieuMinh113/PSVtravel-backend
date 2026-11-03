@@ -51,6 +51,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\VoucherBatch::class, \App\Policies\VoucherBatchPolicy::class);
         Gate::policy(\App\Models\Voucher::class, \App\Policies\VoucherPolicy::class);
         \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
+            // Máy chủ Next.js dựng trang: mọi lời gọi đi ra từ MỘT IP — bot quét cả
+            // website là vượt 600/phút, trang tour không cập nhật. Có khoá nội bộ
+            // đúng thì không tính (xem services.noi_bo, docker/nginx/prod.conf.template).
+            $khoa = (string) config('services.noi_bo.khoa');
+            if (strlen($khoa) >= 32 && hash_equals($khoa, (string) $request->header('X-Psv-Noi-Bo'))) {
+                return \Illuminate\Cache\RateLimiting\Limit::none();
+            }
+
             // API đọc (GET) đã cache: 600 lần/phút/IP đủ chặn lạm dụng mà không cản
             // lúc build (Next.js dựng ~80 trang bắn nhiều request). Nhờ TrustProxies,
             // $request->ip() là IP THẬT của khách nên giới hạn tính đúng theo từng người.

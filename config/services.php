@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // Khoá nội bộ: máy chủ Next.js gửi kèm (header X-Psv-Noi-Bo) khi gọi API để
+    // dựng trang → không tính giới hạn 600 lượt/phút/IP (mọi lời gọi dựng trang
+    // đi ra từ một IP). scripts/trien-khai.sh tự sinh vào .env.
+    'noi_bo' => [
+        'khoa' => env('PSV_NOI_BO'),
+    ],
+
 ];
