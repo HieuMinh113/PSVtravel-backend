@@ -7,7 +7,7 @@
 <div
     x-load
     x-load-src="{{ $js }}"
-    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh), wasm: @js($wasm) })"
+    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh), wasm: @js($wasm), canViTri: @js($coToaDo), daDangKy: @js($daDangKy) })"
     wire:ignore.self
     style="display:grid;gap:16px"
 >
@@ -89,8 +89,55 @@
                     </x-filament::button>
                 </div>
                 <div style="font-size:.85rem;opacity:.7">Bấm rồi đưa mặt vào khung — máy tự nhận ra bạn và chấm công, không cần chụp.</div>
+
+                @if ($coToaDo)
+                    {{-- Vị trí: xin quyền trước, bị chặn thì chỉ cách bật lại --}}
+                    <div x-show="quyenViTri === 'prompt'" x-cloak class="psv-vi-tri psv-vi-tri--hoi">
+                        <div class="psv-vi-tri__tieu-de"><x-filament::icon icon="heroicon-o-map-pin" class="psv-vi-tri__icon" /> Bật vị trí trước khi chấm công</div>
+                        <div>Chấm công cần biết bạn đang ở công ty. Bấm nút dưới, trình duyệt hỏi thì chọn <b>Cho phép</b>.</div>
+                        <div>
+                            <x-filament::button size="sm" icon="heroicon-o-map-pin" x-on:click="hoiQuyenViTri()" x-bind:disabled="dangHoiViTri">
+                                <span x-text="dangHoiViTri ? 'Đang chờ bạn bấm Cho phép…' : 'Cho phép vị trí'"></span>
+                            </x-filament::button>
+                        </div>
+                    </div>
+                    <div x-show="quyenViTri === 'denied'" x-cloak class="psv-vi-tri psv-vi-tri--chan">
+                        <div class="psv-vi-tri__tieu-de"><x-filament::icon icon="heroicon-o-map-pin" class="psv-vi-tri__icon" /> Trình duyệt đang chặn vị trí</div>
+                        <div>Vẫn chấm được, nhưng phải ghi lý do và quản lý sẽ thấy "Không rõ vị trí". Cách bật lại:</div>
+                        <div style="white-space:pre-line" x-text="huongDanViTri"></div>
+                        <div><x-filament::button size="sm" color="gray" icon="heroicon-o-arrow-path" x-on:click="location.reload()">Đã bật — tải lại trang</x-filament::button></div>
+                    </div>
+                    <div x-show="quyenViTri !== 'prompt' && quyenViTri !== 'denied' && nhanViTri" x-cloak style="font-size:.85rem;display:flex;gap:6px;align-items:center">
+                        <x-filament::icon icon="heroicon-o-map-pin" style="width:16px;height:16px;flex:none;opacity:.7" />
+                        <span x-text="nhanViTri" :style="viTri?.lat ? '' : 'color:#b45309'"></span>
+                    </div>
+                @endif
             </div>
         @endif
+
+        {{-- Bước 1: hỏi quyền vị trí trước khi mở camera --}}
+        <div x-show="buoc === 'hoi_vi_tri'" x-cloak style="display:grid;gap:10px;max-width:560px">
+            <div style="font-weight:600">Bước 1/2 — Cho phép vị trí</div>
+            <div style="font-size:.9rem;opacity:.85">
+                Trình duyệt đang hỏi quyền dùng vị trí: bấm <b>Cho phép</b> (Allow). Xong máy tự mở camera để quét khuôn mặt.
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <x-filament::button color="gray" x-on:click="boQuaHoi()">Bỏ qua, quét luôn</x-filament::button>
+                <x-filament::button color="gray" x-on:click="datLai()">Huỷ</x-filament::button>
+            </div>
+        </div>
+
+        {{-- Vị trí bị chặn: chỉ cách bật lại, hoặc chấm không cần vị trí (phải ghi lý do) --}}
+        <div x-show="buoc === 'vi_tri_chan'" x-cloak style="display:grid;gap:10px;max-width:560px">
+            <div style="font-weight:600;color:#b45309">Trình duyệt đang chặn vị trí</div>
+            <div style="font-size:.9rem;opacity:.85">Không có vị trí vẫn chấm được, nhưng phải ghi lý do và quản lý sẽ thấy "Không rõ vị trí". Muốn bật lại:</div>
+            <div style="font-size:.9rem;white-space:pre-line" x-text="huongDanViTri"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <x-filament::button icon="heroicon-o-arrow-path" x-on:click="location.reload()">Đã bật — tải lại trang</x-filament::button>
+                <x-filament::button color="gray" x-on:click="boQuaViTri()">Chấm không cần vị trí</x-filament::button>
+                <x-filament::button color="gray" x-on:click="datLai()">Huỷ</x-filament::button>
+            </div>
+        </div>
 
         {{-- Quét khuôn mặt --}}
         <div x-show="buoc === 'quet'" x-cloak style="display:grid;gap:12px;max-width:420px">
@@ -174,6 +221,11 @@
         .psv-quet__goi-y:empty { display: none; }
         .psv-quet__tien-do { height: 6px; border-radius: 999px; background: rgba(127,127,127,.25); overflow: hidden; }
         .psv-quet__tien-do > div { height: 100%; background: #22c55e; transition: width .25s; }
+        .psv-vi-tri { display: grid; gap: 8px; max-width: 560px; margin-top: 6px; padding: 12px 14px; border-radius: 12px; font-size: .9rem; }
+        .psv-vi-tri--hoi { border: 1px solid rgba(59,130,246,.45); background: rgba(59,130,246,.08); }
+        .psv-vi-tri--chan { border: 1px solid rgba(217,119,6,.5); background: rgba(217,119,6,.08); }
+        .psv-vi-tri__tieu-de { display: flex; gap: 6px; align-items: center; font-weight: 600; }
+        .psv-vi-tri__icon { width: 18px; height: 18px; flex: none; }
 
         .psv-quet--mo .psv-quet__tia { animation: none; opacity: 0; }
         .psv-quet--chinh .psv-quet__khung { border-color: #f59e0b; }

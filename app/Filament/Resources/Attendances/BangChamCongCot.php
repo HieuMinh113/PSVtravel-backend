@@ -69,7 +69,7 @@ class BangChamCongCot
             $p === 'in' && $r->late_minutes ? 'Trễ '.$r->late_minutes."'" : null,
             $p === 'out' && $r->early_minutes ? 'Sớm '.$r->early_minutes."'" : null,
             $r->{"{$p}_location"} === 'ngoai' ? 'Ngoài CT'.($cach !== null ? ' '.($cach >= 1000 ? number_format($cach / 1000, 1, ',', '.').' km' : $cach.' m') : '') : null,
-            $r->{"{$p}_location"} === 'khong_ro' ? 'Không rõ vị trí' : null,
+            $r->{"{$p}_location"} === 'khong_ro' ? 'Không rõ vị trí'.(($loi = Attendance::VI_TRI_LOI_NGAN[$r->{"{$p}_location_error"}] ?? null) ? " ({$loi})" : '') : null,
             $r->{"{$p}_source"} === 'bo_sung' ? 'Bổ sung' : null,
             $r->nghiVan($p) ? ($r->{"{$p}_face_ok"} === false ? 'Mặt chưa khớp' : 'Không thấy mặt') : null,
         ])->filter()->implode(' · ') ?: null;

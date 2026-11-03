@@ -2,7 +2,10 @@
  * Trang Chấm công — quét khuôn mặt kiểu Face ID: bấm Chấm công vào / ra, đưa
  * mặt vào khung, máy tự nhận ra và chấm, không có nút chụp.
  *
- *  1. Mở camera + lấy vị trí GPS cùng lúc.
+ *  1. Vị trí: GPS bật ngay lúc mở trang (đã cho phép) nên quét xong là có toạ độ.
+ *     Chưa cho phép thì hỏi quyền vị trí TRƯỚC, xong mới mở camera — hai hộp hỏi
+ *     quyền hiện cùng lúc thì điện thoại hay nuốt mất hộp vị trí ("Không rõ vị
+ *     trí"). Bị chặn thì hiện cách bật lại theo iPhone / Android / máy tính.
  *  2. Liên tục dò khuôn mặt bằng face-api (chạy ngay trong trình duyệt, ảnh
  *     không gửi ra dịch vụ ngoài), nhắc "lại gần", "vào giữa khung", "giữ yên".
  *  3. Mặt đúng chỗ và đứng yên → tính 128 số đặc trưng, hỏi máy chủ có khớp
@@ -24,6 +27,10 @@
  *    liên tục (WebGL hỏng) → chuyển chế độ; máy yếu → giãn nhịp dò.
  *  - Mọi lần gọi máy chủ có hạn chờ, vị trí GPS có hạn chờ — không treo vô hạn.
  *
+ * Máy tính (webcam): ngồi bàn thì mặt nhỏ trong khung → nhận mặt nhỏ hơn và dò
+ * ở độ phân giải cao hơn. Mỗi lượt chấm gửi kèm loại máy, thời gian quét và lý
+ * do không có vị trí để quản lý xem trong "Xem".
+ *
  * Nạp bằng x-load của Filament: <div x-load x-load-src="…/cham-cong.js" x-data="chamCong({...})">
  */
 const SO_MAU_DANG_KY = 5
@@ -31,6 +38,9 @@ const THOI_GIAN_QUET = 25000 // ms — hết giờ mà chưa khớp thì dừng,
 const NHIP = 180 // ms tối thiểu giữa hai lần dò
 const CHO_MAY_CHU = 25000 // ms — quá thời gian này coi như mạng lỗi
 const CHO_VI_TRI = 12000 // ms — chờ GPS tối đa sau khi đã nhận ra khuôn mặt
+const CHO_HOI_VI_TRI = 30000 // ms — chờ người dùng trả lời hộp hỏi quyền vị trí
+const THEO_DOI_VI_TRI = 300000 // ms — GPS bật tối đa 5 phút mỗi lần, đỡ tốn pin
+const VI_TRI_CU = 120000 // ms — vị trí cũ hơn mức này thì không dùng (có thể đã đi chỗ khác)
 
 const khoangCach = (a, b) => Math.sqrt(a.reduce((t, v, i) => t + (v - b[i]) ** 2, 0))
 const trungBinh = (ds) => ds[0].map((_, i) => ds.reduce((t, d) => t + d[i], 0) / ds.length)
@@ -50,6 +60,24 @@ const loiCamera = (e) => {
 
     return 'Không mở được camera' + (e?.message ? ': ' + e.message : '') + '. Tải lại trang rồi thử lại.'
 }
+
+/** iPad báo mình là Mac → nhận qua màn hình cảm ứng */
+const laIos = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+const laDienThoai = () => navigator.userAgentData?.mobile === true || /Mobi|Android/i.test(navigator.userAgent) || laIos()
+
+const HUONG_DAN_VI_TRI = {
+    ios:
+        'iPhone / iPad: mở Cài đặt → Quyền riêng tư & Bảo mật → Dịch vụ định vị → bật, rồi chọn "Trang web Safari" (hoặc Chrome) → "Khi dùng ứng dụng".\n' +
+        'Sau đó Cài đặt → (Ứng dụng →) Safari → Vị trí → "Cho phép". Quay lại đây, tải lại trang.',
+    android:
+        'Android: kéo thanh thông báo xuống, bật "Vị trí".\n' +
+        'Trong Chrome: bấm biểu tượng bên trái địa chỉ trang → Quyền (Cài đặt trang web) → Vị trí → Cho phép, rồi tải lại trang.',
+    may_tinh:
+        'Máy tính: bấm biểu tượng bên trái địa chỉ trang (ổ khoá / thanh chỉnh) → Vị trí → Cho phép, rồi tải lại trang.\n' +
+        'Windows còn cần: Cài đặt → Quyền riêng tư & bảo mật → Vị trí → bật. Mac: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Dịch vụ định vị → bật cho trình duyệt.',
+}
+
+const met = (m) => (m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(m) + ' m')
 
 /** Chờ video có khung hình thật (iPhone: play() xong mà videoWidth vẫn 0 một lúc) */
 const choKhungHinh = (v, ms = 6000) =>
@@ -74,12 +102,15 @@ const choKhungHinh = (v, ms = 6000) =>
         v.addEventListener('playing', thu)
     })
 
-export default function chamCong({ thuVien, moHinh, wasm }) {
+export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDangKy = true }) {
+    const DIEN_THOAI = laDienThoai()
     let faceapi = null
     let taiPhatHien = null // thư viện + bộ dò mặt (nhẹ) — đủ để nhắc lại gần / vào giữa
     let taiNhanDien = null // + bộ điểm mốc + bộ đặc trưng (~7 MB) — cần để xác minh
     let daCoNhanDien = false
-    let coDo = 320 // kích thước ảnh đưa vào bộ dò; máy yếu hạ xuống 224
+    // Kích thước ảnh đưa vào bộ dò: máy tính ngồi xa webcam, mặt nhỏ → dò kỹ hơn (416);
+    // máy yếu tự hạ dần xuống 224
+    let coDo = DIEN_THOAI ? 320 : 416
 
     const napScript = () =>
         new Promise((xong, loi) => {
@@ -196,7 +227,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
     }
 
     return {
-        buoc: 'cho', // cho | quet | khong_nhan | ly_do | xong
+        buoc: 'cho', // cho | hoi_vi_tri | vi_tri_chan | quet | khong_nhan | ly_do | xong
         pha: '', // trong lúc quét: mo | tim | chinh | giu | xac_minh | truot | khop
         loai: null, // vao | ra | dang_ky
         dongY: false,
@@ -214,8 +245,11 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
         tieuDeKhongNhan: '',
         moTaKhongNhan: '',
         stream: null,
-        viTri: null,
-        hoiViTri: null,
+        viTri: null, // { lat, lng, accuracy, luc } | { loi: chua_cho_phep | het_gio | khong_lay_duoc | khong_ho_tro }
+        quyenViTri: null, // granted | prompt | denied | khong_ho_tro | null (trình duyệt không cho biết trước)
+        dangHoiViTri: false,
+        huongDanViTri: HUONG_DAN_VI_TRI[laIos() ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'may_tinh'],
+        thoiGianQuet: null,
         anh: null,
         dacTrung: null,
         _luot: 0,
@@ -227,12 +261,37 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
         _truot: 0,
         _choDen: 0,
         _mau: [],
+        _bamLuc: 0,
+        _theoDoi: null,
+        _hetTheoDoi: null,
+        _duPhong: null,
+        _daBatViTri: false,
+        _boQuaViTri: false,
+        _choViTri: [],
+        _xemQuyen: null,
+        _khiDoiQuyen: null,
+        _boQuaHoi: null,
 
         get nhanLoai() {
             return { vao: 'Chấm công vào', ra: 'Chấm công ra', dang_ky: 'Đăng ký khuôn mặt' }[this.loai] || ''
         },
 
+        /** Dòng trạng thái vị trí dưới nút chấm công (đã cho phép) */
+        get nhanViTri() {
+            const vt = this.viTri
+            if (vt?.lat) {
+                if (vt.accuracy <= 100) return `Vị trí: đã có (sai số ±${met(vt.accuracy)})`
+                return `Vị trí: chỉ ước đoán (sai số ±${met(vt.accuracy)})` + (DIEN_THOAI ? ' — ra gần cửa sổ để GPS bắt chính xác hơn' : ' — máy tính đoán vị trí qua mạng nên hay lệch')
+            }
+            if (this._theoDoi != null) return 'Đang lấy vị trí…'
+            if (vt?.loi === 'het_gio') return 'Chưa bắt được vị trí — ra gần cửa sổ hoặc bật wifi để định vị nhanh hơn.'
+            if (vt?.loi === 'khong_lay_duoc') return 'Máy chưa lấy được vị trí — kiểm tra đã bật Vị trí (GPS) của máy chưa.'
+
+            return ''
+        },
+
         init() {
+            if (canViTri && daDangKy) this.xemQuyenViTri()
             // Tải sẵn bộ nhận diện lúc máy rảnh (trừ khi bật chế độ tiết kiệm dữ liệu)
             if (!navigator.connection?.saveData) {
                 const khiRanh = window.requestIdleCallback || ((f) => setTimeout(f, 1500))
@@ -242,6 +301,9 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             // hình đứng im — dừng hẳn, quay lại thì mời quét lại
             this._khiAn = () => {
                 if (document.hidden && this.buoc === 'quet') this.tamDung('Đã tạm dừng vì bạn chuyển ứng dụng hoặc tắt màn hình.')
+                // GPS chỉ chạy khi đang mở trang này
+                if (document.hidden) this.tatViTri()
+                else if (this._daBatViTri && this.quyenViTri !== 'denied') this.batViTri()
             }
             document.addEventListener('visibilitychange', this._khiAn)
         },
@@ -250,6 +312,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             document.removeEventListener('visibilitychange', this._khiAn)
             this._luot++
             this.tatCamera()
+            this.tatViTri()
         },
 
         async batDau(loai) {
@@ -265,13 +328,34 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
                 this.loi = 'Trình duyệt chỉ cho mở camera trên trang https. Mở trang quản trị bằng địa chỉ https (Safari / Chrome bản mới).'
                 return
             }
+            if (loai !== 'dang_ky') {
+                // Vị trí trước, camera sau — không để hai hộp hỏi quyền hiện cùng lúc
+                if (canViTri && !this._boQuaViTri) {
+                    await this.xemQuyenViTri()
+                    if (luot !== this._luot) return
+                    if (this.quyenViTri === 'denied') {
+                        this.buoc = 'vi_tri_chan'
+                        return
+                    }
+                    if (!['granted', 'khong_ho_tro'].includes(this.quyenViTri) && !this.viTri?.lat) {
+                        this.buoc = 'hoi_vi_tri'
+                        const kq = await this.hoiQuyenViTri()
+                        if (luot !== this._luot || this.buoc !== 'hoi_vi_tri') return // bấm Huỷ
+                        if (kq === 'denied') {
+                            this.buoc = 'vi_tri_chan'
+                            return
+                        }
+                    }
+                }
+                this.batViTri()
+            }
             this.buoc = 'quet'
             this.pha = 'mo'
             this.goiY = 'Đang mở camera…'
             this.dangMo = true
             this.$nextTick(() => this.$refs.video?.closest('.psv-quet')?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
-            if (loai !== 'dang_ky') this.layViTri()
             napDayDu().catch(() => {}) // tải song song với lúc mở camera (nếu chưa tải sẵn)
+            this._bamLuc = Date.now()
 
             let stream
             try {
@@ -354,7 +438,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
                 }
                 // Máy yếu dò mất nhiều thời gian → nghỉ lâu hơn cho màn hình kịp vẽ, không bị đơ
                 const ton = performance.now() - dau
-                if (ton > 400 && coDo > 224) coDo = 224
+                if (ton > 400 && coDo > 224) coDo = coDo > 320 ? 320 : 224
                 if (conChay()) this._vong = setTimeout(lap, Math.max(NHIP, Math.min(600, ton)))
             }
             lap()
@@ -384,7 +468,8 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             this._truoc = { x, y }
 
             let nhac = null
-            if (rong < 0.28) nhac = 'Lại gần camera hơn'
+            // Webcam máy tính: ngồi cách màn hình ~60–90 cm thì mặt chỉ chiếm ~20–30% khung
+            if (rong < (DIEN_THOAI ? 0.28 : 0.2)) nhac = 'Lại gần camera hơn'
             else if (rong > 0.85) nhac = 'Lùi ra xa một chút'
             else if (Math.abs(x - 0.5) > 0.16 || Math.abs(y - 0.48) > 0.2) nhac = 'Đưa mặt vào giữa khung'
             else if (truoc && Math.hypot(x - truoc.x, y - truoc.y) > 0.035) nhac = 'Giữ yên…'
@@ -480,13 +565,14 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             }
 
             // Khớp: báo ngay "đã nhận ra", rồi mới gửi ảnh + vị trí để chấm
+            this.thoiGianQuet = Date.now() - this._bamLuc
             this.anh = anh
             this.dacTrung = ds
             this._chiKhiKhop = true
             this.daKhop = true
             await this.thanhCong()
             if (!conChay()) return
-            this.goiY = this.viTri ? 'Đang lưu chấm công…' : 'Đã nhận ra bạn — đang lấy vị trí…'
+            this.goiY = this.viTriMoi() || this.quyenViTri === 'denied' ? 'Đang lưu chấm công…' : 'Đã nhận ra bạn — đang lấy vị trí…'
             await this.gui()
         },
 
@@ -504,6 +590,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
 
         /** Hết giờ / không tải được bộ nhận diện / bị ngắt: dừng camera, giữ lại một ảnh để gửi quản lý nếu cần. */
         dungQuet(loi = '', moTa = '', { chupAnh = true } = {}) {
+            if (this._bamLuc) this.thoiGianQuet ??= Date.now() - this._bamLuc
             if (chupAnh) {
                 try {
                     const c = chupKhung(this.$refs.video)
@@ -537,35 +624,159 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             this.loi = 'Mạng chậm hoặc mất mạng — chưa chấm được. Kiểm tra wifi / 4G rồi bấm lại.'
         },
 
-        layViTri() {
-            this.viTri = null
-            const hoi = (chinhXac, han, cu) =>
-                new Promise((xong, loi) =>
-                    navigator.geolocation.getCurrentPosition(xong, loi, { enableHighAccuracy: chinhXac, timeout: han, maximumAge: cu }),
-                )
-            const ghi = (vt) => {
-                this.viTri = { lat: vt.coords.latitude, lng: vt.coords.longitude, accuracy: vt.coords.accuracy }
-            }
-            this.hoiViTri = (async () => {
-                if (!navigator.geolocation) {
-                    this.viTri = { loi: 'Trình duyệt không hỗ trợ định vị' }
+        /** Đã cho phép vị trí chưa (không hiện hộp hỏi). Bật lại trong cài đặt trình duyệt → tự bắt GPS. */
+        xemQuyenViTri() {
+            this._xemQuyen ??= (async () => {
+                if (!navigator.geolocation || !window.isSecureContext) {
+                    this.quyenViTri = 'khong_ho_tro'
                     return
                 }
+                let q
                 try {
-                    ghi(await hoi(true, 9000, 30000))
+                    q = await navigator.permissions.query({ name: 'geolocation' })
                 } catch (e) {
-                    if (e?.code === 1) {
-                        this.viTri = { loi: 'Bạn chưa cho phép lấy vị trí' }
-                        return
-                    }
-                    // GPS chưa bắt được (trong nhà) → lấy vị trí theo wifi / sóng điện thoại
-                    try {
-                        ghi(await hoi(false, 5000, 300000))
-                    } catch (e2) {
-                        this.viTri = { loi: e2?.code === 1 ? 'Bạn chưa cho phép lấy vị trí' : 'Không lấy được vị trí' }
-                    }
+                    return // Safari cũ: không cho biết trước — bấm chấm công sẽ hỏi
                 }
+                const dat = () => {
+                    this.quyenViTri = q.state
+                    if (q.state === 'granted') this.batViTri()
+                    else if (q.state === 'denied') {
+                        this.tatViTri()
+                        this.viTri = { loi: 'chua_cho_phep' }
+                    }
+                    this._khiDoiQuyen?.(q.state)
+                    // Đang xem hướng dẫn mà bật lại được ngay (Chrome) → quét luôn, khỏi tải lại trang
+                    if (q.state === 'granted' && this.buoc === 'vi_tri_chan') this.batDau(this.loai)
+                }
+                dat()
+                q.onchange = dat
             })()
+
+            return this._xemQuyen
+        },
+
+        /**
+         * Hiện hộp hỏi quyền vị trí của trình duyệt và chờ người dùng trả lời
+         * (chờ GPS bắt được không tính — đã cho phép là đi tiếp, GPS bắt ở nền).
+         * @returns {Promise<'granted'|'denied'|'cho'|'bo_qua'|'khong_ho_tro'>}
+         */
+        hoiQuyenViTri() {
+            if (!navigator.geolocation) return Promise.resolve('khong_ho_tro')
+            this.dangHoiViTri = true
+
+            return new Promise((xong) => {
+                let ket = (kq) => {
+                    ket = () => {}
+                    clearTimeout(han)
+                    this._boQuaHoi = this._khiDoiQuyen = null
+                    this.dangHoiViTri = false
+                    xong(kq)
+                }
+                const han = setTimeout(() => ket('cho'), CHO_HOI_VI_TRI)
+                this._boQuaHoi = () => ket('bo_qua')
+                this._khiDoiQuyen = (st) => (st === 'granted' || st === 'denied') && ket(st)
+                navigator.geolocation.getCurrentPosition(
+                    (vt) => {
+                        this.quyenViTri = 'granted'
+                        this.ghiViTri(vt)
+                        this.batViTri()
+                        ket('granted')
+                    },
+                    (e) => {
+                        if (e?.code === 1) {
+                            this.quyenViTri = 'denied'
+                            this.viTri = { loi: 'chua_cho_phep' }
+                            ket('denied')
+                            return
+                        }
+                        // Đã cho phép, chỉ là chưa bắt được vị trí → đi tiếp, GPS bắt tiếp ở nền
+                        this.quyenViTri = 'granted'
+                        this.batViTri()
+                        ket('granted')
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+                )
+            })
+        },
+
+        boQuaHoi() {
+            this._boQuaHoi?.()
+        },
+
+        /** Vị trí bị chặn mà vẫn muốn chấm: quét luôn, máy chủ sẽ hỏi lý do. */
+        boQuaViTri() {
+            this._boQuaViTri = true
+            this.batDau(this.loai)
+        },
+
+        /** Bật GPS theo dõi liên tục (giữ bản chính xác nhất), tự tắt sau 5 phút. */
+        batViTri() {
+            this._daBatViTri = true
+            if (this._theoDoi != null || !navigator.geolocation || this.quyenViTri === 'denied') return
+            this._theoDoi = navigator.geolocation.watchPosition(
+                (vt) => this.ghiViTri(vt),
+                (e) => {
+                    if (e?.code === 1) {
+                        this.quyenViTri = 'denied'
+                        this.tatViTri()
+                        this.viTri = { loi: 'chua_cho_phep' }
+                    } else if (!this.viTri?.lat) this.viTri = { loi: e?.code === 2 ? 'khong_lay_duoc' : 'het_gio' }
+                    this.baoViTri()
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+            )
+            // Trong nhà GPS lâu chưa bắt được → hỏi thêm vị trí theo wifi / sóng điện thoại
+            this._duPhong = setTimeout(() => {
+                if (this._theoDoi != null && !this.viTri?.lat) {
+                    navigator.geolocation.getCurrentPosition((vt) => this.ghiViTri(vt), () => {}, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 })
+                }
+            }, 6000)
+            this._hetTheoDoi = setTimeout(() => this.tatViTri(), THEO_DOI_VI_TRI)
+        },
+
+        tatViTri() {
+            if (this._theoDoi != null) navigator.geolocation?.clearWatch(this._theoDoi)
+            this._theoDoi = null
+            clearTimeout(this._hetTheoDoi)
+            clearTimeout(this._duPhong)
+        },
+
+        ghiViTri(vt) {
+            const c = vt.coords
+            const moi = { lat: c.latitude, lng: c.longitude, accuracy: c.accuracy, luc: Date.now() }
+            const cu = this.viTri
+            // Giữ bản chính xác hơn, trừ khi bản cũ đã quá 30 giây
+            if (!cu?.lat || moi.accuracy <= cu.accuracy || moi.luc - cu.luc > 30000) this.viTri = moi
+            this.baoViTri()
+        },
+
+        baoViTri() {
+            this._choViTri.splice(0).forEach((f) => f())
+        },
+
+        /** Vị trí còn mới (≤ 2 phút) */
+        viTriMoi() {
+            return this.viTri?.lat && Date.now() - this.viTri.luc < VI_TRI_CU ? this.viTri : null
+        },
+
+        /** Chờ có vị trí mới / biết chắc không có (bị chặn), tối đa ms. */
+        choViTri(ms) {
+            const xongChua = () => this.viTriMoi() || this.quyenViTri === 'denied' || !navigator.geolocation
+            if (xongChua()) return Promise.resolve()
+
+            return new Promise((xong) => {
+                const han = setTimeout(xong, ms)
+                const thu = () => (xongChua() ? (clearTimeout(han), xong()) : this._choViTri.push(thu))
+                this._choViTri.push(thu)
+            })
+        },
+
+        /** Vì sao không gửi được vị trí — quản lý xem trong "Xem" */
+        lyDoKhongViTri() {
+            if (!navigator.geolocation || !window.isSecureContext) return 'khong_ho_tro'
+            if (this.quyenViTri === 'denied' || this.quyenViTri === 'prompt' || this.viTri?.loi === 'chua_cho_phep') return 'chua_cho_phep'
+
+            return this.viTri?.loi || 'het_gio'
         },
 
         /** Gửi máy chủ để chấm / đăng ký. */
@@ -574,15 +785,19 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             this.loi = ''
             try {
                 if (this.loai === 'dang_ky') {
-                    this.ketQua(await coHan(this.$wire.dangKyKhuonMat(this.dacTrung, this.anh, this.dongY), CHO_MAY_CHU))
+                    this.ketQua(await coHan(this.$wire.dangKyKhuonMat(this.dacTrung, this.anh, this.dongY, DIEN_THOAI ? 'dien_thoai' : 'may_tinh'), CHO_MAY_CHU))
                     return null
                 }
-                await Promise.race([this.hoiViTri, nghi(CHO_VI_TRI)])
+                await this.choViTri(CHO_VI_TRI)
+                const vt = this.viTriMoi()
                 const kq = await coHan(
                     this.$wire.chamCong(this.loai, {
-                        lat: this.viTri?.lat ?? null,
-                        lng: this.viTri?.lng ?? null,
-                        accuracy: this.viTri?.accuracy ?? null,
+                        lat: vt?.lat ?? null,
+                        lng: vt?.lng ?? null,
+                        accuracy: vt?.accuracy ?? null,
+                        vi_tri_loi: vt ? null : this.lyDoKhongViTri(),
+                        thiet_bi: DIEN_THOAI ? 'dien_thoai' : 'may_tinh',
+                        thoi_gian_quet: this.thoiGianQuet,
                         anh: this.anh,
                         descriptor: this.dacTrung,
                         ly_do: this.lyDo || null,
@@ -631,6 +846,11 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
                 return
             }
             this.buoc = 'xong'
+            if (this.loai !== 'dang_ky') {
+                // Chấm xong → tắt GPS cho đỡ tốn pin (bấm chấm lần sau sẽ bật lại)
+                this.tatViTri()
+                this._daBatViTri = false
+            }
             this.thongBao = kq.thong_bao
             this.canhBao = kq.canh_bao || []
         },
@@ -640,7 +860,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             if (!this.anh || this.dangGui) return
             this._chiKhiKhop = false
             this.daKhop = false
-            if (!this.hoiViTri) this.layViTri()
+            this.batViTri()
             await this.gui()
         },
 
@@ -663,6 +883,7 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
 
         datLai() {
             this._luot++
+            this._boQuaHoi?.() // đang chờ hộp hỏi vị trí → thôi chờ
             this.tatCamera()
             this.buoc = 'cho'
             this.pha = ''
@@ -678,6 +899,8 @@ export default function chamCong({ thuVien, moHinh, wasm }) {
             this.khongMoHinh = false
             this.moTaKhongNhan = ''
             this.tienDo = 0
+            this.thoiGianQuet = null
+            this._bamLuc = 0
             this._chiKhiKhop = true
             this._onDinh = 0
             this._truoc = null

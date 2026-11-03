@@ -8,7 +8,10 @@
         <strong>Ảnh đăng ký</strong>
         @if ($anhDangKy)
             <img src="{{ $anhDangKy }}" style="width:100%;border-radius:8px" alt="Ảnh đăng ký">
-            <span style="opacity:.7">Đồng ý lúc {{ $mat->consented_at?->format('H:i d/m/Y') }}</span>
+            <span style="opacity:.7">Đồng ý lúc {{ $mat->consented_at?->format('H:i d/m/Y') }}{{ $mat->device ? ' · đăng ký bằng '.mb_strtolower(\App\Models\Attendance::THIET_BI[$mat->device] ?? $mat->device) : '' }}</span>
+            @foreach ((array) $mat->extra_descriptors as $loaiMay => $mau)
+                <span style="opacity:.7">Đã lưu thêm mẫu mặt cho {{ mb_strtolower(\App\Models\Attendance::THIET_BI[$loaiMay] ?? $loaiMay) }}{{ ! empty($mau['at']) ? ' ('.\Illuminate\Support\Carbon::parse($mau['at'])->format('d/m/Y').')' : '' }}</span>
+            @endforeach
         @else
             <span style="opacity:.7">Chưa đăng ký</span>
         @endif
@@ -32,6 +35,15 @@
                     @if ($a->{"{$p}_distance"} !== null) — cách {{ $a->{"{$p}_distance"} }} m @endif
                     @if ($a->{"{$p}_accuracy"} !== null) <span style="opacity:.6">(sai số ±{{ $a->{"{$p}_accuracy"} }} m)</span> @endif
                 </span>
+                @if ($loiViTri = \App\Models\Attendance::VI_TRI_LOI[$a->{"{$p}_location_error"}] ?? null)
+                    <span style="color:#b45309">Vì sao: {{ $loiViTri }}</span>
+                @endif
+                @if ($mayQuet = collect([
+                        \App\Models\Attendance::THIET_BI[$a->{"{$p}_device"}] ?? null,
+                        $a->{"{$p}_scan_ms"} !== null ? 'quét '.number_format($a->{"{$p}_scan_ms"} / 1000, 1, ',', '.').' giây' : null,
+                    ])->filter()->implode(' · '))
+                    <span style="opacity:.75">{{ \Illuminate\Support\Str::ucfirst($mayQuet) }}</span>
+                @endif
                 @if ($ban = $a->linkBanDo($p))
                     <a href="{{ $ban }}" target="_blank" rel="noopener" style="text-decoration:underline">Mở bản đồ</a>
                 @endif

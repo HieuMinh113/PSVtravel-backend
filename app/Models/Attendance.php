@@ -31,6 +31,29 @@ class Attendance extends Model
         'khong_ro' => 'Không rõ vị trí',
     ];
 
+    /** Vì sao lượt chấm không có vị trí / vị trí không dùng được. */
+    public const VI_TRI_LOI = [
+        'chua_cho_phep' => 'trình duyệt chưa được cho phép lấy vị trí',
+        'het_gio' => 'chờ GPS quá lâu (trong nhà, sóng yếu)',
+        'khong_lay_duoc' => 'máy không lấy được vị trí (đang tắt Vị trí / GPS)',
+        'khong_ho_tro' => 'trình duyệt không hỗ trợ định vị',
+        'sai_so_lon' => 'vị trí sai số quá lớn (máy tính đoán vị trí qua mạng)',
+    ];
+
+    /** Bản ngắn cho bảng chấm công. */
+    public const VI_TRI_LOI_NGAN = [
+        'chua_cho_phep' => 'chưa cho phép',
+        'het_gio' => 'chờ GPS lâu',
+        'khong_lay_duoc' => 'tắt định vị',
+        'khong_ho_tro' => 'không hỗ trợ',
+        'sai_so_lon' => 'sai số lớn',
+    ];
+
+    public const THIET_BI = [
+        'dien_thoai' => 'Điện thoại',
+        'may_tinh' => 'Máy tính',
+    ];
+
     public const DUYET = [
         'cho_duyet' => 'Chờ duyệt',
         'chap_nhan' => 'Chấp nhận',
@@ -56,6 +79,8 @@ class Attendance extends Model
         'reviewed_at' => 'datetime',
         'late_minutes' => 'integer',
         'early_minutes' => 'integer',
+        'in_scan_ms' => 'integer',
+        'out_scan_ms' => 'integer',
     ];
 
     protected static function booted(): void

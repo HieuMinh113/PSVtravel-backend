@@ -38,11 +38,17 @@ class ChamCong
         }
         $moTa = self::docDacTrung($descriptor);
 
-        return $moTa !== null && self::soKhuonMat($moTa, $khuonMat->descriptor) < Attendance::NGUONG_KHUON_MAT;
+        return $moTa !== null && self::khoangGanNhat($moTa, $khuonMat) < Attendance::NGUONG_KHUON_MAT;
+    }
+
+    /** Độ lệch nhỏ nhất so với mẫu đăng ký và các mẫu thêm theo loại máy. */
+    public static function khoangGanNhat(array $moTa, AttendanceFace $khuonMat): float
+    {
+        return min(array_map(fn (array $mau) => self::soKhuonMat($moTa, $mau), $khuonMat->cacMau()));
     }
 
     /**
-     * @param  array{lat?: ?float, lng?: ?float, accuracy?: ?float, anh?: ?string, descriptor?: ?array, ly_do?: ?string, chi_khi_khop?: bool}  $d
+     * @param  array{lat?: ?float, lng?: ?float, accuracy?: ?float, anh?: ?string, descriptor?: ?array, ly_do?: ?string, chi_khi_khop?: bool, thiet_bi?: ?string, vi_tri_loi?: ?string, thoi_gian_quet?: ?int}  $d
      * @return array{ok: bool, khong_khop?: bool, can_ly_do?: bool, vi_sao?: list<string>, loi?: string, thong_bao?: string, canh_bao?: list<string>}
      */
     public function cham(User $u, string $loai, array $d, ?Carbon $luc = null): array
@@ -62,10 +68,11 @@ class ChamCong
             return ['ok' => false, 'loi' => 'Hôm nay bạn đã chấm vào lúc '.$hom->in_at->format('H:i').'.'];
         }
 
-        // Khuôn mặt: khoảng cách đặc trưng (null = trình duyệt không thấy mặt)
+        // Khuôn mặt: khoảng cách đặc trưng tới mẫu gần nhất (null = trình duyệt không thấy mặt)
         $moTa = self::docDacTrung($d['descriptor'] ?? null);
-        $khoang = $moTa ? self::soKhuonMat($moTa, $khuonMat->descriptor) : null;
+        $khoang = $moTa ? self::khoangGanNhat($moTa, $khuonMat) : null;
         $khop = $khoang === null ? null : $khoang < Attendance::NGUONG_KHUON_MAT;
+        $thietBi = array_key_exists((string) ($d['thiet_bi'] ?? ''), Attendance::THIET_BI) ? $d['thiet_bi'] : null;
 
         // Quét tự động: chỉ chấm khi khuôn mặt khớp. Chưa khớp thì không lưu gì,
         // trình duyệt quét tiếp. Không trả khoảng cách — khỏi dò dẫm từng số.
@@ -78,8 +85,10 @@ class ChamCong
             return ['ok' => false, 'loi' => 'Không nhận được ảnh chụp. Cho phép trình duyệt dùng camera rồi thử lại.'];
         }
 
-        // Vị trí
+        // Vị trí + vì sao không có / không dùng được (để quản lý biết, khỏi đoán)
         [$viTri, $cach, $doChinhXac] = self::viTri($d['lat'] ?? null, $d['lng'] ?? null, $d['accuracy'] ?? null);
+        $viTriLoi = self::viTriLoi($d, $viTri);
+        $giay = is_numeric($d['thoi_gian_quet'] ?? null) ? max(0, min(3_600_000, (int) $d['thoi_gian_quet'])) : null;
 
         // Cần lý do? Trễ / về sớm → lý do phải được quản lý duyệt. Đúng giờ mà
         // ngoài công ty / không rõ vị trí → chỉ ghi lý do, KHÔNG cần duyệt.
@@ -98,14 +107,16 @@ class ChamCong
         if ($viTri === 'ngoai') {
             $viSao[] = 'Bạn đang cách công ty '.self::met($cach);
         } elseif ($viTri === 'khong_ro') {
-            $viSao[] = $d['lat'] ?? null ? 'Vị trí không chính xác (sai số '.self::met($doChinhXac).')' : 'Không lấy được vị trí';
+            $viSao[] = $viTriLoi === 'sai_so_lon'
+                ? 'Vị trí không chính xác (sai số '.self::met($doChinhXac).')'
+                : 'Không lấy được vị trí'.($viTriLoi ? ' — '.Attendance::VI_TRI_LOI[$viTriLoi] : '');
         }
         $lyDo = trim((string) ($d['ly_do'] ?? ''));
         if ($viSao && mb_strlen($lyDo) < 3) {
             return ['ok' => false, 'can_ly_do' => true, 'vi_sao' => $viSao];
         }
 
-        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo, $canDuyet) {
+        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $viTriLoi, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo, $canDuyet, $thietBi, $giay, $moTa, $khuonMat) {
             $cu = $hom->{"{$p}_photo"};
             $hom->forceFill([
                 "{$p}_at" => $luc,
@@ -119,12 +130,18 @@ class ChamCong
                 "{$p}_face_distance" => $khoang,
                 "{$p}_face_ok" => $khop,
                 "{$p}_reason" => $lyDo !== '' ? mb_substr($lyDo, 0, 1000) : null,
+                "{$p}_device" => $thietBi,
+                "{$p}_location_error" => $viTriLoi,
+                "{$p}_scan_ms" => $giay,
             ]);
             if ($canDuyet) {
                 $hom->forceFill(['review_status' => 'cho_duyet', 'reviewed_by' => null, 'reviewed_at' => null]);
             }
             $hom->save();
             $cu && Storage::disk(Attendance::DIA)->delete($cu); // chấm ra lại → bỏ ảnh cũ
+            if ($khop) {
+                $this->luuMauTheoMay($khuonMat, $moTa, $thietBi, $luc);
+            }
         });
 
         $canhBao = [];
@@ -145,8 +162,37 @@ class ChamCong
         ];
     }
 
+    /**
+     * Khớp lần đầu trên một loại máy khác lúc đăng ký (VD đăng ký bằng điện thoại,
+     * nay quét webcam máy tính) → lưu thêm mẫu này, lần sau so nhanh / ổn định hơn.
+     * Chỉ lưu khi khớp với CHÍNH mẫu đăng ký (không nối mẫu thêm vào mẫu thêm), mỗi
+     * loại máy một mẫu. Quản lý "Cho đăng ký lại" thì mẫu thêm mất theo.
+     */
+    private function luuMauTheoMay(AttendanceFace $khuonMat, array $moTa, ?string $thietBi, Carbon $luc): void
+    {
+        $them = (array) $khuonMat->extra_descriptors;
+        if (! $thietBi || $thietBi === $khuonMat->device || isset($them[$thietBi])
+            || self::soKhuonMat($moTa, $khuonMat->descriptor) >= Attendance::NGUONG_KHUON_MAT) {
+            return;
+        }
+        $them[$thietBi] = ['descriptor' => $moTa, 'at' => $luc->toIso8601String()];
+        $khuonMat->forceFill(['extra_descriptors' => $them])->save();
+    }
+
+    /** Vì sao không có vị trí: trình duyệt báo (chưa cho phép / chờ lâu…), hoặc sai số quá lớn. */
+    private static function viTriLoi(array $d, ?string $viTri): ?string
+    {
+        if (is_numeric($d['lat'] ?? null) && is_numeric($d['lng'] ?? null)) {
+            return $viTri === 'khong_ro' ? 'sai_so_lon' : null;
+        }
+        $ma = (string) ($d['vi_tri_loi'] ?? '');
+
+        // Trình duyệt không nói (trang cũ còn lưu tạm) / mã lạ → để trống, không đoán
+        return $ma !== 'sai_so_lon' && array_key_exists($ma, Attendance::VI_TRI_LOI) ? $ma : null;
+    }
+
     /** Lần đầu: nhân viên đồng ý + chụp khuôn mặt mẫu. */
-    public function dangKy(User $u, ?array $descriptor, ?string $anhDataUrl): AttendanceFace
+    public function dangKy(User $u, ?array $descriptor, ?string $anhDataUrl, ?string $thietBi = null): AttendanceFace
     {
         if (AttendanceFace::where('user_id', $u->id)->exists()) {
             throw new InvalidArgumentException('Bạn đã đăng ký khuôn mặt. Muốn đăng ký lại, nhờ quản lý mở lại.');
@@ -162,6 +208,7 @@ class ChamCong
             'descriptor' => $moTa,
             'photo' => $this->luuAnh($anh, $u, now(), 'dang-ky'),
             'consented_at' => now(),
+            'device' => array_key_exists((string) $thietBi, Attendance::THIET_BI) ? $thietBi : null,
         ]);
     }
 

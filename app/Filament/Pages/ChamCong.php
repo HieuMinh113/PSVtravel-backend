@@ -89,13 +89,13 @@ class ChamCong extends Page implements HasTable
     }
 
     /** Gọi từ trình duyệt (Alpine): đăng ký khuôn mặt lần đầu. */
-    public function dangKyKhuonMat($descriptor, $anh, $dongY): array
+    public function dangKyKhuonMat($descriptor, $anh, $dongY, $thietBi = null): array
     {
         if (! $dongY) {
             return ['ok' => false, 'loi' => 'Bạn cần đồng ý cho công ty dùng ảnh khuôn mặt để chấm công.'];
         }
         try {
-            app(DichVuChamCong::class)->dangKy(auth()->user(), is_array($descriptor) ? $descriptor : null, is_string($anh) ? $anh : null);
+            app(DichVuChamCong::class)->dangKy(auth()->user(), is_array($descriptor) ? $descriptor : null, is_string($anh) ? $anh : null, self::thietBi($thietBi));
         } catch (InvalidArgumentException $e) {
             return ['ok' => false, 'loi' => $e->getMessage()];
         }
@@ -145,6 +145,7 @@ class ChamCong extends Page implements HasTable
             return ['ok' => false] + $this->quaNhieuLan($khoa);
         }
 
+        $duLieu['thiet_bi'] = self::thietBi($duLieu['thiet_bi'] ?? null);
         $kq = app(DichVuChamCong::class)->cham(auth()->user(), $loai, $duLieu);
         if (! empty($kq['khong_khop'])) {
             RateLimiter::hit($khoa, 600);
@@ -152,6 +153,16 @@ class ChamCong extends Page implements HasTable
         }
 
         return $kq;
+    }
+
+    /** Điện thoại / máy tính: trình duyệt tự báo (nhận ra cả iPad), không có thì đoán theo User-Agent. */
+    public static function thietBi($tuTrinhDuyet): string
+    {
+        if (is_string($tuTrinhDuyet) && array_key_exists($tuTrinhDuyet, Attendance::THIET_BI)) {
+            return $tuTrinhDuyet;
+        }
+
+        return preg_match('/Mobi|Android|iPhone|iPad|iPod/i', (string) request()->userAgent()) ? 'dien_thoai' : 'may_tinh';
     }
 
     /** @return array{qua_nhieu: true, loi: string} */

@@ -92,7 +92,8 @@ class HuongDan extends Page
                         'o_dau' => 'Chấm công',
                         'buoc' => [
                             'Lần đầu: đọc và đồng ý điều khoản, rồi đăng ký khuôn mặt theo hướng dẫn trên màn hình.',
-                            'Mỗi lần vào / ra: mở **Chấm công**, cho phép trình duyệt dùng camera và vị trí, quét khuôn mặt.',
+                            'Mỗi lần vào / ra: mở **Chấm công**, bấm **Cho phép vị trí** (trình duyệt hỏi thì chọn Cho phép), rồi bấm Chấm công vào / ra, cho phép camera và đưa mặt vào khung.',
+                            'Thấy "Trình duyệt đang chặn vị trí": làm theo hướng dẫn hiện ngay dưới nút (iPhone / Android / máy tính) rồi tải lại trang.',
                             'Trễ, về sớm hoặc đang ở ngoài công ty: hệ thống hỏi lý do — ghi ngắn gọn để được duyệt.',
                             'Quên chấm: bấm **Xin bổ sung công**, chọn ngày, giờ thực tế và lý do.',
                         ],
@@ -465,6 +466,7 @@ class HuongDan extends Page
                         'buoc' => [
                             '**Cấu hình chấm công**: toạ độ công ty, bán kính, giờ vào / ra, số phút được trễ.',
                             '**Khuôn mặt nhân viên**: xoá khuôn mặt đã đăng ký khi nhân viên cần đăng ký lại.',
+                            'Bảng chấm công → **Xem**: "Vì sao" cho biết lý do không có vị trí (chưa cho phép, chờ GPS lâu, sai số lớn…), kèm loại máy (điện thoại / máy tính) và thời gian quét.',
                         ],
                     ],
                     [

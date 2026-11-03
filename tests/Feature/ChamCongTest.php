@@ -6,6 +6,7 @@ use App\Filament\Pages\BangCongThang;
 use App\Filament\Pages\CauHinhChamCong;
 use App\Filament\Pages\ChamCong;
 use App\Filament\Resources\AttendanceFaces\Pages\ListAttendanceFaces;
+use App\Filament\Resources\Attendances\BangChamCongCot;
 use App\Filament\Resources\Attendances\Pages\ListAttendances;
 use App\Models\Attendance;
 use App\Models\AttendanceFace;
@@ -15,6 +16,7 @@ use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Modules\Page\Models\Setting;
@@ -311,6 +313,132 @@ class ChamCongTest extends TestCase
         $this->assertStringEndsWith('/vendor/face-api/wasm/', $d['wasm']); // máy không có card đồ hoạ chạy WebAssembly
         $this->assertFileExists(public_path('vendor/face-api/wasm/tfjs-backend-wasm.wasm'));
         $this->assertFileExists(public_path('vendor/face-api/wasm/tfjs-backend-wasm-simd.wasm'));
+    }
+
+    /** Cùng người, lệch mỗi số một chút (camera khác) — 0,04 → độ lệch ≈ 0,45. */
+    private function matLech(float $d): array
+    {
+        return array_map(fn ($v) => round($v + $d, 6), $this->mat);
+    }
+
+    public function test_may_tinh_khop_lan_dau_luu_them_mau_lan_sau_so_voi_mau_gan_nhat(): void
+    {
+        $u = $this->nhanVien();
+        app(DichVu::class)->dangKy($u, $this->mat, $this->anh(), 'dien_thoai');
+        $dv = app(DichVu::class);
+        $f = AttendanceFace::where('user_id', $u->id)->sole();
+        $this->assertSame('dien_thoai', $f->device);
+        $this->assertFalse($dv->khopKhuonMat($u, $this->matLech(0.055))); // webcam lệch 0,62: chưa khớp
+
+        // Webcam khớp lần đầu (0,45 < 0,55) → lưu thêm mẫu máy tính
+        $kq = $this->cham($u, 'vao', ['descriptor' => $this->matLech(0.04), 'thiet_bi' => 'may_tinh', 'chi_khi_khop' => true]);
+        $this->assertTrue($kq['ok'], json_encode($kq));
+        $f->refresh();
+        $this->assertSame(['may_tinh'], array_keys($f->extra_descriptors));
+        $this->assertSame($this->matLech(0.04), $f->extra_descriptors['may_tinh']['descriptor']);
+        $this->assertArrayNotHasKey('extra_descriptors', $f->toArray()); // không lộ ra ngoài
+        $a = Attendance::sole();
+        $this->assertSame('may_tinh', $a->in_device);
+        $this->assertEqualsWithDelta(0.453, $a->in_face_distance, 0.002);
+
+        // Lần sau: so với mẫu gần nhất → webcam lệch 0,62 so với ảnh đăng ký vẫn khớp
+        $this->assertTrue($dv->khopKhuonMat($u, $this->matLech(0.055)));
+        $this->assertFalse($dv->khopKhuonMat($u, $this->matLech(-0.08)));
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $this->assertTrue($this->cham($u, 'ra', ['descriptor' => $this->matLech(0.055), 'thiet_bi' => 'may_tinh', 'chi_khi_khop' => true])['ok']);
+        $this->assertTrue(Attendance::sole()->out_face_ok);
+        $this->assertSame($this->matLech(0.04), $f->refresh()->extra_descriptors['may_tinh']['descriptor']); // mỗi loại máy một mẫu
+
+        // Không nối mẫu: khớp nhờ mẫu thêm (lệch 0,62 so với ảnh đăng ký) thì KHÔNG lưu mẫu cho loại máy khác
+        $f->forceFill(['device' => null])->save();
+        $this->assertTrue($this->cham($u, 'ra', ['descriptor' => $this->matLech(0.055), 'thiet_bi' => 'dien_thoai'])['ok']);
+        $this->assertSame(['may_tinh'], array_keys($f->refresh()->extra_descriptors));
+
+        // Không khớp (gửi quản lý duyệt) thì không lưu mẫu
+        $ha = $this->nhanVien('Hà');
+        $this->dangKy($ha);
+        $this->assertTrue($this->cham($ha, 'vao', ['descriptor' => $this->matKhac(), 'thiet_bi' => 'may_tinh', 'ly_do' => 'Kẹt xe'])['ok']);
+        $this->assertNull(AttendanceFace::where('user_id', $ha->id)->sole()->extra_descriptors);
+
+        $chiTiet = view('filament.cham-cong.chi-tiet', ['a' => Attendance::where('user_id', $u->id)->sole()])->render();
+        $this->assertStringContainsString('Đã lưu thêm mẫu mặt cho máy tính', $chiTiet);
+    }
+
+    public function test_ghi_vi_sao_khong_co_vi_tri_loai_may_va_thoi_gian_quet(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $khongViTri = ['lat' => null, 'lng' => null, 'accuracy' => null, 'vi_tri_loi' => 'chua_cho_phep', 'thiet_bi' => 'dien_thoai', 'thoi_gian_quet' => 3240];
+
+        // Không có vị trí → hỏi lý do, nói rõ vì sao
+        $kq = $this->cham($u, 'vao', $khongViTri);
+        $this->assertTrue($kq['can_ly_do']);
+        $this->assertSame(['Không lấy được vị trí — trình duyệt chưa được cho phép lấy vị trí'], $kq['vi_sao']);
+        $this->assertTrue($this->cham($u, 'vao', [...$khongViTri, 'ly_do' => 'Điện thoại chặn vị trí'])['ok']);
+        $a = Attendance::sole();
+        $this->assertSame('khong_ro', $a->in_location);
+        $this->assertSame('chua_cho_phep', $a->in_location_error);
+        $this->assertSame('dien_thoai', $a->in_device);
+        $this->assertSame(3240, $a->in_scan_ms);
+
+        $chiTiet = view('filament.cham-cong.chi-tiet', ['a' => $a])->render();
+        $this->assertStringContainsString('Vì sao: trình duyệt chưa được cho phép lấy vị trí', $chiTiet);
+        $this->assertStringContainsString('Điện thoại · quét 3,2 giây', $chiTiet);
+        $this->assertSame('Không rõ vị trí (chưa cho phép)', BangChamCongCot::moTa($a, 'in'));
+
+        // Mã lạ / không có toạ độ mà tự nhận "sai số lớn" → để trống, không đoán
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        foreach (['khong_lay_duoc' => 'khong_lay_duoc', 'xyz' => null, 'sai_so_lon' => null] as $ma => $ghi) {
+            $this->cham($u, 'ra', ['lat' => null, 'lng' => null, 'vi_tri_loi' => $ma, 'ly_do' => 'Không rõ']);
+            $this->assertSame($ghi, Attendance::sole()->out_location_error);
+        }
+
+        // Máy tính đoán vị trí qua mạng: xa 5 km, sai số 3 km → không rõ, vì sai số lớn
+        $kq = $this->cham($u, 'ra', ['lat' => self::LAT + 0.05, 'accuracy' => 3000, 'vi_tri_loi' => 'het_gio']);
+        $this->assertSame(['Vị trí không chính xác (sai số 3,0 km)'], $kq['vi_sao']);
+        $this->cham($u, 'ra', ['lat' => self::LAT + 0.05, 'accuracy' => 3000, 'ly_do' => 'Wifi công ty']);
+        $this->assertSame('sai_so_lon', Attendance::sole()->out_location_error);
+
+        // Ở công ty → không có lý do; thời gian quét rác thì bỏ
+        $this->cham($u, 'ra', ['thoi_gian_quet' => 'abc']);
+        $a = Attendance::sole();
+        $this->assertSame('trong', $a->out_location);
+        $this->assertNull($a->out_location_error);
+        $this->assertNull($a->out_scan_ms);
+
+        // Trình duyệt không báo loại máy → đoán theo User-Agent
+        $this->actingAs($u);
+        $trang = Livewire::test(ChamCong::class)->instance();
+        $trang->chamCong('ra', ['lat' => self::LAT, 'lng' => self::LNG, 'anh' => $this->anh(), 'descriptor' => $this->mat, 'thiet_bi' => 'tivi']);
+        $this->assertSame('may_tinh', Attendance::sole()->out_device);
+        request()->headers->set('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148');
+        $this->assertSame('dien_thoai', ChamCong::thietBi(null));
+        $this->assertSame('may_tinh', ChamCong::thietBi('may_tinh'));
+    }
+
+    public function test_trang_cham_cong_hoi_vi_tri_truoc_khi_mo_camera(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->actingAs($u);
+        Livewire::test(ChamCong::class)
+            ->assertSee('Bật vị trí trước khi chấm công')
+            ->assertSee('Trình duyệt đang chặn vị trí')
+            ->assertSee('Bước 1/2 — Cho phép vị trí')
+            ->assertSee('canViTri: true', false);
+
+        // Chưa đặt toạ độ công ty → không xét vị trí, không hỏi trước
+        Setting::where('key', 'cham_cong_lat')->delete();
+        Cache::flush();
+        Livewire::test(ChamCong::class)
+            ->assertDontSee('Bật vị trí trước khi chấm công')
+            ->assertSee('canViTri: false', false);
+
+        // Đăng ký lần đầu ghi loại máy
+        $ha = $this->nhanVien('Hà');
+        $this->actingAs($ha);
+        $this->assertTrue(Livewire::test(ChamCong::class)->instance()->dangKyKhuonMat($this->mat, $this->anh(), true, 'may_tinh')['ok']);
+        $this->assertSame('may_tinh', AttendanceFace::where('user_id', $ha->id)->sole()->device);
     }
 
     public function test_thu_7_nua_ngay_chu_nhat_khong_tinh_tre(): void
