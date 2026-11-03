@@ -22,9 +22,15 @@ class GuideApiController extends Controller
             $query->where('category', $cat);
         }
 
-        $guides = $query->orderByDesc('published_at')
+        // Mới nhất lên đầu; bài chưa có ngày (nếu còn) xếp cuối — PostgreSQL mặc
+        // định đưa ô trống lên ĐẦU khi xếp giảm dần. id: thứ tự cố định giữa các
+        // bài cùng ngày. Trang /cam-nang lấy hết (tối đa 200) để không sót bài —
+        // trước đây tối đa 30, có 55 bài thì 25 bài không hiện.
+        $guides = $query->orderByRaw('CASE WHEN published_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('published_at')
             ->orderBy('sort_order')
-            ->paginate(min((int) $request->query('per_page', 9), 30));
+            ->orderByDesc('id')
+            ->paginate(max(1, min((int) $request->query('per_page', 9), 200)));
 
         return GuideListResource::collection($guides);
     }

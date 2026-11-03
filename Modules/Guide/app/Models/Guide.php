@@ -47,6 +47,15 @@ class Guide extends Model
 
     protected static function booted(): void
     {
+        // Form ghi "Để trống thì đăng ngay khi chuyển sang Đã đăng" — trước đây
+        // không ai điền thật, bài đăng nào cũng thiếu ngày: web xếp lộn xộn, nhãn
+        // "Mới nhất" sai, thẻ bài không có ngày (55 bài thiếu ngày ngày 03/11/2026)
+        static::saving(function (self $g) {
+            if ($g->status === 'published' && ! $g->published_at) {
+                $g->published_at = now();
+            }
+        });
+
         // Đổi đường dẫn bài đã đăng → link cũ tự chuyển sang link mới (301)
         static::updated(function (self $g) {
             if ($g->wasChanged('slug') && $g->getOriginal('status') === 'published') {
