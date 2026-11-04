@@ -70,6 +70,12 @@ class CamNangDanhSachTest extends TestCase
 
         $this->assertCount(9, $this->getJson('/api/v1/guides')->json('data')); // mặc định không đổi
         $this->assertSame(36, $this->getJson('/api/v1/guides?per_page=5000')->json('meta.total'));
+
+        // Lượt xem: website không thấy (danh sách, bài, lúc ghi nhận), admin vẫn có số
+        $this->assertArrayNotHasKey('view_count', $ds[0]);
+        $this->assertArrayNotHasKey('view_count', $this->getJson('/api/v1/guides/bai-35')->assertOk()->json('data'));
+        $this->postJson('/api/v1/guides/bai-35/view')->assertOk()->assertExactJson(['ok' => true]);
+        $this->assertSame(1, Guide::where('slug', 'bai-35')->value('view_count'));
         $this->assertCount(36, $this->getJson('/api/v1/guides?per_page=5000')->json('data'));
     }
 }

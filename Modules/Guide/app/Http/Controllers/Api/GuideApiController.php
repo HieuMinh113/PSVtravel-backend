@@ -72,7 +72,7 @@ class GuideApiController extends Controller
         if ($cachNhauPhut < 1) {
             $guide->increment('view_count');
 
-            return response()->json(['view_count' => $guide->view_count]);
+            return response()->json(['ok' => true]); // không trả số lượt xem — chỉ admin xem
         }
 
         $khoa = 'luot-xem:'.$guide->id.':'.sha1((string) $request->ip());
@@ -81,7 +81,7 @@ class GuideApiController extends Controller
             $guide->increment('view_count');
         }
 
-        return response()->json(['view_count' => $guide->view_count]);
+        return response()->json(['ok' => true]); // không trả số lượt xem — chỉ admin xem
     }
 
     // GET /api/v1/guides-sitemap — MỌI bài đang hiển thị cho sitemap.xml (danh sách

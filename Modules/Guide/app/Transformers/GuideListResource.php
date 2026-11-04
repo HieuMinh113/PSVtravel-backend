@@ -18,7 +18,7 @@ class GuideListResource extends JsonResource
             'category' => $this->category,
             'author_name' => TacGiaResource::tomTat($this->relationLoaded('tacGia') ? $this->tacGia : null)['name']
                 ?? ($this->relationLoaded('author') ? $this->author?->name : null),
-            'view_count' => $this->view_count,
+            // Lượt xem chỉ hiện trong admin, không trả ra website
             'published_at' => $this->published_at?->format('Y-m-d'),
         ];
     }

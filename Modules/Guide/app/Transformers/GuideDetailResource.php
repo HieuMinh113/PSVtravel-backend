@@ -28,7 +28,7 @@ class GuideDetailResource extends JsonResource
             'author' => $this->whenLoaded('tacGia', fn () => TacGiaResource::tomTat($this->tacGia)),
             'author_name' => TacGiaResource::tomTat($this->relationLoaded('tacGia') ? $this->tacGia : null)['name']
                 ?? ($this->relationLoaded('author') ? $this->author?->name : null),
-            'view_count' => $this->view_count,
+            // Lượt xem chỉ hiện trong admin, không trả ra website
             'published_at' => $this->published_at?->format('Y-m-d'),
             // Ưu tiên "Tiêu đề SEO" nhân viên tự viết; trống thì dùng tiêu đề bài
             'meta_title' => $this->seo_title ?: $this->title,
