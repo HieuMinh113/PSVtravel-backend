@@ -90,18 +90,23 @@ class ChamCong
         $viTriLoi = self::viTriLoi($d, $viTri);
         $giay = is_numeric($d['thoi_gian_quet'] ?? null) ? max(0, min(3_600_000, (int) $d['thoi_gian_quet'])) : null;
 
-        // Cần lý do? Trễ / về sớm → lý do phải được quản lý duyệt. Đúng giờ mà
+        // Cần lý do? Trễ quá số phút phải ghi lý do / về sớm → lý do phải được
+        // quản lý duyệt. Trễ ít hơn thì vẫn tính phút trễ, không hỏi. Đúng giờ mà
         // ngoài công ty / không rõ vị trí → chỉ ghi lý do, KHÔNG cần duyệt.
+        // Tính theo phút như giờ hiển thị (08:31:45 là 08:31).
         $viSao = [];
         $canDuyet = false;
         $lich = CauHinhChamCong::lichNgay($luc->copy()->startOfDay());
-        $choPhep = CauHinhChamCong::phutChoPhep();
-        if ($lich && $p === 'in' && $luc->gt($lich[0]->copy()->addMinutes($choPhep))) {
-            $viSao[] = 'Đi trễ '.self::phut((int) $lich[0]->diffInMinutes($luc)).' (giờ vào '.$lich[0]->format('H:i').')';
+        $tre = $lich && $p === 'in' ? CauHinhChamCong::phutTre($luc, $lich[0]) : 0;
+        $som = $lich && $p === 'out' ? CauHinhChamCong::phutSom($luc, $lich[1]) : 0;
+        if ($tre > CauHinhChamCong::phutCanLyDo()) {
+            $viSao[] = 'Đi trễ '.self::phut($tre).' (giờ vào '.$lich[0]->format('H:i').')';
             $canDuyet = true;
         }
-        if ($lich && $p === 'out' && $luc->lt($lich[1]->copy()->subMinutes($choPhep))) {
-            $viSao[] = 'Về sớm '.self::phut((int) $luc->diffInMinutes($lich[1])).' (giờ ra '.$lich[1]->format('H:i').')';
+        if ($som > 0) {
+            // Về sớm: lý do chưa được chấp nhận thì ngày này chỉ được nửa công
+            $viSao[] = 'Về sớm '.self::phut($som).' (giờ ra '.$lich[1]->format('H:i').') — quản lý chưa duyệt lý do thì ngày này tính '
+                .($luc->isSaturday() ? '0,25' : '0,5').' công';
             $canDuyet = true;
         }
         if ($viTri === 'ngoai') {
@@ -155,6 +160,7 @@ class ChamCong
             'ok' => true,
             'thong_bao' => ($p === 'in' ? 'Đã chấm vào' : 'Đã chấm ra').' lúc '.$luc->format('H:i').match (true) {
                 $canDuyet => ' — lý do đã gửi quản lý duyệt.',
+                $tre > 0 => ' — trễ '.self::phut($tre).'.',
                 $lyDo !== '' => ' — đã ghi lý do.',
                 default => '.',
             },
@@ -257,8 +263,11 @@ class ChamCong
             return [null, null, $saiSo]; // chưa đặt toạ độ công ty → không xét
         }
         $cach = CauHinhChamCong::khoangCach((float) $lat, (float) $lng, $congTy[0], $congTy[1]);
+        $banKinh = CauHinhChamCong::banKinh();
         $loai = match (true) {
-            $cach <= CauHinhChamCong::banKinh() => 'trong',
+            // Điểm rơi trong bán kính nhưng sai số còn lớn hơn bán kính (GPS trong
+            // nhà lệch) → không dám nói là ở công ty, hỏi lý do
+            $cach <= $banKinh => $saiSo !== null && $saiSo > $banKinh ? 'khong_ro' : 'trong',
             $saiSo !== null && $saiSo > 500 => 'khong_ro', // máy tính đoán vị trí qua mạng, lệch xa
             default => 'ngoai',
         };

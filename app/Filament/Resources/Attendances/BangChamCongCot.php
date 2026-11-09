@@ -19,7 +19,14 @@ class BangChamCongCot
             TextColumn::make('work_date')
                 ->label('Ngày')
                 ->date('d/m/Y')
-                ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].($r->cong() ? ' · '.str_replace('.', ',', (string) $r->cong()).' công' : ''))
+                // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T7 · 0,25 công (thiếu giờ ra)"
+                ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].(($c = $r->cong())
+                    ? ' · '.str_replace('.', ',', (string) $c).' công'.match ($r->nuaCong()) {
+                        've_som' => ' (về sớm)',
+                        'thieu_ra' => ' (thiếu giờ ra)',
+                        default => '',
+                    }
+                    : ''))
                 ->sortable(),
         ];
         if ($quanLy) {

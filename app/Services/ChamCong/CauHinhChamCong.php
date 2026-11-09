@@ -44,9 +44,47 @@ class CauHinhChamCong
         return max(20, (int) self::lay('cham_cong_ban_kinh'));
     }
 
+    /** Trễ / về sớm trong số phút này thì không tính (ô "Không tính trễ / về sớm trong"). */
     public static function phutChoPhep(): int
     {
         return max(0, (int) self::lay('cham_cong_phut_tre'));
+    }
+
+    /**
+     * Đi trễ quá số phút này mới phải ghi lý do và chờ duyệt. Trễ ít hơn vẫn
+     * được tính phút trễ, chỉ không hỏi lý do. Ô để trống / nhỏ hơn số phút
+     * không tính → trễ là phải ghi lý do (như trước khi có ô này).
+     */
+    public static function phutCanLyDo(): int
+    {
+        $v = Setting::lay('cham_cong_phut_ly_do');
+
+        return max(self::phutChoPhep(), is_numeric($v) ? (int) $v : 0);
+    }
+
+    /**
+     * Số phút đi trễ so với giờ vào — tính theo PHÚT như giờ hiển thị (08:31:45
+     * là 08:31), bỏ qua giây. Trong số phút không tính → 0.
+     */
+    public static function phutTre(Carbon $luc, Carbon $gioVao): int
+    {
+        $phut = self::soPhut($gioVao, $luc);
+
+        return $phut > self::phutChoPhep() ? $phut : 0;
+    }
+
+    /** Số phút về sớm so với giờ ra, theo phút như trên. Trong số phút không tính → 0. */
+    public static function phutSom(Carbon $luc, Carbon $gioRa): int
+    {
+        $phut = self::soPhut($luc, $gioRa);
+
+        return $phut > self::phutChoPhep() ? $phut : 0;
+    }
+
+    /** Số phút từ $tu đến $den, cả hai làm tròn xuống đầu phút (âm = $den sớm hơn). */
+    private static function soPhut(Carbon $tu, Carbon $den): int
+    {
+        return intdiv($den->copy()->startOfMinute()->getTimestamp() - $tu->copy()->startOfMinute()->getTimestamp(), 60);
     }
 
     /**

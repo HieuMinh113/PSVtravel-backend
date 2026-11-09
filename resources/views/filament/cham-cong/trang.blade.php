@@ -27,7 +27,7 @@
         </x-slot>
         <x-slot name="description">
             @if ($lich)
-                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }}
+                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }} · Về trước {{ $lich[1]->format('H:i') }} hoặc quên chấm ra: tính nửa công (trừ khi quản lý chấp nhận lý do)
             @else
                 Chủ nhật — ngày nghỉ
             @endif

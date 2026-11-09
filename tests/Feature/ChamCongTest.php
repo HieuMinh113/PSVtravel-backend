@@ -524,7 +524,7 @@ class ChamCongTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-14 09:00'));
         $trang = Livewire::test(BangCongThang::class)->assertOk()->assertCanSeeTableRecords([$lan]);
         $so = BangCongThang::cong(Attendance::where('user_id', $lan->id)->get());
-        $this->assertSame(2.0, $so['cong']);
+        $this->assertSame(1.5, $so['cong']); // 13/10 quên chấm ra → nửa công
         $this->assertSame(1, $so['tre_lan']);
         $this->assertSame(30, $so['tre_phut']);
         $this->assertSame(1, $so['tre_co_phep']);
@@ -552,6 +552,197 @@ class ChamCongTest extends TestCase
         $this->assertSame('10.7412345', Setting::lay('cham_cong_lat'));
         $this->assertSame('200', Setting::lay('cham_cong_ban_kinh'));
         $this->assertSame('08:30', Setting::lay('cham_cong_vao'));
+
+        Livewire::test(CauHinhChamCong::class)
+            ->assertSet('data.cham_cong_phut_ly_do', null)
+            ->set('data.cham_cong_phut_tre', '0')
+            ->set('data.cham_cong_phut_ly_do', '5')
+            ->call('luu')
+            ->assertHasNoErrors();
+        $this->assertSame(0, \App\Services\ChamCong\CauHinhChamCong::phutChoPhep());
+        $this->assertSame(5, \App\Services\ChamCong\CauHinhChamCong::phutCanLyDo());
+    }
+
+    private function cauHinh(array $gt): void
+    {
+        foreach ($gt as $k => $v) {
+            Setting::updateOrCreate(['key' => "cham_cong_{$k}"], ['value' => $v, 'group' => 'cham_cong', 'label' => $k]);
+        }
+    }
+
+    public function test_tinh_tre_theo_phut_bo_qua_giay(): void
+    {
+        $this->cauHinh(['vao' => '08:30', 'phut_tre' => '0']);
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+
+        // 08:30:45 vẫn là 08:30 → đúng giờ (trước đây: "Đi trễ 0 phút", bắt ghi lý do)
+        $this->travelTo(Carbon::parse('2026-10-12 08:30:45'));
+        $kq = $this->cham($u, 'vao');
+        $this->assertTrue($kq['ok']);
+        $this->assertSame(0, Attendance::sole()->late_minutes);
+        Attendance::query()->delete();
+
+        // 08:31:10 → trễ 1 phút, chưa đặt ô "phải ghi lý do" → hỏi lý do như cũ
+        $this->travelTo(Carbon::parse('2026-10-12 08:31:10'));
+        $this->assertSame(['Đi trễ 1 phút (giờ vào 08:30)'], $this->cham($u, 'vao')['vi_sao']);
+
+        // Không tính trễ trong 1 phút: 08:31:59 vẫn đúng giờ, 08:32 trễ 2 phút (tính từ 08:30)
+        $this->cauHinh(['phut_tre' => '1']);
+        $this->travelTo(Carbon::parse('2026-10-12 08:31:59'));
+        $this->assertTrue($this->cham($u, 'vao')['ok']);
+        $this->assertSame(0, Attendance::sole()->late_minutes);
+        Attendance::query()->delete();
+        $this->travelTo(Carbon::parse('2026-10-12 08:32:05'));
+        $this->assertSame(['Đi trễ 2 phút (giờ vào 08:30)'], $this->cham($u, 'vao')['vi_sao']);
+    }
+
+    public function test_tre_it_van_tinh_phut_nhung_khong_hoi_ly_do(): void
+    {
+        $this->cauHinh(['vao' => '08:30', 'phut_tre' => '0', 'phut_ly_do' => '5']);
+        $lan = $this->nhanVien('Lan');
+        $vy = $this->nhanVien('Vy');
+        $an = $this->nhanVien('An');
+        foreach ([$lan, $vy, $an] as $u) {
+            $this->dangKy($u);
+        }
+
+        // 08:31 → trễ 1 phút, không phải ghi lý do, không chờ duyệt
+        $this->travelTo(Carbon::parse('2026-10-12 08:31:30'));
+        $kq = $this->cham($lan, 'vao');
+        $this->assertTrue($kq['ok']);
+        $this->assertStringContainsString('trễ 1 phút', $kq['thong_bao']);
+        $a = Attendance::where('user_id', $lan->id)->sole();
+        $this->assertSame(1, $a->late_minutes);
+        $this->assertNull($a->review_status);
+
+        // Đúng 5 phút vẫn chưa phải ghi lý do; 6 phút thì phải ghi và chờ duyệt
+        $this->travelTo(Carbon::parse('2026-10-12 08:35:20'));
+        $this->assertTrue($this->cham($vy, 'vao')['ok']);
+        $this->assertSame(5, Attendance::where('user_id', $vy->id)->sole()->late_minutes);
+        $this->travelTo(Carbon::parse('2026-10-12 08:36:00'));
+        $this->assertSame(['Đi trễ 6 phút (giờ vào 08:30)'], $this->cham($an, 'vao')['vi_sao']);
+        $this->assertTrue($this->cham($an, 'vao', ['ly_do' => 'Kẹt xe'])['ok']);
+        $a = Attendance::where('user_id', $an->id)->sole();
+        $this->assertSame(6, $a->late_minutes);
+        $this->assertSame('cho_duyet', $a->review_status);
+
+        // Bảng công tháng đếm cả trễ ít
+        $this->assertSame(12, BangCongThang::cong(Attendance::all())['tre_phut']);
+    }
+
+    public function test_phut_tre_chot_luc_cham_doi_cau_hinh_khong_doi_dong_cu(): void
+    {
+        $this->cauHinh(['vao' => '08:30', 'phut_tre' => '5']);
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->travelTo(Carbon::parse('2026-10-12 08:33'));
+        $this->cham($u, 'vao');
+
+        // Quản lý đổi "không tính trễ" còn 0 phút, nhân viên chấm ra / được duyệt sau đó
+        $this->cauHinh(['phut_tre' => '0']);
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $this->cham($u, 'ra');
+        $a = Attendance::sole();
+        $this->assertSame(0, $a->late_minutes);
+        app(DichVu::class)->duyet($a, true, null, $this->quanLy());
+        $this->assertSame(0, $a->fresh()->late_minutes);
+
+        // Sửa giờ vào của dòng → tính lại theo cấu hình hiện tại
+        $a->forceFill(['in_at' => Carbon::parse('2026-10-12 08:34')])->save();
+        $this->assertSame(4, $a->fresh()->late_minutes);
+    }
+
+    public function test_sai_so_gps_lon_hon_ban_kinh_la_khong_ro_vi_tri(): void
+    {
+        $this->cauHinh(['ban_kinh' => '50']);
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+
+        // Điểm GPS cách 33 m (trong 50 m) nhưng sai số ±80 m → không dám nói là ở công ty
+        $kq = $this->cham($u, 'vao', ['accuracy' => 80]);
+        $this->assertSame(['Vị trí không chính xác (sai số 80 m)'], $kq['vi_sao']);
+        $this->assertTrue($this->cham($u, 'vao', ['accuracy' => 80, 'ly_do' => 'Ngồi trong phòng họp'])['ok']);
+        $a = Attendance::sole();
+        $this->assertSame('khong_ro', $a->in_location);
+        $this->assertSame('sai_so_lon', $a->in_location_error);
+        $this->assertNull($a->review_status); // đúng giờ → chỉ ghi lý do, không chờ duyệt
+
+        // Sai số nhỏ hơn bán kính → trong công ty như cũ
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $this->assertTrue($this->cham($u, 'ra', ['accuracy' => 20])['ok']);
+        $this->assertSame('trong', $a->fresh()->out_location);
+    }
+
+    public function test_ve_som_hoac_quen_cham_ra_tinh_nua_cong(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $ql = $this->quanLy();
+        $dv = app(DichVu::class);
+        $ngay = fn (string $d) => Attendance::whereDate('work_date', $d)->sole();
+
+        // T2 12/10: về 16:00 → nửa công, báo trước cho nhân viên; quản lý chấp nhận → đủ công
+        $this->travelTo(Carbon::parse('2026-10-12 07:55'));
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-12 16:00'));
+        $this->assertStringContainsString('tính 0,5 công', $this->cham($u, 'ra')['vi_sao'][0]);
+        $this->cham($u, 'ra', ['ly_do' => 'Đi khám bệnh']);
+        $a = $ngay('2026-10-12');
+        $this->assertSame(0.5, $a->cong());
+        $this->assertSame('ve_som', $a->nuaCong());
+        $this->assertStringContainsString('0,5 công (về sớm)', (string) $this->moTaNgay($a));
+        $dv->duyet($a, false, 'Không đủ giấy tờ', $ql);
+        $this->assertSame(0.5, $a->fresh()->cong());
+        $dv->duyet($a, true, null, $ql);
+        $this->assertSame(1.0, $a->fresh()->cong());
+
+        // T3 13/10: về 17:26 (trong 5 phút không tính) → đủ công
+        $this->travelTo(Carbon::parse('2026-10-13 07:58'));
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-13 17:26'));
+        $this->assertTrue($this->cham($u, 'ra')['ok']);
+        $this->assertSame(1.0, $ngay('2026-10-13')->cong());
+
+        // T4 14/10: chưa chấm ra — trong ngày vẫn tạm tính đủ, qua ngày thành nửa công
+        $this->travelTo(Carbon::parse('2026-10-14 07:58'));
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-14 15:00'));
+        $this->assertSame(1.0, $ngay('2026-10-14')->cong());
+        $this->travelTo(Carbon::parse('2026-10-15 09:00'));
+        $this->assertSame(0.5, $ngay('2026-10-14')->cong());
+        $this->assertSame('thieu_ra', $ngay('2026-10-14')->nuaCong());
+        // Xin bổ sung giờ ra: chờ duyệt vẫn nửa công, duyệt rồi đủ công
+        $dv->boSung($u, Carbon::parse('2026-10-14'), 'ra', '17:40', 'Quên chấm ra');
+        $this->assertSame(0.5, $ngay('2026-10-14')->cong());
+        $dv->duyet($ngay('2026-10-14'), true, null, $ql);
+        $this->assertSame(1.0, $ngay('2026-10-14')->cong());
+
+        // T7 17/10: về 11:00 (giờ ra 12:00) → 0,25 công
+        $this->travelTo(Carbon::parse('2026-10-17 07:55'));
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-17 11:00'));
+        $this->assertStringContainsString('tính 0,25 công', $this->cham($u, 'ra')['vi_sao'][0]);
+        $this->cham($u, 'ra', ['ly_do' => 'Việc nhà']);
+        $this->assertSame(0.25, $ngay('2026-10-17')->cong());
+
+        // T2 19/10: lỡ bấm ra sớm, cuối giờ chấm ra lại → đủ công
+        $this->travelTo(Carbon::parse('2026-10-19 07:55'));
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-19 15:00'));
+        $this->cham($u, 'ra', ['ly_do' => 'Bấm nhầm']);
+        $this->assertSame(0.5, $ngay('2026-10-19')->cong());
+        $this->travelTo(Carbon::parse('2026-10-19 17:35'));
+        $this->assertTrue($this->cham($u, 'ra')['ok']);
+        $this->assertSame(1.0, $ngay('2026-10-19')->cong());
+    }
+
+    /** Dòng mô tả dưới cột Ngày của bảng chấm công: "T2 · 0,5 công (về sớm)". */
+    private function moTaNgay(Attendance $a): ?string
+    {
+        $cot = BangChamCongCot::cot(false)[0];
+
+        return $cot->record($a)->getDescriptionBelow();
     }
 
     public function test_xoa_anh_cham_cong_sau_3_thang(): void

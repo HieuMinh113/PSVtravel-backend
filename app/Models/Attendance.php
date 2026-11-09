@@ -85,7 +85,13 @@ class Attendance extends Model
 
     protected static function booted(): void
     {
-        static::saving(fn (Attendance $a) => $a->tinhPhut());
+        // Chốt phút trễ / về sớm lúc chấm (theo cấu hình lúc đó): chỉ tính lại phần
+        // giờ vào / ra vừa đổi. Lưu dòng vì việc khác (chấm ra, duyệt…) hoặc đổi
+        // cấu hình sau đó không làm đổi phần đã chốt.
+        static::saving(fn (Attendance $a) => $a->tinhPhut(
+            ! $a->exists || $a->isDirty('in_at') || $a->isDirty('work_date'),
+            ! $a->exists || $a->isDirty('out_at') || $a->isDirty('work_date'),
+        ));
     }
 
     /**
@@ -98,22 +104,18 @@ class Attendance extends Model
             ?? new static(['user_id' => $userId, 'work_date' => $ngay->toDateString()]);
     }
 
-    /** Phút trễ / về sớm so với giờ làm của ngày đó (chủ nhật không tính). */
-    public function tinhPhut(): void
+    /**
+     * Phút trễ / về sớm so với giờ làm của ngày đó (chủ nhật không tính), tính
+     * theo phút như giờ hiển thị. $vao / $ra: tính lại phần nào.
+     */
+    public function tinhPhut(bool $vao = true, bool $ra = true): void
     {
-        $lich = CauHinhChamCong::lichNgay($this->work_date);
-        $choPhep = CauHinhChamCong::phutChoPhep();
-        $this->late_minutes = 0;
-        $this->early_minutes = 0;
-        if (! $lich) {
-            return;
+        $lich = $this->work_date ? CauHinhChamCong::lichNgay($this->work_date) : null;
+        if ($vao) {
+            $this->late_minutes = $lich && $this->in_at ? min(65535, CauHinhChamCong::phutTre($this->in_at, $lich[0])) : 0;
         }
-        [$vao, $ra] = $lich;
-        if ($this->in_at && $this->in_at->gt($vao->copy()->addMinutes($choPhep))) {
-            $this->late_minutes = min(65535, (int) $vao->diffInMinutes($this->in_at));
-        }
-        if ($this->out_at && $this->out_at->lt($ra->copy()->subMinutes($choPhep))) {
-            $this->early_minutes = min(65535, (int) $this->out_at->diffInMinutes($ra));
+        if ($ra) {
+            $this->early_minutes = $lich && $this->out_at ? min(65535, CauHinhChamCong::phutSom($this->out_at, $lich[1])) : 0;
         }
     }
 
@@ -127,18 +129,38 @@ class Attendance extends Model
         return $this->{"{$p}_source"} !== 'bo_sung' || $this->review_status === 'chap_nhan';
     }
 
-    /** 1 công ngày thường, 0,5 công thứ 7, 0 chủ nhật / không chấm. */
+    /**
+     * 1 công ngày thường, 0,5 công thứ 7, 0 chủ nhật / không chấm. Chỉ được
+     * nửa số đó (0,5 ngày thường, 0,25 thứ 7) khi:
+     * - về sớm (quá số phút không tính) mà lý do chưa được quản lý chấp nhận;
+     * - quên chấm ra (ngày đã qua) và chưa có giờ ra bổ sung được duyệt —
+     *   không thì cứ không chấm ra là khỏi bị tính về sớm.
+     */
     public function cong(): float
     {
         if (! $this->tinhPhan('in') && ! $this->tinhPhan('out')) {
             return 0;
         }
-
-        return match ($this->work_date->dayOfWeek) {
-            Carbon::SUNDAY => 0,
+        $du = match ($this->work_date->dayOfWeek) {
+            Carbon::SUNDAY => 0.0,
             Carbon::SATURDAY => 0.5,
-            default => 1,
+            default => 1.0,
         };
+        if ($du > 0 && $this->nuaCong()) {
+            return $du / 2;
+        }
+
+        return $du;
+    }
+
+    /** Vì sao ngày này chỉ được nửa công: 've_som' | 'thieu_ra' | null (đủ công). */
+    public function nuaCong(): ?string
+    {
+        if ($this->tinhPhan('out')) {
+            return $this->early_minutes > 0 && ! $this->coPhep() ? 've_som' : null;
+        }
+
+        return $this->work_date->lt(today()) ? 'thieu_ra' : null; // hôm nay: chưa tới lúc về
     }
 
     /** Khuôn mặt không khớp, hoặc không thấy mặt trong ảnh. */
