@@ -105,9 +105,10 @@ class BangCongThang extends Page implements HasTable
         ];
     }
 
+    /** 3 → "3", 3,5 → "3,5", 2,25 → "2,25" (thứ 7 về sớm / quên chấm được 0,25 công). */
     public static function so(float $v): string
     {
-        return rtrim(rtrim(number_format($v, 1, ',', '.'), '0'), ',');
+        return rtrim(rtrim(number_format($v, 2, ',', '.'), '0'), ',');
     }
 
     private function soLieuNguoi(int $id): array

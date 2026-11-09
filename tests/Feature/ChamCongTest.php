@@ -778,8 +778,12 @@ class ChamCongTest extends TestCase
         $this->assertStringContainsString('0,25 công', $this->cham($u, 'ra')['canh_bao'][0]);
         $this->assertSame(0.25, $ngay('2026-10-17')->cong());
 
-        // Bảng công tháng đếm số ngày thiếu chấm vào
-        $this->assertSame(1, BangCongThang::cong(Attendance::all())['thieu_vao']);
+        // Bảng công tháng đếm số ngày thiếu chấm vào; ngày công hiện đủ 2 số lẻ
+        $so = BangCongThang::cong(Attendance::all());
+        $this->assertSame(1, $so['thieu_vao']);
+        $this->assertSame('1,75', BangCongThang::so($so['cong'])); // 1 + 0,5 + 0,25
+        $this->assertSame('3,5', BangCongThang::so(3.5));
+        $this->assertSame('3', BangCongThang::so(3.0));
     }
 
     /** Dòng mô tả dưới cột Ngày của bảng chấm công: "T2 · 0,5 công (về sớm)". */
