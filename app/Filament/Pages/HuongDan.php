@@ -220,6 +220,18 @@ class HuongDan extends Page
                         'luu_y' => 'Mỗi clip / bài mới tạo một link mới. Không tự sửa phần đuôi "?utm_…" của link. Rút gọn link (bit.ly…) vẫn được.',
                     ],
                     [
+                        'tieu_de' => 'Sửa trang giới thiệu Team Building',
+                        'o_dau' => 'Nội dung website → Trang team building',
+                        'buoc' => [
+                            '**Đầu trang**: ảnh lớn của một đoàn thật, tiêu đề, mô tả ngắn, link video YouTube (có video thì có nút "Xem video").',
+                            '**Vì sao doanh nghiệp chọn PSV**: một ảnh + vài đoạn giới thiệu (xuống dòng để tách đoạn).',
+                            '**Số liệu**: chỉ ghi số thật, VD "120+ / đoàn doanh nghiệp mỗi năm". Để trống thì web dùng số đã công bố.',
+                            '**Loại hình chương trình**, **Khoảnh khắc thật** (kéo thả nhiều ảnh cùng lúc), **Khách hàng đã đồng hành** (logo, bật / tắt từng logo).',
+                            'Bấm **Lưu**, khoảng 1 phút sau web cập nhật. Bấm **Xem trang trên website** để kiểm tra.',
+                        ],
+                        'luu_y' => 'Ô để trống thì web dùng chữ mặc định; khối không có ảnh / logo thì tự ẩn. Chỉ đăng logo khi khách đồng ý. Gói, đánh giá, hỏi đáp vẫn sửa ở Gói team building, Đánh giá gói, Câu hỏi thường gặp.',
+                    ],
+                    [
                         'tieu_de' => 'Bài / clip nào ra đơn',
                         'o_dau' => 'Marketing → Nguồn khách',
                         'buoc' => [

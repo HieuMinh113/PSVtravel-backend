@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\SeasonPageController;
 use App\Http\Controllers\Api\SubscriberController;
 use App\Http\Controllers\Api\TacGiaController;
 use App\Http\Controllers\Api\TeamMemberController;
+use App\Http\Controllers\Api\TrangTeamBuildingController;
 use App\Http\Controllers\Api\VoucherController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +82,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('destinations/{slug}', [DestinationController::class, 'show']);
     Route::get('link-cu', LinkCuController::class);
     Route::get('link-cu/doi-duong-dan', [LinkCuController::class, 'doiDuongDan']);
+    Route::get('team-building-page', TrangTeamBuildingController::class);
     Route::get('season-pages', [SeasonPageController::class, 'index']);
     Route::get('season-pages/{slug}', [SeasonPageController::class, 'show']);
     Route::get('faqs', [FaqController::class, 'index']);
