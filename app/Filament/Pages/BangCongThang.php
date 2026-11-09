@@ -60,7 +60,7 @@ class BangCongThang extends Page implements HasTable
     public const COT = [
         'cong' => 'Ngày công', 'tre_lan' => 'Đi trễ (lần)', 'tre_phut' => 'Đi trễ (phút)', 'tre_co_phep' => 'Trễ có phép',
         'som_lan' => 'Về sớm (lần)', 'som_phut' => 'Về sớm (phút)', 'ngoai' => 'Ngoài công ty', 'nghi_van' => 'Nghi vấn',
-        'thieu_ra' => 'Thiếu chấm ra', 'cho_duyet' => 'Chờ duyệt',
+        'thieu_vao' => 'Thiếu chấm vào', 'thieu_ra' => 'Thiếu chấm ra', 'cho_duyet' => 'Chờ duyệt',
     ];
 
     /** Nhân viên = tài khoản vào được trang quản trị (vai trò có quyền). */
@@ -99,6 +99,7 @@ class BangCongThang extends Page implements HasTable
             'som_phut' => (int) $ds->sum('early_minutes'),
             'ngoai' => $ds->filter(fn ($a) => $a->ngoaiCongTy())->count(),
             'nghi_van' => $ds->filter(fn ($a) => $a->nghiVan())->count(),
+            'thieu_vao' => $ds->filter(fn ($a) => $a->out_at && ! $a->in_at)->count(),
             'thieu_ra' => $ds->filter(fn ($a) => $a->in_at && ! $a->out_at && $daQua($a))->count(),
             'cho_duyet' => $ds->where('review_status', 'cho_duyet')->count(),
         ];
@@ -129,7 +130,7 @@ class BangCongThang extends Page implements HasTable
                 ->label($nhan)
                 ->alignEnd()
                 ->state(fn (User $u) => $khoa === 'cong' ? self::so($this->soLieuNguoi($u->id)[$khoa]) : $this->soLieuNguoi($u->id)[$khoa])
-                ->color(fn ($state) => in_array($khoa, ['nghi_van', 'ngoai', 'thieu_ra', 'cho_duyet', 'tre_lan', 'som_lan'], true) && (int) $state > 0 ? 'warning' : null);
+                ->color(fn ($state) => in_array($khoa, ['nghi_van', 'ngoai', 'thieu_vao', 'thieu_ra', 'cho_duyet', 'tre_lan', 'som_lan'], true) && (int) $state > 0 ? 'warning' : null);
         }
 
         return $table

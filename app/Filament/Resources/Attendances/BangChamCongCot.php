@@ -19,9 +19,10 @@ class BangChamCongCot
             TextColumn::make('work_date')
                 ->label('Ngày')
                 ->date('d/m/Y')
-                // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T7 · 0,25 công (thiếu giờ ra)"
+                // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T7 · 0,25 công (thiếu giờ vào)"
                 ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].(($c = $r->cong())
                     ? ' · '.str_replace('.', ',', (string) $c).' công'.match ($r->nuaCong()) {
+                        'thieu_vao' => ' (thiếu giờ vào)',
                         've_som' => ' (về sớm)',
                         'thieu_ra' => ' (thiếu giờ ra)',
                         default => '',

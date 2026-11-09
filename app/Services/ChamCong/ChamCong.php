@@ -150,6 +150,11 @@ class ChamCong
         });
 
         $canhBao = [];
+        if ($p === 'out' && ! $hom->in_at) {
+            // Quên chấm vào: báo ngay để kịp xin bổ sung, khỏi tới cuối tháng mới biết
+            $canhBao[] = 'Hôm nay bạn chưa chấm vào — ngày này chỉ tính '.($luc->isSaturday() ? '0,25' : '0,5')
+                .' công. Bấm "Xin bổ sung công" để bổ sung giờ vào cho quản lý duyệt.';
+        }
         if ($khop === false) {
             $canhBao[] = 'Khuôn mặt chưa khớp với ảnh đăng ký — quản lý sẽ xem lại.';
         } elseif ($khop === null) {

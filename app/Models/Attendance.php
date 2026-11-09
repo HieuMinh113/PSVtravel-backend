@@ -132,6 +132,8 @@ class Attendance extends Model
     /**
      * 1 công ngày thường, 0,5 công thứ 7, 0 chủ nhật / không chấm. Chỉ được
      * nửa số đó (0,5 ngày thường, 0,25 thứ 7) khi:
+     * - quên chấm vào (chỉ có giờ ra) và chưa có giờ vào bổ sung được duyệt —
+     *   không thì cứ bỏ chấm vào là khỏi bị tính đi trễ;
      * - về sớm (quá số phút không tính) mà lý do chưa được quản lý chấp nhận;
      * - quên chấm ra (ngày đã qua) và chưa có giờ ra bổ sung được duyệt —
      *   không thì cứ không chấm ra là khỏi bị tính về sớm.
@@ -153,14 +155,18 @@ class Attendance extends Model
         return $du;
     }
 
-    /** Vì sao ngày này chỉ được nửa công: 've_som' | 'thieu_ra' | null (đủ công). */
+    /** Vì sao ngày này chỉ được nửa công: 'thieu_vao' | 've_som' | 'thieu_ra' | null (đủ công). */
     public function nuaCong(): ?string
     {
-        if ($this->tinhPhan('out')) {
-            return $this->early_minutes > 0 && ! $this->coPhep() ? 've_som' : null;
-        }
+        $vao = $this->tinhPhan('in');
+        $ra = $this->tinhPhan('out');
 
-        return $this->work_date->lt(today()) ? 'thieu_ra' : null; // hôm nay: chưa tới lúc về
+        return match (true) {
+            ! $vao && ! $ra => null, // không chấm gì: 0 công chứ không phải nửa công
+            ! $vao => 'thieu_vao',
+            $ra => $this->early_minutes > 0 && ! $this->coPhep() ? 've_som' : null,
+            default => $this->work_date->lt(today()) ? 'thieu_ra' : null, // hôm nay: chưa tới lúc về
+        };
     }
 
     /** Khuôn mặt không khớp, hoặc không thấy mặt trong ảnh. */

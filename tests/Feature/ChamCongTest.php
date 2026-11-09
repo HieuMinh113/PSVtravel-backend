@@ -737,6 +737,51 @@ class ChamCongTest extends TestCase
         $this->assertSame(1.0, $ngay('2026-10-19')->cong());
     }
 
+    public function test_quen_cham_vao_tinh_nua_cong(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $ql = $this->quanLy();
+        $dv = app(DichVu::class);
+        $ngay = fn (string $d) => Attendance::whereDate('work_date', $d)->sole();
+
+        // T2 12/10: không chấm vào, chỉ chấm ra → báo ngay lúc chấm ra, nửa công
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $kq = $this->cham($u, 'ra');
+        $this->assertTrue($kq['ok']);
+        $this->assertStringContainsString('chưa chấm vào', $kq['canh_bao'][0]);
+        $this->assertStringContainsString('0,5 công', $kq['canh_bao'][0]);
+        $a = $ngay('2026-10-12');
+        $this->assertSame(0.5, $a->cong());
+        $this->assertSame('thieu_vao', $a->nuaCong());
+        $this->assertStringContainsString('0,5 công (thiếu giờ vào)', (string) $this->moTaNgay($a));
+
+        // Quản lý chấp nhận lý do khác trong ngày không bù được giờ vào
+        $dv->duyet($a, true, null, $ql);
+        $this->assertSame(0.5, $a->fresh()->cong());
+
+        // Xin bổ sung giờ vào: chờ duyệt vẫn nửa công, duyệt rồi đủ công; trễ tính theo giờ khai
+        $dv->boSung($u, Carbon::parse('2026-10-12'), 'vao', '08:20', 'Quên chấm vào');
+        $this->assertSame(0.5, $ngay('2026-10-12')->cong());
+        $dv->duyet($ngay('2026-10-12'), true, null, $ql);
+        $this->assertSame(1.0, $ngay('2026-10-12')->cong());
+        $this->assertSame(20, $ngay('2026-10-12')->late_minutes);
+
+        // Đã xin bổ sung giờ vào (đang chờ duyệt) rồi mới chấm ra → không nhắc lại
+        $this->travelTo(Carbon::parse('2026-10-13 10:00'));
+        $dv->boSung($u, Carbon::parse('2026-10-13'), 'vao', '07:58', 'Điện thoại hết pin');
+        $this->travelTo(Carbon::parse('2026-10-13 17:35'));
+        $this->assertSame([], $this->cham($u, 'ra')['canh_bao']);
+
+        // T7 17/10: chỉ chấm ra → 0,25 công
+        $this->travelTo(Carbon::parse('2026-10-17 12:05'));
+        $this->assertStringContainsString('0,25 công', $this->cham($u, 'ra')['canh_bao'][0]);
+        $this->assertSame(0.25, $ngay('2026-10-17')->cong());
+
+        // Bảng công tháng đếm số ngày thiếu chấm vào
+        $this->assertSame(1, BangCongThang::cong(Attendance::all())['thieu_vao']);
+    }
+
     /** Dòng mô tả dưới cột Ngày của bảng chấm công: "T2 · 0,5 công (về sớm)". */
     private function moTaNgay(Attendance $a): ?string
     {
