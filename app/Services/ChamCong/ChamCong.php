@@ -116,7 +116,7 @@ class ChamCong
         // lượt này phải được quản lý chấp nhận mới tính công. Sai số lớn (GPS
         // yếu trong toà nhà) thì chỉ ghi lý do như trước.
         $ngoaiCanDuyet = $viTri === 'ngoai' || ($viTri === 'khong_ro' && $viTriLoi !== 'sai_so_lon');
-        $phaiDuyet = ' — chấm ở ngoài công ty phải được quản lý duyệt mới tính công'
+        $phaiDuyet = ' — chấm ở ngoài công ty phải được quản lý duyệt mới tính công, không duyệt thì cả ngày 0 công'
             .($p === 'in' ? '. Sắp tới công ty thì bấm Huỷ, tới nơi chấm lại' : '');
         if ($viTri === 'ngoai') {
             $viSao[] = 'Bạn đang cách công ty '.self::met($cach).$phaiDuyet;

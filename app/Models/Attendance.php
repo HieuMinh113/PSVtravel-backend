@@ -159,8 +159,9 @@ class Attendance extends Model
     }
 
     /**
-     * 1 công ngày thường, 0,5 công thứ 7, 0 chủ nhật / không chấm. Chỉ được
-     * nửa số đó (0,5 ngày thường, 0,25 thứ 7) khi:
+     * 1 công ngày thường, 0,5 công thứ 7, 0 chủ nhật / không chấm / có lượt chấm
+     * ở ngoài công ty chưa được chấp nhận. Chỉ được nửa số đó (0,5 ngày thường,
+     * 0,25 thứ 7) khi:
      * - quên chấm vào (chỉ có giờ ra) và chưa có giờ vào bổ sung được duyệt —
      *   không thì cứ bỏ chấm vào là khỏi bị tính đi trễ;
      * - về sớm (quá số phút không tính) mà lý do chưa được quản lý chấp nhận;
@@ -169,7 +170,7 @@ class Attendance extends Model
      */
     public function cong(): float
     {
-        if (! $this->tinhPhan('in') && ! $this->tinhPhan('out')) {
+        if ($this->chamNgoaiChuaDuyet() || (! $this->tinhPhan('in') && ! $this->tinhPhan('out'))) {
             return 0;
         }
         $du = match ($this->work_date->dayOfWeek) {
@@ -185,9 +186,17 @@ class Attendance extends Model
     }
 
     /**
-     * Vì sao ngày này chỉ được nửa công: 'vao_ngoai' | 'thieu_vao' | 'ra_ngoai' |
-     * 've_som' | 'thieu_ra' | null (đủ công).
+     * Có lượt chấm vào / ra ở ngoài công ty (hoặc không lấy được vị trí) mà quản
+     * lý chưa chấp nhận → CẢ NGÀY không tính công, kể cả lượt kia chấm ở công ty.
+     * Chấm vào lại / ra lại ở công ty thì cờ của lượt đó mất, ngày tính bình thường.
      */
+    public function chamNgoaiChuaDuyet(): bool
+    {
+        return $this->review_status !== 'chap_nhan'
+            && (($this->in_at && $this->in_requires_approval) || ($this->out_at && $this->out_requires_approval));
+    }
+
+    /** Vì sao ngày này chỉ được nửa công: 'thieu_vao' | 've_som' | 'thieu_ra' | null (đủ công). */
     public function nuaCong(): ?string
     {
         $vao = $this->tinhPhan('in');
@@ -195,9 +204,8 @@ class Attendance extends Model
 
         return match (true) {
             ! $vao && ! $ra => null, // không phần nào được tính: 0 công chứ không phải nửa công
-            ! $vao => $this->in_at && $this->in_requires_approval ? 'vao_ngoai' : 'thieu_vao',
+            ! $vao => 'thieu_vao',
             $ra => $this->early_minutes > 0 && ! $this->coPhep() ? 've_som' : null,
-            $this->out_at && $this->out_requires_approval => 'ra_ngoai',
             default => $this->work_date->lt(today()) ? 'thieu_ra' : null, // hôm nay: chưa tới lúc về
         };
     }

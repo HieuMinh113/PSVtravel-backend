@@ -19,17 +19,18 @@ class BangChamCongCot
             TextColumn::make('work_date')
                 ->label('Ngày')
                 ->date('d/m/Y')
-                // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T7 · 0,25 công (thiếu giờ vào)"
-                ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].(($c = $r->cong())
-                    ? ' · '.str_replace('.', ',', (string) $c).' công'.match ($r->nuaCong()) {
-                        'vao_ngoai' => ' (vào ở ngoài, chưa duyệt)',
+                // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T3 · 0 công (chấm ở ngoài, chờ duyệt)"
+                ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].match (true) {
+                    $r->chamNgoaiChuaDuyet() && ! $r->work_date->isSunday() => ' · 0 công (chấm ở ngoài, '
+                        .($r->review_status === 'tu_choi' ? 'không chấp nhận' : 'chờ duyệt').')',
+                    ($c = $r->cong()) > 0 => ' · '.str_replace('.', ',', (string) $c).' công'.match ($r->nuaCong()) {
                         'thieu_vao' => ' (thiếu giờ vào)',
-                        'ra_ngoai' => ' (ra ở ngoài, chưa duyệt)',
                         've_som' => ' (về sớm)',
                         'thieu_ra' => ' (thiếu giờ ra)',
                         default => '',
-                    }
-                    : ''))
+                    },
+                    default => '',
+                })
                 ->sortable(),
         ];
         if ($quanLy) {

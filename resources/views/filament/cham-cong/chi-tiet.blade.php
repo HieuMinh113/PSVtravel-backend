@@ -39,7 +39,7 @@
                     <span style="color:#b45309">Vì sao: {{ $loiViTri }}</span>
                 @endif
                 @if ($a->{"{$p}_requires_approval"} && $a->review_status !== 'chap_nhan')
-                    <span style="color:#b45309">Chấm ở ngoài công ty — chỉ tính công khi bạn chấp nhận</span>
+                    <span style="color:#b45309">Chấm ở ngoài công ty — chưa chấp nhận thì cả ngày 0 công</span>
                 @endif
                 @if ($mayQuet = collect([
                         \App\Models\Attendance::THIET_BI[$a->{"{$p}_device"}] ?? null,

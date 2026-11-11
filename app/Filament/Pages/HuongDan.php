@@ -95,7 +95,7 @@ class HuongDan extends Page
                             'Mỗi lần vào / ra: mở **Chấm công**, bấm **Cho phép vị trí** (trình duyệt hỏi thì chọn Cho phép), rồi bấm Chấm công vào / ra, cho phép camera và đưa mặt vào khung.',
                             'Thấy "Trình duyệt đang chặn vị trí": làm theo hướng dẫn hiện ngay dưới nút (iPhone / Android / máy tính) rồi tải lại trang.',
                             'Trễ quá số phút công ty quy định, về sớm hoặc đang ở ngoài công ty: hệ thống hỏi lý do — ghi ngắn gọn để được duyệt.',
-                            '**Chấm ở ngoài công ty** (hoặc không cho phép vị trí) chỉ được tính công khi quản lý duyệt. Lỡ chấm vào ở ngoài thì tới công ty bấm **Chấm vào lại tại công ty** — giờ vào lấy theo lúc chấm lại.',
+                            '**Chấm ở ngoài công ty** (hoặc không cho phép vị trí) phải được quản lý duyệt — không duyệt thì **cả ngày 0 công**. Lỡ chấm vào ở ngoài thì tới công ty bấm **Chấm vào lại tại công ty** — giờ vào lấy theo lúc chấm lại.',
                             '**Về sớm, quên chấm vào hoặc quên chấm ra** thì ngày đó chỉ tính **nửa công** (0,5 ngày thường, 0,25 thứ 7), trừ khi quản lý chấp nhận lý do về sớm hoặc duyệt giờ bổ sung. Lỡ bấm ra sớm thì cuối giờ chấm ra lại.',
                             'Quên chấm: bấm **Xin bổ sung công**, chọn ngày, giờ thực tế và lý do.',
                         ],

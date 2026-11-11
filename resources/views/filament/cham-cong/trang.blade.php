@@ -29,7 +29,7 @@
         </x-slot>
         <x-slot name="description">
             @if ($lich)
-                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }} · Về trước {{ $lich[1]->format('H:i') }}, quên chấm hoặc chấm ở ngoài công ty: tính nửa công (trừ khi quản lý duyệt)
+                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }} · Về trước {{ $lich[1]->format('H:i') }} hoặc quên chấm: tính nửa công · Chấm ở ngoài công ty: quản lý không duyệt thì 0 công
             @else
                 Chủ nhật — ngày nghỉ
             @endif
@@ -93,7 +93,7 @@
                 <div style="font-size:.85rem;opacity:.7">Bấm rồi đưa mặt vào khung — máy tự nhận ra bạn và chấm công, không cần chụp.</div>
                 @if ($vaoLai)
                     <div style="font-size:.9rem;color:#b45309">
-                        Bạn đã chấm vào lúc {{ $homNay->in_at->format('H:i') }} ở ngoài công ty — lượt này chỉ được tính khi quản lý duyệt.
+                        Bạn đã chấm vào lúc {{ $homNay->in_at->format('H:i') }} ở ngoài công ty — quản lý không duyệt thì cả ngày hôm nay 0 công.
                         Tới công ty bấm <b>Chấm vào lại tại công ty</b> để được tính ngay (giờ vào lấy theo lúc chấm lại).
                     </div>
                 @endif
