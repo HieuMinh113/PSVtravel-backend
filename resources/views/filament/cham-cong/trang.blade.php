@@ -1,6 +1,8 @@
 @php
     $thu = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     $daVao = $homNay?->in_at && $homNay->in_source === 'cham';
+    // Đã chấm vào ở ngoài công ty, chưa được duyệt → tới công ty chấm vào lại
+    $vaoLai = $daVao && $homNay->duocChamVaoLai();
     $daRa = $homNay?->out_at && $homNay->out_source === 'cham';
 @endphp
 
@@ -27,7 +29,7 @@
         </x-slot>
         <x-slot name="description">
             @if ($lich)
-                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }} · Về trước {{ $lich[1]->format('H:i') }}, quên chấm vào hoặc quên chấm ra: tính nửa công (trừ khi quản lý duyệt)
+                Giờ làm {{ $lich[0]->format('H:i') }} – {{ $lich[1]->format('H:i') }} · Về trước {{ $lich[1]->format('H:i') }}, quên chấm hoặc chấm ở ngoài công ty: tính nửa công (trừ khi quản lý duyệt)
             @else
                 Chủ nhật — ngày nghỉ
             @endif
@@ -80,8 +82,8 @@
             <div x-show="buoc === 'cho'" style="display:grid;gap:8px">
                 <div style="display:flex;gap:12px;flex-wrap:wrap">
                     <x-filament::button size="xl" icon="heroicon-o-arrow-right-end-on-rectangle" color="success"
-                        x-on:click="batDau('vao')" :disabled="$daVao">
-                        {{ $daVao ? 'Đã chấm vào' : 'Chấm công vào' }}
+                        x-on:click="batDau('vao')" :disabled="$daVao && ! $vaoLai">
+                        {{ $vaoLai ? 'Chấm vào lại tại công ty' : ($daVao ? 'Đã chấm vào' : 'Chấm công vào') }}
                     </x-filament::button>
                     <x-filament::button size="xl" icon="heroicon-o-arrow-right-start-on-rectangle" color="primary"
                         x-on:click="batDau('ra')">
@@ -89,6 +91,12 @@
                     </x-filament::button>
                 </div>
                 <div style="font-size:.85rem;opacity:.7">Bấm rồi đưa mặt vào khung — máy tự nhận ra bạn và chấm công, không cần chụp.</div>
+                @if ($vaoLai)
+                    <div style="font-size:.9rem;color:#b45309">
+                        Bạn đã chấm vào lúc {{ $homNay->in_at->format('H:i') }} ở ngoài công ty — lượt này chỉ được tính khi quản lý duyệt.
+                        Tới công ty bấm <b>Chấm vào lại tại công ty</b> để được tính ngay (giờ vào lấy theo lúc chấm lại).
+                    </div>
+                @endif
 
                 @if ($coToaDo)
                     {{-- Vị trí: xin quyền trước, bị chặn thì chỉ cách bật lại --}}

@@ -76,6 +76,8 @@ class Attendance extends Model
         'out_face_distance' => 'float',
         'in_face_ok' => 'boolean',
         'out_face_ok' => 'boolean',
+        'in_requires_approval' => 'boolean',
+        'out_requires_approval' => 'boolean',
         'reviewed_at' => 'datetime',
         'late_minutes' => 'integer',
         'early_minutes' => 'integer',
@@ -119,14 +121,41 @@ class Attendance extends Model
         }
     }
 
-    /** Phần vào / ra được tính công: chấm thật, hoặc bổ sung đã được duyệt. */
+    /**
+     * Phần vào / ra được tính công: chấm ở công ty; bổ sung hoặc chấm ở ngoài
+     * công ty / không lấy được vị trí thì phải được quản lý chấp nhận.
+     */
     public function tinhPhan(string $p): bool
     {
         if (! $this->{"{$p}_at"}) {
             return false;
         }
 
-        return $this->{"{$p}_source"} !== 'bo_sung' || $this->review_status === 'chap_nhan';
+        return ($this->{"{$p}_source"} !== 'bo_sung' && ! $this->{"{$p}_requires_approval"})
+            || $this->review_status === 'chap_nhan';
+    }
+
+    /**
+     * Cả ngày này còn gì phải quản lý duyệt không: giờ bổ sung, chấm ở ngoài,
+     * trễ quá số phút phải ghi lý do, về sớm. Dùng khi nhân viên chấm lại ở công
+     * ty để tự bỏ trạng thái chờ duyệt của lượt cũ.
+     */
+    public function conCanDuyet(): bool
+    {
+        foreach (['in', 'out'] as $p) {
+            if ($this->{"{$p}_at"} && ($this->{"{$p}_source"} === 'bo_sung' || $this->{"{$p}_requires_approval"})) {
+                return true;
+            }
+        }
+
+        return $this->late_minutes > CauHinhChamCong::phutCanLyDo() || $this->early_minutes > 0;
+    }
+
+    /** Hôm nay đã chấm vào ở ngoài và chưa được duyệt → cho chấm vào lại khi tới công ty. */
+    public function duocChamVaoLai(): bool
+    {
+        return $this->in_at && $this->in_source === 'cham' && $this->in_requires_approval
+            && $this->review_status !== 'chap_nhan';
     }
 
     /**
@@ -155,16 +184,20 @@ class Attendance extends Model
         return $du;
     }
 
-    /** Vì sao ngày này chỉ được nửa công: 'thieu_vao' | 've_som' | 'thieu_ra' | null (đủ công). */
+    /**
+     * Vì sao ngày này chỉ được nửa công: 'vao_ngoai' | 'thieu_vao' | 'ra_ngoai' |
+     * 've_som' | 'thieu_ra' | null (đủ công).
+     */
     public function nuaCong(): ?string
     {
         $vao = $this->tinhPhan('in');
         $ra = $this->tinhPhan('out');
 
         return match (true) {
-            ! $vao && ! $ra => null, // không chấm gì: 0 công chứ không phải nửa công
-            ! $vao => 'thieu_vao',
+            ! $vao && ! $ra => null, // không phần nào được tính: 0 công chứ không phải nửa công
+            ! $vao => $this->in_at && $this->in_requires_approval ? 'vao_ngoai' : 'thieu_vao',
             $ra => $this->early_minutes > 0 && ! $this->coPhep() ? 've_som' : null,
+            $this->out_at && $this->out_requires_approval => 'ra_ngoai',
             default => $this->work_date->lt(today()) ? 'thieu_ra' : null, // hôm nay: chưa tới lúc về
         };
     }

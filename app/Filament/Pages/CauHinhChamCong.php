@@ -85,7 +85,7 @@ class CauHinhChamCong extends Page
                     ])->columnSpanFull(),
                 ]),
             Section::make('Giờ làm')
-                ->description('Chủ nhật nghỉ. Thứ 7 làm nửa ngày (0,5 công). Về sớm, quên chấm vào hoặc quên chấm ra: ngày đó chỉ tính nửa công (0,5 ngày thường, 0,25 thứ 7) — trừ khi quản lý chấp nhận lý do về sớm / duyệt giờ vào, giờ ra bổ sung. Tính theo phút như giờ hiển thị: giờ vào 08:30 thì 08:30 là đúng giờ, 08:31 là trễ 1 phút. Đổi giờ ở đây chỉ áp dụng cho lượt chấm sau khi lưu.')
+                ->description('Chủ nhật nghỉ. Thứ 7 làm nửa ngày (0,5 công). Về sớm, quên chấm vào / ra, hoặc chấm ở ngoài công ty / không lấy được vị trí: ngày đó chỉ tính nửa công (0,5 ngày thường, 0,25 thứ 7) — trừ khi quản lý chấp nhận. Ai lỡ chấm vào ở ngoài thì tới công ty chấm vào lại được. Tính theo phút như giờ hiển thị: giờ vào 08:30 thì 08:30 là đúng giờ, 08:31 là trễ 1 phút. Đổi giờ ở đây chỉ áp dụng cho lượt chấm sau khi lưu.')
                 ->columns(3)
                 ->schema([
                     TimePicker::make('cham_cong_vao')->label('Giờ vào thứ 2 – 6')->seconds(false)->required(),

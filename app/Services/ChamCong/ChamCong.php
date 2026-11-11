@@ -15,7 +15,9 @@ use InvalidArgumentException;
  * Chấm công vào / ra: kiểm tra khuôn mặt (so 128 số đặc trưng trình duyệt gửi
  * lên với khuôn mặt đã đăng ký — so ở MÁY CHỦ, trình duyệt không biết khuôn mặt
  * gốc), vị trí so với công ty, đi trễ / về sớm. Trễ, về sớm, ngoài công ty thì
- * bắt buộc ghi lý do → chờ quản lý duyệt.
+ * bắt buộc ghi lý do → chờ quản lý duyệt. Chấm ở ngoài công ty / không lấy được
+ * vị trí thì lượt đó chỉ tính công khi quản lý chấp nhận; chấm vào ở ngoài rồi
+ * thì tới công ty chấm vào lại được (lấy giờ mới, bỏ chờ duyệt).
  *
  * Trang chấm công quét liên tục và gửi kèm chi_khi_khop: khớp mới chấm. Khi
  * quét mãi không khớp (khẩu trang, ảnh đăng ký xấu…) nhân viên bấm "Gửi ảnh cho
@@ -64,9 +66,10 @@ class ChamCong
             return ['ok' => false, 'loi' => 'Bạn chưa đăng ký khuôn mặt.'];
         }
         $hom = Attendance::cuaNgay($u->id, $luc);
-        if ($p === 'in' && $hom->in_at && $hom->in_source === 'cham') {
+        if ($p === 'in' && $hom->in_at && $hom->in_source === 'cham' && ! $hom->duocChamVaoLai()) {
             return ['ok' => false, 'loi' => 'Hôm nay bạn đã chấm vào lúc '.$hom->in_at->format('H:i').'.'];
         }
+        $chamLai = $hom->{"{$p}_at"} && $hom->{"{$p}_source"} === 'cham'; // thay lượt cũ của phần này
 
         // Khuôn mặt: khoảng cách đặc trưng tới mẫu gần nhất (null = trình duyệt không thấy mặt)
         $moTa = self::docDacTrung($d['descriptor'] ?? null);
@@ -109,19 +112,26 @@ class ChamCong
                 .($luc->isSaturday() ? '0,25' : '0,5').' công';
             $canDuyet = true;
         }
+        // Ở ngoài công ty hoặc không lấy được vị trí (chưa cho phép, GPS lỗi…):
+        // lượt này phải được quản lý chấp nhận mới tính công. Sai số lớn (GPS
+        // yếu trong toà nhà) thì chỉ ghi lý do như trước.
+        $ngoaiCanDuyet = $viTri === 'ngoai' || ($viTri === 'khong_ro' && $viTriLoi !== 'sai_so_lon');
+        $phaiDuyet = ' — chấm ở ngoài công ty phải được quản lý duyệt mới tính công'
+            .($p === 'in' ? '. Sắp tới công ty thì bấm Huỷ, tới nơi chấm lại' : '');
         if ($viTri === 'ngoai') {
-            $viSao[] = 'Bạn đang cách công ty '.self::met($cach);
+            $viSao[] = 'Bạn đang cách công ty '.self::met($cach).$phaiDuyet;
         } elseif ($viTri === 'khong_ro') {
             $viSao[] = $viTriLoi === 'sai_so_lon'
                 ? 'Vị trí không chính xác (sai số '.self::met($doChinhXac).')'
-                : 'Không lấy được vị trí'.($viTriLoi ? ' — '.Attendance::VI_TRI_LOI[$viTriLoi] : '');
+                : 'Không lấy được vị trí'.($viTriLoi ? ' — '.Attendance::VI_TRI_LOI[$viTriLoi] : '').$phaiDuyet;
         }
+        $canDuyet = $canDuyet || $ngoaiCanDuyet;
         $lyDo = trim((string) ($d['ly_do'] ?? ''));
         if ($viSao && mb_strlen($lyDo) < 3) {
             return ['ok' => false, 'can_ly_do' => true, 'vi_sao' => $viSao];
         }
 
-        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $viTriLoi, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo, $canDuyet, $thietBi, $giay, $moTa, $khuonMat) {
+        DB::transaction(function () use ($hom, $p, $luc, $d, $viTri, $viTriLoi, $cach, $doChinhXac, $khoang, $khop, $anh, $u, $lyDo, $canDuyet, $ngoaiCanDuyet, $chamLai, $thietBi, $giay, $moTa, $khuonMat) {
             $cu = $hom->{"{$p}_photo"};
             $hom->forceFill([
                 "{$p}_at" => $luc,
@@ -137,10 +147,18 @@ class ChamCong
                 "{$p}_reason" => $lyDo !== '' ? mb_substr($lyDo, 0, 1000) : null,
                 "{$p}_device" => $thietBi,
                 "{$p}_location_error" => $viTriLoi,
+                "{$p}_requires_approval" => $ngoaiCanDuyet,
                 "{$p}_scan_ms" => $giay,
             ]);
             if ($canDuyet) {
                 $hom->forceFill(['review_status' => 'cho_duyet', 'reviewed_by' => null, 'reviewed_at' => null]);
+            } elseif ($chamLai && in_array($hom->review_status, ['cho_duyet', 'tu_choi'], true)) {
+                // Chấm lại ở công ty thay lượt cũ (ở ngoài / về sớm…): ngày này hết
+                // gì phải duyệt thì bỏ trạng thái chờ duyệt / không chấp nhận cũ
+                $hom->tinhPhut($p === 'in', $p === 'out');
+                if (! $hom->conCanDuyet()) {
+                    $hom->forceFill(['review_status' => null, 'reviewed_by' => null, 'reviewed_at' => null, 'review_note' => null]);
+                }
             }
             $hom->save();
             $cu && Storage::disk(Attendance::DIA)->delete($cu); // chấm ra lại → bỏ ảnh cũ
@@ -164,7 +182,9 @@ class ChamCong
         return [
             'ok' => true,
             'thong_bao' => ($p === 'in' ? 'Đã chấm vào' : 'Đã chấm ra').' lúc '.$luc->format('H:i').match (true) {
-                $canDuyet => ' — lý do đã gửi quản lý duyệt.',
+                $canDuyet => ' — lý do đã gửi quản lý duyệt.'.($ngoaiCanDuyet && $p === 'in'
+                    ? ' Tới công ty thì bấm "Chấm vào lại tại công ty" để được tính ngay, khỏi chờ duyệt.'
+                    : ''),
                 $tre > 0 => ' — trễ '.self::phut($tre).'.',
                 $lyDo !== '' => ' — đã ghi lý do.',
                 default => '.',

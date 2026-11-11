@@ -38,6 +38,9 @@
                 @if ($loiViTri = \App\Models\Attendance::VI_TRI_LOI[$a->{"{$p}_location_error"}] ?? null)
                     <span style="color:#b45309">Vì sao: {{ $loiViTri }}</span>
                 @endif
+                @if ($a->{"{$p}_requires_approval"} && $a->review_status !== 'chap_nhan')
+                    <span style="color:#b45309">Chấm ở ngoài công ty — chỉ tính công khi bạn chấp nhận</span>
+                @endif
                 @if ($mayQuet = collect([
                         \App\Models\Attendance::THIET_BI[$a->{"{$p}_device"}] ?? null,
                         $a->{"{$p}_scan_ms"} !== null ? 'quét '.number_format($a->{"{$p}_scan_ms"} / 1000, 1, ',', '.').' giây' : null,

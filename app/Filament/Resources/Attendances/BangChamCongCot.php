@@ -22,7 +22,9 @@ class BangChamCongCot
                 // "T2 · 1 công" / "T2 · 0,5 công (về sớm)" / "T7 · 0,25 công (thiếu giờ vào)"
                 ->description(fn (Attendance $r) => self::THU[$r->work_date->dayOfWeek].(($c = $r->cong())
                     ? ' · '.str_replace('.', ',', (string) $c).' công'.match ($r->nuaCong()) {
+                        'vao_ngoai' => ' (vào ở ngoài, chưa duyệt)',
                         'thieu_vao' => ' (thiếu giờ vào)',
+                        'ra_ngoai' => ' (ra ở ngoài, chưa duyệt)',
                         've_som' => ' (về sớm)',
                         'thieu_ra' => ' (thiếu giờ ra)',
                         default => '',

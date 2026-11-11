@@ -180,34 +180,87 @@ class ChamCongTest extends TestCase
         $v = $this->nhanVien('Vy');
         $this->dangKy($v);
         $kq = $this->cham($v, 'vao', ['lat' => null, 'lng' => null]);
-        $this->assertSame(['Đi trễ 8 giờ 30 phút (giờ vào 08:00)', 'Không lấy được vị trí'], $kq['vi_sao']);
+        $this->assertSame('Đi trễ 8 giờ 30 phút (giờ vào 08:00)', $kq['vi_sao'][0]);
+        $this->assertStringStartsWith('Không lấy được vị trí — chấm ở ngoài công ty phải được quản lý duyệt mới tính công', $kq['vi_sao'][1]);
     }
 
-    public function test_dung_gio_ngoai_cong_ty_ghi_ly_do_nhung_khong_can_duyet(): void
+    public function test_cham_o_ngoai_phai_duyet_moi_tinh_cong_va_cham_vao_lai_tai_cong_ty(): void
     {
-        $u = $this->nhanVien();
-        $this->dangKy($u);
+        $lan = $this->nhanVien('Lan');
+        $vy = $this->nhanVien('Vy');
+        $an = $this->nhanVien('An');
+        foreach ([$lan, $vy, $an] as $u) {
+            $this->dangKy($u);
+        }
+        $ql = $this->quanLy();
+        $dv = app(DichVu::class);
         $xa = ['lat' => self::LAT + 0.02];
+        $cua = fn (User $u) => Attendance::where('user_id', $u->id)->sole();
 
-        // 07:50 đúng giờ, ở sân bay → vẫn hỏi lý do, nhưng không chờ duyệt
-        $kq = $this->cham($u, 'vao', $xa);
-        $this->assertSame(['Bạn đang cách công ty 2,2 km'], $kq['vi_sao']);
-        $kq = $this->cham($u, 'vao', [...$xa, 'ly_do' => 'Đón đoàn ở sân bay']);
-        $this->assertStringContainsString('đã ghi lý do', $kq['thong_bao']);
-        $a = Attendance::sole();
-        $this->assertSame('Đón đoàn ở sân bay', $a->in_reason);
-        $this->assertSame('ngoai', $a->in_location);
+        // Lan 07:50 đúng giờ nhưng đứng ngoài 2,2 km → hỏi lý do, báo phải duyệt mới tính
+        $kq = $this->cham($lan, 'vao', $xa);
+        $this->assertStringStartsWith('Bạn đang cách công ty 2,2 km — chấm ở ngoài công ty phải được quản lý duyệt mới tính công', $kq['vi_sao'][0]);
+        $kq = $this->cham($lan, 'vao', [...$xa, 'ly_do' => 'Đang gửi xe']);
+        $this->assertStringContainsString('Chấm vào lại tại công ty', $kq['thong_bao']);
+        $a = $cua($lan);
+        $this->assertTrue($a->in_requires_approval);
+        $this->assertSame('cho_duyet', $a->review_status);
+        $this->assertSame(0.0, $a->cong()); // lượt vào ở ngoài chưa duyệt → chưa tính
+        $anhCu = $a->in_photo;
+
+        // Trang chấm công hiện nút chấm vào lại
+        $this->actingAs($lan);
+        $this->get('/admin/cham-cong')->assertSee('Chấm vào lại tại công ty');
+
+        // 07:58 tới công ty chấm lại → lấy giờ mới, hết chờ duyệt, ảnh cũ bỏ
+        $this->travelTo(Carbon::parse('2026-10-12 07:58'));
+        $kq = $this->cham($lan, 'vao');
+        $this->assertTrue($kq['ok']);
+        $a = $cua($lan);
+        $this->assertSame('07:58', $a->in_at->format('H:i'));
+        $this->assertSame('trong', $a->in_location);
+        $this->assertFalse($a->in_requires_approval);
+        $this->assertNull($a->in_reason);
         $this->assertNull($a->review_status);
+        $this->assertSame(1.0, $a->cong());
+        Storage::disk('rieng')->assertMissing($anhCu);
+        // Đã chấm ở công ty → không chấm vào lại được nữa
+        $this->assertSame('Hôm nay bạn đã chấm vào lúc 07:58.', $this->cham($lan, 'vao')['loi']);
 
-        // Ra đúng giờ ở công ty → vẫn không cần duyệt
-        $this->travelTo(Carbon::parse('2026-10-12 17:31'));
-        $this->assertTrue($this->cham($u, 'ra')['ok']);
-        $this->assertNull($a->fresh()->review_status);
+        // Vy chấm vào ở sân bay, ra ở công ty → nửa công tới khi quản lý chấp nhận
+        $this->travelTo(Carbon::parse('2026-10-12 07:55'));
+        $this->cham($vy, 'vao', [...$xa, 'ly_do' => 'Đón đoàn ở sân bay']);
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $this->assertTrue($this->cham($vy, 'ra')['ok']);
+        $a = $cua($vy);
+        $this->assertSame('cho_duyet', $a->review_status); // chấm ra ở công ty không xoá chờ duyệt của lượt vào
+        $this->assertSame(0.5, $a->cong());
+        $this->assertSame('vao_ngoai', $a->nuaCong());
+        $this->assertStringContainsString('0,5 công (vào ở ngoài, chưa duyệt)', (string) $this->moTaNgay($a));
+        $this->assertStringContainsString('chỉ tính công khi bạn chấp nhận', view('filament.cham-cong.chi-tiet', ['a' => $a])->render());
+        $dv->duyet($a, false, 'Không có lịch đón đoàn', $ql);
+        $this->assertSame(0.5, $a->fresh()->cong());
+        $dv->duyet($a, true, null, $ql);
+        $this->assertSame(1.0, $a->fresh()->cong());
+        $this->assertFalse($a->fresh()->duocChamVaoLai()); // đã duyệt → khỏi chấm lại
 
-        // Ra lại sớm hơn (về sớm) → lúc này mới chờ duyệt
-        $this->travelTo(Carbon::parse('2026-10-12 17:00'));
-        $this->cham($u, 'ra', ['ly_do' => 'Đi khám bệnh']);
-        $this->assertSame('cho_duyet', $a->fresh()->review_status);
+        // An vào ở công ty, ra ở ngoài → nửa công; quay lại công ty chấm ra lại → đủ công
+        $this->travelTo(Carbon::parse('2026-10-12 07:58'));
+        $this->cham($an, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-12 17:40'));
+        $kq = $this->cham($an, 'ra', $xa);
+        $this->assertStringNotContainsString('bấm Huỷ', $kq['vi_sao'][0]); // chấm ra: không nhắc chấm lại
+        $this->cham($an, 'ra', [...$xa, 'ly_do' => 'Ra cổng rồi mới nhớ']);
+        $this->assertSame('ra_ngoai', $cua($an)->nuaCong());
+        $this->travelTo(Carbon::parse('2026-10-12 17:45'));
+        $this->cham($an, 'ra');
+        $this->assertNull($cua($an)->review_status);
+        $this->assertSame(1.0, $cua($an)->cong());
+
+        // Lượt chấm ở ngoài từ trước khi có quy tắc này (không gắn cờ) → giữ nguyên đủ công
+        $cu = Attendance::create(['user_id' => $an->id, 'work_date' => '2026-10-09', 'in_at' => Carbon::parse('2026-10-09 07:50'), 'in_source' => 'cham',
+            'in_location' => 'ngoai', 'out_at' => Carbon::parse('2026-10-09 17:40'), 'out_source' => 'cham', 'out_location' => 'trong']);
+        $this->assertSame(1.0, $cu->fresh()->cong());
     }
 
     public function test_khuon_mat_khong_khop_van_cham_nhung_nghi_van(): void
@@ -373,11 +426,13 @@ class ChamCongTest extends TestCase
         // Không có vị trí → hỏi lý do, nói rõ vì sao
         $kq = $this->cham($u, 'vao', $khongViTri);
         $this->assertTrue($kq['can_ly_do']);
-        $this->assertSame(['Không lấy được vị trí — trình duyệt chưa được cho phép lấy vị trí'], $kq['vi_sao']);
+        $this->assertStringStartsWith('Không lấy được vị trí — trình duyệt chưa được cho phép lấy vị trí — chấm ở ngoài công ty phải được quản lý duyệt', $kq['vi_sao'][0]);
         $this->assertTrue($this->cham($u, 'vao', [...$khongViTri, 'ly_do' => 'Điện thoại chặn vị trí'])['ok']);
         $a = Attendance::sole();
         $this->assertSame('khong_ro', $a->in_location);
         $this->assertSame('chua_cho_phep', $a->in_location_error);
+        $this->assertTrue($a->in_requires_approval); // không cho phép vị trí → phải duyệt mới tính
+        $this->assertSame('cho_duyet', $a->review_status);
         $this->assertSame('dien_thoai', $a->in_device);
         $this->assertSame(3240, $a->in_scan_ms);
 
