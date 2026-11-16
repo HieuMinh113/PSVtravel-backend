@@ -68,6 +68,8 @@ class TaoLinkTaiAnh extends Tool
             'link_tai_len' => $link,
             'het_han_sau_phut' => self::PHUT_HIEU_LUC,
             'cach_tai' => 'curl -sS -X POST -F "anh=@<đường dẫn tệp ảnh trên máy>" "'.$link.'"',
+            // Windows PowerShell 5.1: "curl" là tên khác của Invoke-WebRequest, không nhận -F
+            'ghi_chu_windows' => 'Trong Windows PowerShell gõ curl.exe thay cho curl.',
             'ket_qua' => $d['loai'] === 'bia'
                 ? 'Ảnh tự gắn làm ảnh bìa của bài.'
                 : 'Phản hồi có "markdown" — chèn vào nội dung rồi gọi update_guide_draft.',

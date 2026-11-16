@@ -3,7 +3,8 @@
     $ma = $maMoi ?? '<MÃ KHOÁ>';
     // Chuỗi JS cho nút Chép: @js() không chạy trong thuộc tính của thẻ <x-…>, phải tính trước
     $maJs = \Illuminate\Support\Js::from((string) $maMoi);
-    $lenhClaudeCode = 'claude mcp add --transport http psv-noi-bo '.$diaChi.' --header "Authorization: Bearer '.$ma.'"';
+    // --scope user: dùng được ở MỌI thư mục (mặc định "local" chỉ có ở thư mục chạy lệnh)
+    $lenhClaudeCode = 'claude mcp add --scope user --transport http psv-noi-bo '.$diaChi.' --header "Authorization: Bearer '.$ma.'"';
     $cauHinhDesktop = json_encode(['mcpServers' => ['psv-noi-bo' => [
         'command' => 'npx',
         'args' => ['-y', 'mcp-remote', $diaChi, '--header', 'Authorization:${PSV_MCP}'],
@@ -36,11 +37,12 @@
     <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)" @if ($maMoi) open @endif>
         <summary style="cursor:pointer;font-weight:600">Cài vào Claude Code (khuyên dùng: đọc được thư mục, tải được ảnh)</summary>
         <ol style="margin:.75rem 0 0 1.25rem;list-style:decimal">
-            <li>Mở cửa sổ dòng lệnh, chạy (thay <code>&lt;MÃ KHOÁ&gt;</code> nếu chưa tạo mã ở trên):</li>
+            <li>Mở cửa sổ dòng lệnh (Windows: PowerShell), chạy một lần (thay <code>&lt;MÃ KHOÁ&gt;</code> nếu chưa tạo mã ở trên):</li>
         </ol>
         <code style="display:block;margin:.5rem 0;padding:.6rem;border-radius:8px;background:rgba(0,0,0,.05);word-break:break-all">{{ $lenhClaudeCode }}</code>
         <ol start="2" style="margin:0 0 0 1.25rem;list-style:decimal">
-            <li>Vào thư mục chứa tài liệu bài viết, gõ <code>claude</code>, rồi nhờ: <em>"Đọc file kinh-nghiem-da-lat.docx và ảnh trong thư mục anh/, soạn bài cẩm nang nháp, ảnh dalat-1.jpg làm ảnh bìa."</em></li>
+            <li>Kiểm tra: <code>claude mcp list</code> thấy <code>psv-noi-bo … Connected</code>.</li>
+            <li>Vào thư mục chứa tài liệu bài viết, gõ <code>claude</code>, rồi nhờ: <em>"Đọc file kinh-nghiem-da-lat.pdf và ảnh trong thư mục anh, soạn bài cẩm nang nháp, ảnh dalat-1.jpg làm ảnh bìa."</em></li>
         </ol>
     </details>
 
