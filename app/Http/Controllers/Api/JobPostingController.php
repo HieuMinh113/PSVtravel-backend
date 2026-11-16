@@ -51,6 +51,8 @@ class JobPostingController extends Controller
             'salary_range' => $j->salary_range,
             'quantity' => $j->quantity,
             'deadline' => $j->deadline?->format('Y-m-d'),
+            // Ngày đăng tin — schema JobPosting (Google for Jobs) bắt buộc datePosted
+            'date_posted' => $j->created_at?->format('Y-m-d'),
         ];
     }
 }

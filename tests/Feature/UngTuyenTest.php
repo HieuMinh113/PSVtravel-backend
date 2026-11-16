@@ -39,6 +39,17 @@ class UngTuyenTest extends TestCase
         $this->tin = JobPosting::create(['title' => 'Nhân viên kinh doanh tour', 'slug' => 'nhan-vien-kinh-doanh', 'status' => 'published']);
     }
 
+    public function test_api_tin_tuyen_dung_tra_ngay_dang_cho_schema_job_posting(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 3));
+        $tin = JobPosting::create(['title' => 'Điều hành tour', 'slug' => 'dieu-hanh-tour', 'status' => 'published', 'deadline' => '2026-12-31']);
+        $this->getJson('/api/v1/jobs/dieu-hanh-tour')->assertOk()
+            ->assertJsonPath('data.date_posted', '2026-11-03')
+            ->assertJsonPath('data.deadline', '2026-12-31');
+        $this->getJson('/api/v1/jobs')->assertOk()->assertJsonPath('data.0.date_posted', $this->tin->created_at->format('Y-m-d'));
+        $this->assertNotNull($tin->created_at);
+    }
+
     /** File thật trên đĩa — để kiểm tra theo NỘI DUNG file (finfo), không chỉ theo đuôi. */
     private function tep(string $ten, string $noiDung): UploadedFile
     {
