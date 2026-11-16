@@ -10,6 +10,26 @@
         'args' => ['-y', 'mcp-remote', $diaChi, '--header', 'Authorization:${PSV_MCP}'],
         'env' => ['PSV_MCP' => 'Bearer '.$ma],
     ]]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    // Codex (OpenAI): mã để trong biến môi trường, Codex tự gửi "Authorization: Bearer …"
+    $lenhCodex = 'codex mcp add psv-noi-bo --url '.$diaChi.' --bearer-token-env-var PSV_MCP_TOKEN';
+    $cauHinhCodex = "[mcp_servers.psv-noi-bo]\nurl = \"{$diaChi}\"\nbearer_token_env_var = \"PSV_MCP_TOKEN\"";
+    // Gemini CLI: -s user = dùng ở mọi thư mục (mặc định chỉ thư mục hiện tại)
+    $lenhGemini = 'gemini mcp add -s user --transport http --header "Authorization: Bearer '.$ma.'" psv-noi-bo '.$diaChi;
+    $cauHinhCursor = json_encode(['mcpServers' => ['psv-noi-bo' => [
+        'url' => $diaChi,
+        'headers' => ['Authorization' => 'Bearer '.$ma],
+    ]]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    // VS Code: hỏi mã khi kết nối lần đầu (lưu trong kho bí mật của VS Code), không ghi vào tệp
+    $cauHinhVsCode = json_encode([
+        'inputs' => [['type' => 'promptString', 'id' => 'psv-mcp', 'description' => 'Mã khoá MCP PSV Travel', 'password' => true]],
+        'servers' => ['psv-noi-bo' => [
+            'type' => 'http',
+            'url' => $diaChi,
+            'headers' => ['Authorization' => 'Bearer ${input:psv-mcp}'],
+        ]],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $khoi = 'margin:.5rem 0;padding:.6rem;border-radius:8px;background:rgba(0,0,0,.05);white-space:pre-wrap;word-break:break-all;font-size:.8rem';
 @endphp
 
 <div style="display:flex;flex-direction:column;gap:1rem;font-size:.9rem;line-height:1.6">
@@ -52,4 +72,46 @@
         <pre style="margin:0;padding:.6rem;border-radius:8px;background:rgba(0,0,0,.05);white-space:pre-wrap;word-break:break-all;font-size:.8rem">{{ $cauHinhDesktop }}</pre>
         <p style="margin:.5rem 0 0;opacity:.75">Claude Desktop soạn được bài từ nội dung bạn dán hoặc đính kèm; muốn AI tự mở thư mục và tải ảnh lên thì dùng Claude Code.</p>
     </details>
+
+    <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)">
+        <summary style="cursor:pointer;font-weight:600">Cài vào Codex (OpenAI — dòng lệnh và tiện ích VS Code)</summary>
+        <ol style="margin:.75rem 0 0 1.25rem;list-style:decimal">
+            <li>Lưu mã vào biến môi trường <code>PSV_MCP_TOKEN</code> (làm một lần, rồi mở lại cửa sổ dòng lệnh):
+                <div>Windows (PowerShell):</div>
+                <pre style="{{ $khoi }}">setx PSV_MCP_TOKEN "{{ $ma }}"</pre>
+                <div>macOS:</div>
+                <pre style="{{ $khoi }}">echo 'export PSV_MCP_TOKEN="{{ $ma }}"' >> ~/.zshrc</pre>
+            </li>
+            <li>Thêm máy chủ:
+                <pre style="{{ $khoi }}">{{ $lenhCodex }}</pre>
+                hoặc thêm thẳng vào tệp <code>~/.codex/config.toml</code>:
+                <pre style="{{ $khoi }}">{{ $cauHinhCodex }}</pre>
+            </li>
+            <li>Kiểm tra: <code>codex mcp list</code>. Vào thư mục bài viết, gõ <code>codex</code> rồi nhờ như với Claude Code.</li>
+        </ol>
+    </details>
+
+    <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)">
+        <summary style="cursor:pointer;font-weight:600">Cài vào Gemini CLI (Google)</summary>
+        <pre style="{{ $khoi }}">{{ $lenhGemini }}</pre>
+        <p style="margin:0">Kiểm tra: <code>gemini mcp list</code>. Vào thư mục bài viết, gõ <code>gemini</code> rồi nhờ.</p>
+    </details>
+
+    <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)">
+        <summary style="cursor:pointer;font-weight:600">Cài vào Cursor</summary>
+        <p style="margin:.75rem 0 0">Mở tệp <code>~/.cursor/mcp.json</code> (Windows: <code>C:\Users\&lt;tên&gt;\.cursor\mcp.json</code>), thêm khối dưới đây vào, lưu rồi xem trạng thái ở Cursor Settings → MCP:</p>
+        <pre style="{{ $khoi }}">{{ $cauHinhCursor }}</pre>
+    </details>
+
+    <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)">
+        <summary style="cursor:pointer;font-weight:600">Cài vào VS Code (GitHub Copilot, chế độ Agent)</summary>
+        <p style="margin:.75rem 0 0">Ctrl+Shift+P → <strong>MCP: Open User Configuration</strong>, dán khối dưới đây, lưu. Lần đầu kết nối VS Code hỏi mã khoá — dán mã vào (mã không bị ghi vào tệp):</p>
+        <pre style="{{ $khoi }}">{{ $cauHinhVsCode }}</pre>
+    </details>
+
+    <div style="padding:1rem;border-radius:12px;border:1px dashed rgba(0,0,0,.2);opacity:.85">
+        <strong>ChatGPT, claude.ai (web / app điện thoại), Gemini app:</strong> các ứng dụng này chỉ kết nối MCP bằng đăng nhập OAuth,
+        không cho dán mã khoá, nên chưa dùng được máy chủ nội bộ này. Máy chủ công khai <code>{{ url('/mcp') }}</code> (tra tour, gửi yêu cầu tư vấn)
+        thì thêm được vào các ứng dụng đó.
+    </div>
 </div>

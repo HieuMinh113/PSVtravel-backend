@@ -189,6 +189,10 @@ class McpNoiBoTest extends TestCase
         $maMoi = $trang->get('maMoi');
         $this->assertNotEmpty($maMoi);
         $trang->assertSee('Laptop văn phòng');
+        // Hướng dẫn cài cho từng ứng dụng, mã đã điền sẵn (không còn chỗ trống <MÃ KHOÁ>)
+        $trang->assertSee(['claude mcp add --scope user', 'codex mcp add psv-noi-bo', 'gemini mcp add -s user', 'MCP: Open User Configuration'])
+            ->assertSee('Bearer '.$maMoi)
+            ->assertDontSee('Bearer &lt;MÃ KHOÁ&gt;', false);
 
         // Mã vừa tạo dùng được ngay (bỏ phiên đăng nhập admin của test để chỉ còn mã khoá)
         $this->app['auth']->forgetGuards();
