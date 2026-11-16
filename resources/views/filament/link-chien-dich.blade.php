@@ -1,12 +1,14 @@
 {{-- Kết quả trang "Tạo link chiến dịch" (App\Filament\Pages\TaoLinkChienDich) --}}
 @if ($link)
+    {{-- @js() không chạy trong thuộc tính của thẻ <x-…> (ra nguyên chữ "@js(...)", nút Chép lỗi JS) — tính trước --}}
+    @php($linkJs = \Illuminate\Support\Js::from($link))
     <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start">
         <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:.75rem">
             <div x-data="{ daChep: false }" style="display:flex;flex-direction:column;gap:.5rem">
                 <code style="display:block;padding:.75rem;border-radius:10px;border:1px solid rgba(0,0,0,.1);word-break:break-all;font-size:.85rem">{{ $link }}</code>
                 <div>
                     <x-filament::button icon="heroicon-o-clipboard-document"
-                        x-on:click="navigator.clipboard.writeText(@js($link)); daChep = true; setTimeout(() => daChep = false, 2000)">
+                        x-on:click="navigator.clipboard.writeText({{ $linkJs }}); daChep = true; setTimeout(() => daChep = false, 2000)">
                         <span x-show="!daChep">Chép link</span>
                         <span x-show="daChep" x-cloak>Đã chép</span>
                     </x-filament::button>

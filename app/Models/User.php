@@ -94,6 +94,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function phaiBat2fa(): bool
     {
+        return $this->laAdmin();
+    }
+
+    /** Vai trò Admin: super admin (tên theo cấu hình Shield) hoặc admin */
+    public function laAdmin(): bool
+    {
         return $this->hasRole(array_filter([
             config('filament-shield.super_admin.name'),
             'admin',

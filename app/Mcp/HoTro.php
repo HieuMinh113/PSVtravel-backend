@@ -36,6 +36,18 @@ class HoTro
         return $chu === '' ? null : Str::limit($chu, $toiDa, '…', preserveWords: true);
     }
 
+    /**
+     * Markdown (AI viết) → HTML cho ô nội dung bài. Bỏ mọi HTML viết tay trong
+     * Markdown và link javascript:; tiêu đề # (H1) hạ thành H2 vì trang bài đã có
+     * H1 là tên bài. Bảng theo kiểu GitHub vẫn giữ.
+     */
+    public static function htmlTuMarkdown(string $md): string
+    {
+        $html = Str::markdown($md, ['html_input' => 'strip', 'allow_unsafe_links' => false]);
+
+        return trim((string) preg_replace(['#<h1(\s[^>]*)?>#i', '#</h1>#i'], ['<h2$1>', '</h2>'], $html));
+    }
+
     /** Chuỗi để so khớp: chữ thường, bỏ dấu tiếng Việt */
     public static function khongDau(?string $s): string
     {

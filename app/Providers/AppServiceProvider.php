@@ -105,6 +105,11 @@ class AppServiceProvider extends ServiceProvider
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
         });
 
+        // MCP nội bộ (Admin soạn bài nháp + tải ảnh): 120 lượt/phút/người
+        \Illuminate\Support\Facades\RateLimiter::for('mcp-noi-bo', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
         // Chống spam form liên hệ: 3 tin/giờ/IP
         \Illuminate\Support\Facades\RateLimiter::for('contact', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());

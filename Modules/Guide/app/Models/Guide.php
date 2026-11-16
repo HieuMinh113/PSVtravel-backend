@@ -18,6 +18,15 @@ class Guide extends Model
 {
     use ChuanHoaNoiDung, LogsActivity, SoftDeletes;
 
+    /** Chuyên mục bài (mã lưu trong cột category => tên hiện cho người dùng) */
+    public const CHUYEN_MUC = [
+        'kinh-nghiem' => 'Kinh nghiệm du lịch',
+        'am-thuc' => 'Ẩm thực',
+        'thu-tuc' => 'Thủ tục giấy tờ',
+        'diem-den' => 'Điểm đến',
+        'khac' => 'Khác',
+    ];
+
     protected $fillable = [
         'title', 'seo_title', 'slug', 'excerpt', 'content', 'cover_image', 'video_url',
         'author_id', 'team_member_id', 'category', 'tour_id', 'view_count', 'status', 'published_at', 'sort_order',
