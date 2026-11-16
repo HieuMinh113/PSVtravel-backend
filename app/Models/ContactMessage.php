@@ -20,6 +20,8 @@ class ContactMessage extends Model
     public const NGUON = [
         'contact' => 'Liên hệ',
         'team_building' => 'Team Building',
+        // Trợ lý AI (ChatGPT, Claude…) gửi thay khách qua máy chủ MCP /mcp
+        'tro_ly_ai' => 'Trợ lý AI (MCP)',
     ];
 
     protected $fillable = [

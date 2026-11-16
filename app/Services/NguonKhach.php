@@ -28,6 +28,8 @@ class NguonKhach
         'gemini' => 'Gemini',
         'copilot' => 'Copilot',
         'claude' => 'Claude',
+        // Yêu cầu gửi thẳng từ trợ lý AI qua máy chủ MCP (không qua trang web)
+        'tro_ly_ai_mcp' => 'Trợ lý AI (MCP)',
         'email' => 'Email',
         'qr' => 'Mã QR',
         'web_khac' => 'Trang web khác',
@@ -36,7 +38,7 @@ class NguonKhach
     ];
 
     /** Trợ lý AI — lượt khách đến từ đây nghĩa là PSV đang được AI trích dẫn */
-    public const AI = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'claude'];
+    public const AI = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'claude', 'tro_ly_ai_mcp'];
 
     private const TRUONG = ['source', 'medium', 'campaign', 'content', 'term', 'referrer', 'landing'];
 

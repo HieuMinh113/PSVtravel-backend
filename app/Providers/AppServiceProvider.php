@@ -98,6 +98,13 @@ class AppServiceProvider extends ServiceProvider
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(20)->by($request->ip());
         });
 
+        // Máy chủ MCP /mcp cho trợ lý AI: 60 lượt gọi/phút/IP. Lượt từ ChatGPT, Claude…
+        // đi qua máy chủ chung của họ nên rộng tay hơn API web; công cụ gửi yêu
+        // cầu tư vấn có giới hạn riêng theo số điện thoại.
+        \Illuminate\Support\Facades\RateLimiter::for('mcp', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
+        });
+
         // Chống spam form liên hệ: 3 tin/giờ/IP
         \Illuminate\Support\Facades\RateLimiter::for('contact', function (\Illuminate\Http\Request $request) {
             return \Illuminate\Cache\RateLimiting\Limit::perHour(3)->by($request->ip());

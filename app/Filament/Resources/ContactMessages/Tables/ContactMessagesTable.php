@@ -31,7 +31,11 @@ class ContactMessagesTable
                     ->label('Nguồn')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => ContactMessage::NGUON[$state] ?? 'Liên hệ')
-                    ->color(fn (?string $state): string => $state === 'team_building' ? 'warning' : 'gray'),
+                    ->color(fn (?string $state): string => match ($state) {
+                        'team_building' => 'warning',
+                        'tro_ly_ai' => 'info',
+                        default => 'gray',
+                    }),
                 TextColumn::make('name')
                     ->label('Khách')
                     ->weight('semibold')
