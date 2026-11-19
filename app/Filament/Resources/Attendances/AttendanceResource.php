@@ -88,6 +88,7 @@ class AttendanceResource extends Resource
             ->recordActions([
                 self::nutXem(),
                 self::nutDuyet(),
+                self::nutGo(),
             ])
             ->paginated([25, 50, 100]);
     }
@@ -129,6 +130,43 @@ class AttendanceResource extends Resource
             ->action(function (Attendance $record, array $data) {
                 app(ChamCong::class)->duyet($record, $data['ket_qua'] === 'chap_nhan', $data['ghi_chu'] ?? null, auth()->user());
                 Notification::make()->title('Đã lưu kết quả duyệt')->success()->send();
+            });
+    }
+
+    /**
+     * Gỡ lượt chấm bấm nhầm (VD vừa chấm vào đã bấm chấm ra). Chỉ người có quyền
+     * "Gỡ lượt chấm công bấm nhầm" (Remove:Attendance) — mặc định Admin.
+     */
+    public static function nutGo(): Action
+    {
+        return Action::make('go')
+            ->label('Gỡ')
+            ->icon(Heroicon::OutlinedArrowUturnLeft)
+            ->color('danger')
+            ->visible(fn (Attendance $record) => (bool) auth()->user()?->can('Remove:Attendance') && ($record->in_at || $record->out_at))
+            ->authorize(fn () => (bool) auth()->user()?->can('Remove:Attendance'))
+            ->modalHeading(fn (Attendance $record) => 'Gỡ lượt chấm — '.$record->user?->name.' '.$record->work_date->format('d/m/Y'))
+            ->modalDescription('Dùng khi bấm nhầm (VD vừa chấm vào đã bấm chấm ra). Giờ, vị trí và ảnh của lượt bị gỡ sẽ xoá; nhân viên thấy ghi chú và lý do. '
+                .'Gỡ trong ngày thì nhân viên chấm lại bình thường; ngày đã qua thì nhân viên bấm "Xin bổ sung công".')
+            ->fillForm(fn (Attendance $record) => ['chon' => $record->out_at ? 'ra' : 'vao'])
+            ->schema(fn (Attendance $record) => [
+                Radio::make('chon')->label('Gỡ')->options(array_filter([
+                    'ra' => $record->out_at ? 'Giờ ra '.$record->out_at->format('H:i') : null,
+                    'vao' => $record->in_at ? 'Giờ vào '.$record->in_at->format('H:i') : null,
+                    'ca_hai' => $record->in_at && $record->out_at ? 'Cả giờ vào và giờ ra' : null,
+                ]))->required(),
+                Textarea::make('ly_do')->label('Lý do (nhân viên thấy)')->placeholder('VD: bấm nhầm chấm ra ngay sau khi chấm vào')
+                    ->required()->minLength(3)->maxLength(500)->rows(2),
+            ])
+            ->modalSubmitActionLabel('Gỡ lượt chấm')
+            ->action(function (Attendance $record, array $data, Action $action) {
+                try {
+                    app(ChamCong::class)->goLuot($record, $data['chon'], $data['ly_do'], auth()->user());
+                } catch (\InvalidArgumentException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+                }
+                Notification::make()->title('Đã gỡ lượt chấm')->success()->send();
             });
     }
 

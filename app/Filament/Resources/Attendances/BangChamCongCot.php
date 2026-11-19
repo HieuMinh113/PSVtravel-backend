@@ -68,11 +68,13 @@ class BangChamCongCot
         return $cot;
     }
 
-    /** "Trễ 12' · Ngoài công ty 2,3 km · Khuôn mặt chưa khớp · Bổ sung" */
+    /** "Trễ 12' · Ngoài công ty 2,3 km · Khuôn mặt chưa khớp · Bổ sung" — lượt đã gỡ: "Đã gỡ 08:02: bấm nhầm" */
     public static function moTa(Attendance $r, string $p): ?string
     {
         if (! $r->{"{$p}_at"}) {
-            return null;
+            $go = $r->lanGo($p);
+
+            return $go ? 'Đã gỡ '.$go['gio'].': '.$go['ly_do'] : null;
         }
         $cach = $r->{"{$p}_distance"};
 

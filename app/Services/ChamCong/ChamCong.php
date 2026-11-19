@@ -190,6 +190,7 @@ class ChamCong
                 default => '.',
             },
             'canh_bao' => $canhBao,
+            'luc' => $luc->toIso8601String(),
         ];
     }
 
@@ -264,6 +265,60 @@ class ChamCong
         ])->save();
 
         return $hom;
+    }
+
+    public const GO = ['ra' => ['out'], 'vao' => ['in'], 'ca_hai' => ['in', 'out']];
+
+    /**
+     * Gỡ lượt chấm bấm nhầm (VD vừa chấm vào đã bấm chấm ra): xoá giờ, vị trí, ảnh
+     * của lượt đó, tính lại phút trễ / sớm và trạng thái duyệt, ghi lại ai gỡ, lúc
+     * nào, vì sao. Gỡ trong ngày thì nhân viên chấm lại bình thường; ngày đã qua
+     * thì thành thiếu giờ — nhân viên "Xin bổ sung công" như mọi khi.
+     *
+     * @param  'ra'|'vao'|'ca_hai'  $chon
+     */
+    public function goLuot(Attendance $a, string $chon, string $lyDo, User $nguoi): void
+    {
+        $phan = array_values(array_filter(self::GO[$chon] ?? [], fn (string $p) => $a->{"{$p}_at"} !== null));
+        if ($phan === []) {
+            throw new InvalidArgumentException('Không có giờ chấm nào để gỡ.');
+        }
+        $lyDo = trim($lyDo);
+        if (mb_strlen($lyDo) < 3) {
+            throw new InvalidArgumentException('Ghi lý do gỡ (ít nhất vài chữ).');
+        }
+
+        $anh = [];
+        DB::transaction(function () use ($a, $phan, $lyDo, $nguoi, &$anh) {
+            $lichSu = (array) $a->removals;
+            foreach ($phan as $p) {
+                $lichSu[] = [
+                    'phan' => $p,
+                    'gio' => $a->{"{$p}_at"}->format('H:i'),
+                    'nguon' => $a->{"{$p}_source"},
+                    'ly_do' => mb_substr($lyDo, 0, 500),
+                    'nguoi' => $nguoi->name,
+                    'nguoi_id' => $nguoi->id,
+                    'luc' => now()->toIso8601String(),
+                ];
+                $anh[] = $a->{"{$p}_photo"};
+                foreach (Attendance::COT_LUOT as $cot) {
+                    $a->{"{$p}_{$cot}"} = null;
+                }
+                $a->{"{$p}_requires_approval"} = false;
+            }
+            $a->removals = $lichSu;
+
+            // Hết gì phải duyệt (VD gỡ giờ ra về sớm) → bỏ trạng thái duyệt cũ
+            $a->tinhPhut(in_array('in', $phan, true), in_array('out', $phan, true));
+            if (! $a->conCanDuyet()) {
+                $a->forceFill(['review_status' => null, 'reviewed_by' => null, 'reviewed_at' => null, 'review_note' => null]);
+            }
+            $a->save();
+        });
+
+        $anh = array_filter($anh);
+        $anh && Storage::disk(Attendance::DIA)->delete($anh);
     }
 
     public function duyet(Attendance $a, bool $chapNhan, ?string $ghiChu, User $nguoi): void

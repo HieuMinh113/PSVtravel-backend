@@ -62,6 +62,19 @@ class Attendance extends Model
 
     public const PHAN = ['in' => 'Vào', 'out' => 'Ra'];
 
+    /** Bấm "Chấm công ra" trong ngần này phút sau giờ vào → hỏi lại cho chắc (hay bấm nhầm) */
+    public const PHUT_HOI_LAI_KHI_RA = 30;
+
+    /** Các cột riêng của một lượt chấm ("in_…" / "out_…") — gỡ lượt là xoá hết */
+    public const COT_LUOT = ['at', 'source', 'lat', 'lng', 'accuracy', 'distance', 'location', 'photo',
+        'face_distance', 'face_ok', 'reason', 'device', 'location_error', 'scan_ms'];
+
+    /** Lần gỡ gần nhất của phần vào / ra (để ghi chú cho nhân viên) */
+    public function lanGo(string $p): ?array
+    {
+        return collect((array) $this->removals)->where('phan', $p)->last();
+    }
+
     protected $guarded = ['id'];
 
     protected $casts = [
@@ -83,6 +96,7 @@ class Attendance extends Model
         'early_minutes' => 'integer',
         'in_scan_ms' => 'integer',
         'out_scan_ms' => 'integer',
+        'removals' => 'array',
     ];
 
     protected static function booted(): void
@@ -268,7 +282,7 @@ class Attendance extends Model
     {
         // Không ghi toạ độ / ảnh vào nhật ký — chỉ giờ và việc duyệt
         return LogOptions::defaults()
-            ->logOnly(['in_at', 'out_at', 'in_source', 'out_source', 'review_status', 'review_note'])
+            ->logOnly(['in_at', 'out_at', 'in_source', 'out_source', 'review_status', 'review_note', 'removals'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('attendance');

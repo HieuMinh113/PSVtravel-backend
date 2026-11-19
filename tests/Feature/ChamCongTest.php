@@ -903,4 +903,110 @@ class ChamCongTest extends TestCase
         Storage::disk('rieng')->assertExists($moi->in_photo);
         Storage::disk('rieng')->assertExists(AttendanceFace::sole()->photo); // ảnh đăng ký không xoá
     }
+
+    /** Quản lý được quyền gỡ lượt chấm bấm nhầm (mặc định Admin) */
+    private function nguoiGo(): User
+    {
+        return $this->quanLy()->givePermissionTo(Permission::findOrCreate('Remove:Attendance', 'web'));
+    }
+
+    public function test_go_gio_ra_bam_nham_roi_cuoi_ngay_cham_ra_lai_du_cong(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->cham($u, 'vao');                                     // 07:50
+        $this->travelTo(Carbon::parse('2026-10-12 07:52'));
+        $kq = $this->cham($u, 'ra', ['ly_do' => 'bấm nhầm']);      // bấm nhầm nút ngay cạnh
+        $this->assertTrue($kq['ok']);
+        $a = Attendance::sole();
+        $this->assertSame('cho_duyet', $a->review_status);
+        $this->assertGreaterThan(0, $a->early_minutes);
+        $anhRa = $a->out_photo;
+        Storage::disk('rieng')->assertExists($anhRa);
+
+        app(DichVu::class)->goLuot($a, 'ra', 'Bấm nhầm chấm ra ngay sau khi chấm vào', $this->nguoiGo());
+
+        $a->refresh();
+        $this->assertNull($a->out_at);
+        $this->assertNull($a->out_reason);
+        $this->assertNull($a->out_photo);
+        Storage::disk('rieng')->assertMissing($anhRa);
+        $this->assertSame(0, $a->early_minutes);
+        $this->assertNull($a->review_status);                       // hết gì phải duyệt
+        $this->assertSame('07:50', $a->in_at->format('H:i'));       // giờ vào giữ nguyên
+        $this->assertSame('07:52', $a->lanGo('out')['gio']);
+        $this->assertSame('Quản lý', $a->lanGo('out')['nguoi']);
+        $this->assertSame('Đã gỡ 07:52: Bấm nhầm chấm ra ngay sau khi chấm vào', BangChamCongCot::moTa($a, 'out'));
+
+        // Cuối ngày chấm ra bình thường → đủ 1 công, không phải duyệt gì
+        $this->travelTo(Carbon::parse('2026-10-12 17:35'));
+        $this->assertTrue($this->cham($u, 'ra')['ok']);
+        $a->refresh();
+        $this->assertSame('17:35', $a->out_at->format('H:i'));
+        $this->assertSame(1.0, $a->cong());
+        $this->assertNull($a->review_status);
+    }
+
+    public function test_go_gio_vao_thi_cham_vao_lai_duoc(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->cham($u, 'vao');
+        $this->assertFalse($this->cham($u, 'vao')['ok']);           // đã chấm vào thì không chấm vào nữa
+
+        app(DichVu::class)->goLuot(Attendance::sole(), 'vao', 'Chấm nhầm máy', $this->nguoiGo());
+        $this->assertNull(Attendance::sole()->in_at);
+
+        $this->travelTo(Carbon::parse('2026-10-12 07:58'));
+        $this->assertTrue($this->cham($u, 'vao')['ok']);
+        $this->assertSame('07:58', Attendance::sole()->in_at->format('H:i'));
+    }
+
+    public function test_go_luot_chi_nguoi_co_quyen_va_phai_ghi_ly_do(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $this->cham($u, 'vao');
+        $this->travelTo(Carbon::parse('2026-10-12 07:52'));
+        $this->cham($u, 'ra', ['ly_do' => 'bấm nhầm']);
+        $a = Attendance::sole();
+
+        // Quyền mặc định của Admin (máy mới cài cũng có)
+        $this->seed(RoleSeeder::class);
+        $this->assertTrue(Role::findByName('admin', 'web')->hasPermissionTo('Remove:Attendance'));
+
+        // Quản lý chấm công nhưng không có quyền gỡ: không thấy nút
+        $this->actingAs($this->quanLy());
+        Livewire::test(ListAttendances::class)->assertTableActionHidden('go', $a);
+
+        $this->actingAs($this->nguoiGo());
+        Livewire::test(ListAttendances::class)
+            ->assertTableActionVisible('go', $a)
+            ->callTableAction('go', $a, data: ['chon' => 'ra', 'ly_do' => ''])
+            ->assertHasTableActionErrors(['ly_do' => 'required']);
+        $this->assertNotNull($a->fresh()->out_at);
+
+        Livewire::test(ListAttendances::class)
+            ->callTableAction('go', $a, data: ['chon' => 'ra', 'ly_do' => 'Bấm nhầm'])
+            ->assertHasNoTableActionErrors();
+        $this->assertNull($a->fresh()->out_at);
+        $this->assertNotNull($a->fresh()->in_at);
+
+        // Không còn giờ ra để gỡ
+        $this->expectException(\InvalidArgumentException::class);
+        app(DichVu::class)->goLuot($a->fresh(), 'ra', 'Gỡ lần nữa', $this->nguoiGo());
+    }
+
+    public function test_cham_vao_tra_ve_gio_de_trinh_duyet_hoi_lai_khi_cham_ra(): void
+    {
+        $u = $this->nhanVien();
+        $this->dangKy($u);
+        $kq = $this->cham($u, 'vao');
+        $this->assertSame('2026-10-12T07:50:00+07:00', $kq['luc']);
+
+        $this->actingAs($u);
+        $trang = Livewire::test(ChamCong::class)->instance()->duLieuTrang();
+        $this->assertSame('2026-10-12T07:50:00+07:00', $trang['gioVao']);
+        $this->assertSame(Attendance::PHUT_HOI_LAI_KHI_RA, $trang['phutHoiLai']);
+    }
 }

@@ -102,7 +102,7 @@ const choKhungHinh = (v, ms = 6000) =>
         v.addEventListener('playing', thu)
     })
 
-export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDangKy = true }) {
+export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDangKy = true, gioVao = null, phutHoiLai = 30 }) {
     const DIEN_THOAI = laDienThoai()
     let faceapi = null
     let taiPhatHien = null // thư viện + bộ dò mặt (nhẹ) — đủ để nhắc lại gần / vào giữa
@@ -230,6 +230,7 @@ export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDa
         buoc: 'cho', // cho | hoi_vi_tri | vi_tri_chan | quet | khong_nhan | ly_do | xong
         pha: '', // trong lúc quét: mo | tim | chinh | giu | xac_minh | truot | khop
         loai: null, // vao | ra | dang_ky
+        gioVao, // giờ chấm vào hôm nay (ISO) — để hỏi lại khi bấm chấm ra ngay sau đó
         dongY: false,
         goiY: '',
         tienDo: 0,
@@ -317,6 +318,7 @@ export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDa
 
         async batDau(loai) {
             if (this.dangMo) return // bấm hai lần liền
+            if (loai === 'ra' && !this.chacChamRa()) return
             this.datLai()
             const luot = ++this._luot
             this.loai = loai
@@ -846,6 +848,7 @@ export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDa
                 return
             }
             this.buoc = 'xong'
+            if (this.loai === 'vao' && kq.luc) this.gioVao = kq.luc
             if (this.loai !== 'dang_ky') {
                 // Chấm xong → tắt GPS cho đỡ tốn pin (bấm chấm lần sau sẽ bật lại)
                 this.tatViTri()
@@ -853,6 +856,18 @@ export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDa
             }
             this.thongBao = kq.thong_bao
             this.canhBao = kq.canh_bao || []
+        },
+
+        /**
+         * Vừa chấm vào (trong phutHoiLai phút) mà bấm "Chấm công ra" → hỏi lại: hay
+         * bấm nhầm nút ngay cạnh, lưu giờ ra sai thì cả ngày bị tính về sớm.
+         */
+        chacChamRa() {
+            const vao = this.gioVao ? new Date(this.gioVao) : null
+            const phut = vao ? (Date.now() - vao.getTime()) / 60000 : -1
+            if (!vao || phut < 0 || phut >= phutHoiLai) return true
+            const gio = vao.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
+            return window.confirm(`Bạn vừa chấm VÀO lúc ${gio} (cách đây ${Math.max(1, Math.round(phut))} phút).\n\nChắc chắn chấm RA bây giờ?`)
         },
 
         /** Quét mãi không khớp: chấm bằng ảnh vừa chụp, quản lý xem lại (đánh dấu nghi vấn). */

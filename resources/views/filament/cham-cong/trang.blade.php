@@ -9,7 +9,7 @@
 <div
     x-load
     x-load-src="{{ $js }}"
-    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh), wasm: @js($wasm), canViTri: @js($coToaDo), daDangKy: @js($daDangKy) })"
+    x-data="chamCong({ thuVien: @js($thuVien), moHinh: @js($moHinh), wasm: @js($wasm), canViTri: @js($coToaDo), daDangKy: @js($daDangKy), gioVao: @js($gioVao), phutHoiLai: @js($phutHoiLai) })"
     wire:ignore.self
     style="display:grid;gap:16px"
 >

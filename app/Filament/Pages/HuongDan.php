@@ -96,7 +96,8 @@ class HuongDan extends Page
                             'Thấy "Trình duyệt đang chặn vị trí": làm theo hướng dẫn hiện ngay dưới nút (iPhone / Android / máy tính) rồi tải lại trang.',
                             'Trễ quá số phút công ty quy định, về sớm hoặc đang ở ngoài công ty: hệ thống hỏi lý do — ghi ngắn gọn để được duyệt.',
                             '**Chấm ở ngoài công ty** (hoặc không cho phép vị trí) phải được quản lý duyệt — không duyệt thì **cả ngày 0 công**. Lỡ chấm vào ở ngoài thì tới công ty bấm **Chấm vào lại tại công ty** — giờ vào lấy theo lúc chấm lại.',
-                            '**Về sớm, quên chấm vào hoặc quên chấm ra** thì ngày đó chỉ tính **nửa công** (0,5 ngày thường, 0,25 thứ 7), trừ khi quản lý chấp nhận lý do về sớm hoặc duyệt giờ bổ sung. Lỡ bấm ra sớm thì cuối giờ chấm ra lại.',
+                            '**Về sớm, quên chấm vào hoặc quên chấm ra** thì ngày đó chỉ tính **nửa công** (0,5 ngày thường, 0,25 thứ 7), trừ khi quản lý chấp nhận lý do về sớm hoặc duyệt giờ bổ sung. Lỡ bấm ra sớm thì cuối giờ chấm ra lại, hoặc nhờ quản lý **gỡ** lượt bấm nhầm.',
+                            'Bấm **Chấm công ra** ngay sau khi vừa chấm vào (trong 30 phút), hệ thống hỏi lại cho chắc — bấm nhầm thì chọn Huỷ.',
                             'Quên chấm: bấm **Xin bổ sung công**, chọn ngày, giờ thực tế và lý do.',
                         ],
                         'luu_y' => 'Ảnh chấm công là dữ liệu khuôn mặt (dữ liệu nhạy cảm), chỉ dùng để chấm công và tự xoá sau 3 tháng.',
@@ -481,6 +482,7 @@ class HuongDan extends Page
                             '**Cấu hình chấm công**: toạ độ công ty, bán kính, giờ vào / ra, số phút được trễ.',
                             '**Khuôn mặt nhân viên**: xoá khuôn mặt đã đăng ký khi nhân viên cần đăng ký lại.',
                             'Bảng chấm công → **Xem**: "Vì sao" cho biết lý do không có vị trí (chưa cho phép, chờ GPS lâu, sai số lớn…), kèm loại máy (điện thoại / máy tính) và thời gian quét.',
+                            'Bảng chấm công → **Gỡ**: gỡ lượt chấm bấm nhầm (VD vừa chấm vào đã bấm chấm ra) — chọn giờ vào / ra, ghi lý do; nhân viên thấy ghi chú "Đã gỡ…". Gỡ trong ngày thì nhân viên chấm lại bình thường, ngày đã qua thì nhân viên **Xin bổ sung công**. Chỉ người có quyền "Gỡ lượt chấm công bấm nhầm" (mặc định Admin) thấy nút này.',
                         ],
                     ],
                     [

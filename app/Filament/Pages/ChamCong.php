@@ -81,6 +81,9 @@ class ChamCong extends Page implements HasTable
             'daDangKy' => AttendanceFace::where('user_id', auth()->id())->exists(),
             'coToaDo' => CauHinhChamCong::toaDo() !== null,
             'laQuanLy' => (bool) auth()->user()?->can('ViewAll:Attendance'),
+            // Bấm "Chấm công ra" ngay sau khi chấm vào → trình duyệt hỏi lại (hay bấm nhầm)
+            'gioVao' => $homNay?->in_at?->toIso8601String(),
+            'phutHoiLai' => Attendance::PHUT_HOI_LAI_KHI_RA,
             'js' => asset('js/psv/cham-cong.js').'?v='.@filemtime(public_path('js/psv/cham-cong.js')),
             'thuVien' => asset('vendor/face-api/face-api.js'),
             'moHinh' => asset('vendor/face-api/model'),

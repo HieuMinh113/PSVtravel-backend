@@ -258,6 +258,7 @@ return [
         'Approve:Payment' => 'Duyệt khoản thu (đã nhận tiền)',
         'ViewAll:Booking' => 'Xem mọi đơn, đổi người phụ trách',
         'ViewAll:Attendance' => 'Quản lý chấm công mọi người',
+        'Remove:Attendance' => 'Gỡ lượt chấm công bấm nhầm',
         'ViewAll:VisaCase' => 'Xem mọi hồ sơ visa, giao hồ sơ',
         'Scan:Voucher' => 'Quét voucher, đánh dấu đã dùng',
     ],
