@@ -936,7 +936,7 @@ class ChamCongTest extends TestCase
         $this->assertSame('07:50', $a->in_at->format('H:i'));       // giờ vào giữ nguyên
         $this->assertSame('07:52', $a->lanGo('out')['gio']);
         $this->assertSame('Quản lý', $a->lanGo('out')['nguoi']);
-        $this->assertSame('Đã gỡ 07:52: Bấm nhầm chấm ra ngay sau khi chấm vào', BangChamCongCot::moTa($a, 'out'));
+        $this->assertSame('Đã gỡ giờ ra 07:52: Bấm nhầm chấm ra ngay sau khi chấm vào', BangChamCongCot::lyDo($a));
 
         // Cuối ngày chấm ra bình thường → đủ 1 công, không phải duyệt gì
         $this->travelTo(Carbon::parse('2026-10-12 17:35'));

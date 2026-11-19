@@ -51,7 +51,7 @@ class BangChamCongCot
         }
         $cot[] = TextColumn::make('ly_do')
             ->label('Lý do')
-            ->state(fn (Attendance $r) => collect([$r->in_reason ? 'Vào: '.$r->in_reason : null, $r->out_reason ? 'Ra: '.$r->out_reason : null])->filter()->implode("\n") ?: null)
+            ->state(fn (Attendance $r) => self::lyDo($r))
             ->placeholder('—')
             ->wrap()
             ->lineClamp(3);
@@ -68,13 +68,23 @@ class BangChamCongCot
         return $cot;
     }
 
-    /** "Trễ 12' · Ngoài công ty 2,3 km · Khuôn mặt chưa khớp · Bổ sung" — lượt đã gỡ: "Đã gỡ 08:02: bấm nhầm" */
+    /**
+     * Cột Lý do: lượt quản lý đã gỡ (đặt đầu cho nhân viên thấy ngay) rồi lý do
+     * nhân viên ghi lúc chấm. "Đã gỡ giờ ra 07:57: bấm nhầm\nVào: kẹt xe"
+     */
+    public static function lyDo(Attendance $r): ?string
+    {
+        return collect((array) $r->removals)
+            ->map(fn (array $g) => 'Đã gỡ giờ '.(($g['phan'] ?? '') === 'in' ? 'vào' : 'ra').' '.($g['gio'] ?? '').': '.($g['ly_do'] ?? ''))
+            ->push($r->in_reason ? 'Vào: '.$r->in_reason : null, $r->out_reason ? 'Ra: '.$r->out_reason : null)
+            ->filter()->implode("\n") ?: null;
+    }
+
+    /** "Trễ 12' · Ngoài công ty 2,3 km · Khuôn mặt chưa khớp · Bổ sung" */
     public static function moTa(Attendance $r, string $p): ?string
     {
         if (! $r->{"{$p}_at"}) {
-            $go = $r->lanGo($p);
-
-            return $go ? 'Đã gỡ '.$go['gio'].': '.$go['ly_do'] : null;
+            return null;
         }
         $cach = $r->{"{$p}_distance"};
 

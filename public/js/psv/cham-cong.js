@@ -866,7 +866,8 @@ export default function chamCong({ thuVien, moHinh, wasm, canViTri = false, daDa
             const vao = this.gioVao ? new Date(this.gioVao) : null
             const phut = vao ? (Date.now() - vao.getTime()) / 60000 : -1
             if (!vao || phut < 0 || phut >= phutHoiLai) return true
-            const gio = vao.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
+            // Giờ công ty (máy nhân viên lỡ để sai múi giờ vẫn hiện đúng như bảng chấm công)
+            const gio = vao.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' })
             return window.confirm(`Bạn vừa chấm VÀO lúc ${gio} (cách đây ${Math.max(1, Math.round(phut))} phút).\n\nChắc chắn chấm RA bây giờ?`)
         },
 
