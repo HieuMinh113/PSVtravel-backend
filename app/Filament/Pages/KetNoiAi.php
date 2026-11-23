@@ -21,7 +21,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Kết nối trợ lý AI trên máy tính (Claude Code, Claude Desktop…) vào máy chủ MCP
- * nội bộ để soạn bài cẩm nang nháp. Mỗi Admin tự tạo mã khoá cho máy của mình,
+ * nội bộ (xem số liệu quản trị, soạn bài cẩm nang nháp). Mỗi Admin tự tạo mã khoá cho máy của mình,
  * thu hồi khi đổi máy / nghi lộ mã. Chỉ vai trò Admin.
  */
 class KetNoiAi extends Page implements HasTable

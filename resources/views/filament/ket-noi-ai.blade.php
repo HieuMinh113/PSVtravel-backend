@@ -47,11 +47,17 @@
 
     <div style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)">
         <p style="margin:0 0 .5rem">
-            Trợ lý AI trên máy tính của bạn (Claude Code, Claude Desktop…) đọc tài liệu, ảnh trong thư mục bạn chỉ định rồi
-            <strong>tạo bài cẩm nang nháp</strong> trên website. AI <strong>không đăng được</strong> — bạn vào
-            <strong>Nội dung website → Cẩm nang</strong> xem lại, chọn ảnh bìa rồi bấm Đăng.
+            Trợ lý AI trên máy tính của bạn (Claude Code, Claude Desktop, Codex…) làm được hai việc:
         </p>
-        <p style="margin:0">Địa chỉ máy chủ: <code>{{ $diaChi }}</code> · Mã khoá hết hạn sau {{ $soNgay }} ngày · Chỉ tài khoản Admin có quyền viết cẩm nang dùng được.</p>
+        <ul style="margin:0 0 .5rem 1.25rem;list-style:disc">
+            <li><strong>Xem số liệu quản trị</strong>: doanh số tháng, tìm đơn tour / Maldives, tin liên hệ chưa xử lý, đợt khởi hành sắp tới,
+                bảng công tháng, hồ sơ visa đang làm, tra voucher, đánh giá. <strong>Chỉ xem</strong>, không sửa được gì; số điện thoại / email
+                khách bị che bớt; không có hộ chiếu, ảnh, vị trí, tệp giấy tờ. Ví dụ: <em>"Doanh số tháng này ai cao nhất?"</em>,
+                <em>"Đợt nào đi trong 30 ngày tới còn trống nhiều?"</em></li>
+            <li><strong>Soạn bài cẩm nang nháp</strong> từ tài liệu, ảnh trong thư mục bạn chỉ định. AI <strong>không đăng được</strong> — bạn vào
+                <strong>Nội dung website → Cẩm nang</strong> xem lại, chọn ảnh bìa rồi bấm Đăng.</li>
+        </ul>
+        <p style="margin:0">Địa chỉ máy chủ: <code>{{ $diaChi }}</code> · Mã khoá hết hạn sau {{ $soNgay }} ngày · Chỉ tài khoản Admin dùng được, và AI chỉ xem / làm được phần tài khoản đó đã được tick quyền trong Vai trò.</p>
     </div>
 
     <details style="padding:1rem;border-radius:12px;border:1px solid rgba(0,0,0,.1)" @if ($maMoi) open @endif>

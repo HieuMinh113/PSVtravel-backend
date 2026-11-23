@@ -78,8 +78,10 @@ class McpNoiBoTest extends TestCase
         // Mã MCP của Admin → vào được; không có công cụ nào đăng bài
         $ma = MaKhoaMcp::tao($admin, 'Laptop');
         $ten = collect($this->goi($ma, 'tools/list')->assertOk()->json('result.tools'))->pluck('name')->sort()->values()->all();
-        $this->assertSame(['create_guide_draft', 'get_guide', 'get_tour', 'guide_options', 'request_image_upload',
-            'search_guides_admin', 'search_tours', 'update_guide_draft'], $ten);
+        $this->assertSame(['attendance_month', 'create_guide_draft', 'get_booking', 'get_guide', 'get_tour', 'guide_options',
+            'lookup_voucher', 'request_image_upload', 'sales_report', 'search_bookings', 'search_contact_messages',
+            'search_guides_admin', 'search_maldives_bookings', 'search_reviews', 'search_tours', 'upcoming_departures',
+            'update_guide_draft', 'visa_cases'], $ten);
 
         // Admin bị hạ quyền → mã cũ hết tác dụng ngay
         $admin->syncRoles([Role::findOrCreate('staff', 'web')]);

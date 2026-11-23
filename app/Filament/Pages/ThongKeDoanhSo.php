@@ -215,7 +215,7 @@ class ThongKeDoanhSo extends Page implements HasTable
     }
 
     /** @param  Collection<int, Booking>  $g */
-    private static function cong(Collection $g, string $ten, bool $tong = false): array
+    public static function cong(Collection $g, string $ten, bool $tong = false): array
     {
         $con = $g->where('status', '!=', 'cancelled');
         $tien = $con->countBy(fn (Booking $b) => $b->tinhTrangTien());
