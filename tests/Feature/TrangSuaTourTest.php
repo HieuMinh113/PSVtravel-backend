@@ -50,28 +50,21 @@ class TrangSuaTourTest extends TestCase
         $this->assertSame('Hành trình duyên hải Vĩnh Hy – Nha Trang', $tour->fresh()->name);
     }
 
-    /** Thẻ tour ngoài web khung 16:9: ảnh bìa mới phải đúng 16:9; ảnh cũ lệch tỉ lệ vẫn lưu được */
-    public function test_anh_bia_tai_moi_phai_dung_ti_le_16_9(): void
+    /** Thẻ tour ngoài web hiện trọn ảnh: ảnh bìa tỉ lệ nào cũng tải lên được, không bắt cắt 16:9 */
+    public function test_anh_bia_ti_le_nao_cung_tai_len_duoc(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('tours/cu-4-3.jpg', UploadedFile::fake()->image('cu.jpg', 1200, 900)->getContent());
-        $tour = Tour::create(['slug' => 'seoul', 'name' => 'Seoul Nami', 'type' => 'abroad', 'status' => 'published',
-            'adult_price' => 17_990_000, 'cover_image' => 'tours/cu-4-3.jpg']);
-        $trang = fn () => Livewire::test(EditTour::class, ['record' => $tour->getRouteKey()]);
+        $tour = Tour::create(['slug' => 'seoul', 'name' => 'Seoul Nami', 'type' => 'abroad', 'status' => 'published', 'adult_price' => 17_990_000]);
 
-        // Ảnh cũ 4:3 có sẵn: sửa chỗ khác vẫn lưu bình thường
-        $trang()->fillForm(['name' => 'Seoul - Nami - Lotte'])->call('save')->assertHasNoFormErrors();
-        $this->assertSame('tours/cu-4-3.jpg', $tour->fresh()->cover_image);
-
-        // Tải ảnh mới 4:3 → báo phải cắt lại 16:9
-        $trang()->fillForm(['cover_image' => [UploadedFile::fake()->image('bia.jpg', 1200, 900)]])->call('save')
-            ->assertHasFormErrors(['cover_image']);
-
-        // Ảnh 16:9 → lưu được
-        // (mảng = thay hẳn ảnh cũ, như người dùng xoá ảnh cũ rồi tải ảnh mới)
-        $trang()->fillForm(['cover_image' => [UploadedFile::fake()->image('bia.jpg', 1600, 900)]])->call('save')->assertHasNoFormErrors();
-        $this->assertNotSame('tours/cu-4-3.jpg', $tour->fresh()->cover_image);
-        Storage::disk('public')->assertExists($tour->fresh()->cover_image);
+        foreach ([[1200, 900], [900, 1600], [1600, 900]] as [$rong, $cao]) {
+            // (mảng = thay hẳn ảnh cũ, như người dùng xoá ảnh cũ rồi tải ảnh mới)
+            Livewire::test(EditTour::class, ['record' => $tour->getRouteKey()])
+                ->fillForm(['cover_image' => [UploadedFile::fake()->image('bia.jpg', $rong, $cao)]])
+                ->call('save')
+                ->assertHasNoFormErrors();
+            [$w, $h] = getimagesize(Storage::disk('public')->path($tour->fresh()->cover_image));
+            $this->assertSame([$rong, $cao], [$w, $h], 'ảnh lưu nguyên, không bị cắt');
+        }
     }
 
     public function test_tao_tour_xong_mo_trang_sua_tour_vua_tao(): void
