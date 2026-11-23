@@ -292,10 +292,9 @@ class TourForm
                 TextInput::make('tag')
                     ->label('Nhãn (Bán chạy / Mới…)')
                     ->maxLength(255),
-                // Thẻ tour ngoài website khung 16:9 và luôn hiện TRỌN ảnh: ảnh khác
-                // tỉ lệ có nền mờ của chính ảnh ở phần trống. Không bắt cắt khi tải
-                // lên (công ty muốn giữ nguyên ảnh); muốn ảnh lấp kín khung thì bấm
-                // biểu tượng bút trên ảnh, chọn 16:9 rồi cắt.
+                // Thẻ tour ngoài website khung 16:9, ảnh phủ kín (lệch tỉ lệ thì cắt
+                // ở giữa). Không bắt cắt khi tải lên; bút chỉnh ảnh có sẵn 16:9 để
+                // tự chọn phần hiện trên thẻ.
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
                     ->image()->acceptedFileTypes(TepTaiLen::ANH)
@@ -303,7 +302,7 @@ class TourForm
                     ->disk('public')
                     ->imageEditor()
                     ->imageEditorAspectRatioOptions(['16:9', null])
-                    ->helperText('Thẻ tour trên website luôn hiện đầy đủ ảnh. Ảnh đúng tỉ lệ 16:9 (ví dụ 1600×900) sẽ lấp kín khung; ảnh khác tỉ lệ có nền mờ ở hai bên hoặc trên dưới. Muốn lấp kín khung: bấm biểu tượng bút trên ảnh, chọn 16:9 rồi cắt (không bắt buộc).'),
+                    ->helperText('Thẻ tour trên website hiển thị ảnh theo khung 16:9 (ví dụ 1600×900). Ảnh khác tỉ lệ sẽ bị cắt bớt phần thừa ở giữa — muốn tự chọn phần hiện ra: bấm biểu tượng bút trên ảnh, chọn 16:9 rồi kéo khung cắt.'),
 
                 // Chỉ lưu LINK YouTube — video do YouTube phát, không tốn ổ đĩa
                 // hay băng thông máy chủ. Để trống thì trang tour ẩn khối video.

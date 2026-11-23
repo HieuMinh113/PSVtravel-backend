@@ -50,7 +50,7 @@ class TrangSuaTourTest extends TestCase
         $this->assertSame('Hành trình duyên hải Vĩnh Hy – Nha Trang', $tour->fresh()->name);
     }
 
-    /** Thẻ tour ngoài web hiện trọn ảnh: ảnh bìa tỉ lệ nào cũng tải lên được, không bắt cắt 16:9 */
+    /** Ảnh bìa tỉ lệ nào cũng tải lên được, không bắt cắt 16:9 (cắt hay không do người tải chọn) */
     public function test_anh_bia_ti_le_nao_cung_tai_len_duoc(): void
     {
         Storage::fake('public');
