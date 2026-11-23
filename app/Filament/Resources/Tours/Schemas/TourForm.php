@@ -292,11 +292,21 @@ class TourForm
                 TextInput::make('tag')
                     ->label('Nhãn (Bán chạy / Mới…)')
                     ->maxLength(255),
+                // Thẻ tour ngoài website có khung ảnh 16:9. Ảnh tải lên khác tỉ lệ
+                // thì tự mở khung cắt (khoá 16:9) để người tải chọn phần giữ lại —
+                // trước đây web tự cắt giữa ảnh, banner mất chữ hai bên. Ảnh cũ
+                // không bị bắt lỗi khi lưu; bấm biểu tượng bút trên ảnh để chỉnh.
                 FileUpload::make('cover_image')
                     ->label('Ảnh bìa')
                     ->image()->acceptedFileTypes(TepTaiLen::ANH)
                     ->directory('tours')
-                    ->disk('public'),
+                    ->disk('public')
+                    ->imageEditor()
+                    ->imageEditorAspectRatioOptions(['16:9'])
+                    ->imageAspectRatio('16:9')
+                    ->automaticallyOpenImageEditorForAspectRatio()
+                    ->validationMessages(['dimensions' => 'Ảnh bìa phải đúng tỉ lệ 16:9 — cắt lại ảnh trong khung chỉnh ảnh.'])
+                    ->helperText('Thẻ tour trên website hiển thị ảnh theo tỉ lệ 16:9 (ví dụ 1600×900). Ảnh khác tỉ lệ sẽ mở khung cắt để bạn chọn phần giữ lại; ảnh đã tải thì bấm biểu tượng bút trên ảnh để chỉnh.'),
 
                 // Chỉ lưu LINK YouTube — video do YouTube phát, không tốn ổ đĩa
                 // hay băng thông máy chủ. Để trống thì trang tour ẩn khối video.

@@ -8,6 +8,8 @@ use App\Filament\Resources\Tours\Pages\ListTours;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Modules\Category\Models\Category;
 use Modules\Tour\Models\Tour;
@@ -46,6 +48,30 @@ class TrangSuaTourTest extends TestCase
             ->assertNoRedirect();
 
         $this->assertSame('Hành trình duyên hải Vĩnh Hy – Nha Trang', $tour->fresh()->name);
+    }
+
+    /** Thẻ tour ngoài web khung 16:9: ảnh bìa mới phải đúng 16:9; ảnh cũ lệch tỉ lệ vẫn lưu được */
+    public function test_anh_bia_tai_moi_phai_dung_ti_le_16_9(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('tours/cu-4-3.jpg', UploadedFile::fake()->image('cu.jpg', 1200, 900)->getContent());
+        $tour = Tour::create(['slug' => 'seoul', 'name' => 'Seoul Nami', 'type' => 'abroad', 'status' => 'published',
+            'adult_price' => 17_990_000, 'cover_image' => 'tours/cu-4-3.jpg']);
+        $trang = fn () => Livewire::test(EditTour::class, ['record' => $tour->getRouteKey()]);
+
+        // Ảnh cũ 4:3 có sẵn: sửa chỗ khác vẫn lưu bình thường
+        $trang()->fillForm(['name' => 'Seoul - Nami - Lotte'])->call('save')->assertHasNoFormErrors();
+        $this->assertSame('tours/cu-4-3.jpg', $tour->fresh()->cover_image);
+
+        // Tải ảnh mới 4:3 → báo phải cắt lại 16:9
+        $trang()->fillForm(['cover_image' => [UploadedFile::fake()->image('bia.jpg', 1200, 900)]])->call('save')
+            ->assertHasFormErrors(['cover_image']);
+
+        // Ảnh 16:9 → lưu được
+        // (mảng = thay hẳn ảnh cũ, như người dùng xoá ảnh cũ rồi tải ảnh mới)
+        $trang()->fillForm(['cover_image' => [UploadedFile::fake()->image('bia.jpg', 1600, 900)]])->call('save')->assertHasNoFormErrors();
+        $this->assertNotSame('tours/cu-4-3.jpg', $tour->fresh()->cover_image);
+        Storage::disk('public')->assertExists($tour->fresh()->cover_image);
     }
 
     public function test_tao_tour_xong_mo_trang_sua_tour_vua_tao(): void
