@@ -2,7 +2,6 @@
 
 | Tệp | Dùng cho | Cách dùng |
 |---|---|---|
-| `ban-giao/` | Bàn giao website cho người tiếp quản | Đọc `ban-giao/00-BAT-DAU-TU-DAY.md` trước |
 | `mau-bao-gia-doanh-nghiep.xlsx` | Sales — báo giá nhanh du lịch công ty / team building | Sheet "Hướng dẫn". Lần đầu điền giá thật ở "Bảng đơn giá"; mỗi khách chép sheet "Báo giá" |
 | `theo-doi-trich-dan-ai.xlsx` | Marketing — PSV có được ChatGPT / Perplexity / Gemini nhắc tới không | Mỗi tháng hỏi 20 câu ở sheet "Câu hỏi", mỗi câu 3 lần / nền tảng, ghi ở "Theo dõi"; "Tổng hợp" tự tính tỉ lệ |
 
