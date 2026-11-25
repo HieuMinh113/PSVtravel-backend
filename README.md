@@ -5,6 +5,8 @@ Laravel 13 · Filament 5 · PostgreSQL 16 · Redis 7 · chạy bằng Docker.
 
 Frontend nằm ở repo riêng: `psvtravel-frontend`.
 
+Người tiếp quản website: đọc `tai-lieu/ban-giao/00-BAT-DAU-TU-DAY.md` trước.
+
 ---
 
 ## Dựng môi trường lần đầu
